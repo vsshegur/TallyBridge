@@ -53,7 +53,7 @@ final class CryptoStore {
     }
     String get(String key) {return prefs.getString(key,"");}
     void put(String key,String value) {prefs.edit().putString(key,value).apply();}
-    synchronized void reset() throws Exception {prefs.edit().clear().commit();keys.deleteEntry(SIGN);keys.deleteEntry(SECRET);}
+    synchronized void reset() throws Exception {if(!prefs.edit().clear().commit())throw new Exception("Could not clear saved sign-in. Try resetting again.");keys.deleteEntry(SIGN);keys.deleteEntry(SECRET);}
     static String b64(byte[] bytes){return Base64.encodeToString(bytes,Base64.NO_WRAP);}
     static String url64(byte[] bytes){return Base64.encodeToString(bytes,Base64.NO_WRAP|Base64.URL_SAFE|Base64.NO_PADDING);}
     static String random(){byte[] b=new byte[32];new SecureRandom().nextBytes(b);return url64(b);}
