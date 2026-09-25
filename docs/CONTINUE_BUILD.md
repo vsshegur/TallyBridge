@@ -19,17 +19,13 @@ Implemented in this tree:
 - preserved Tally gate/cache/PDF/bank behavior;
 - Windows preview binaries built and checked.
 
-Blocked: no Android SDK/platform or build tools in the build environment; Google
-SDK/Maven download hosts time out. Do not pretend Java syntax parsing constitutes
-an Android build. No APK was generated. SDK platform 35 and Linux build-tools
-35.0.0 are sufficient to try build-offline.sh (no Gradle dependencies required).
-A JDK17 runtime with jdk.compiler exists; `java -m jdk.compiler/com.sun.tools.javac.Main`
-works even though the javac launcher executable is missing. For normal builds,
-use Android Studio or the included Windows bootstrap helper.
+GitHub repository: https://github.com/vsshegur/TallyBridge
+Build 2 passed both platforms: https://github.com/vsshegur/TallyBridge/actions/runs/36102780940
+Android and Windows artifacts are available. Detailed owner steps are in
+CLOUDFLARE_SETUP.md. The local SDK remains unavailable, but CI builds successfully.
 
 Next required work:
-1. Obtain authorized SDK tools in the build environment, compile, fix API errors,
-   run lint and sign a preview APK. Keep signing keys private and persistent.
+1. Establish a stable private release signing key before production distribution.
 2. Test Google/Access login on an owner's actual configured domain. Check dynamic
    registration, PKCE, token refresh and expiry. No service secret belongs in APK.
 3. Test native UI on Android, including system back, background lock, lifecycle,

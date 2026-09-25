@@ -1,7 +1,9 @@
 # Owner setup — each installation is independent
 
 Do not install the 2.0 Windows preview over your working 1.6 setup until the
-Android APK has been built. This build does not include an APK.
+Android APK has been tested on your devices. Windows and Android CI builds now pass.
+Download artifacts from [run 2](https://github.com/vsshegur/TallyBridge/actions/runs/36102780940).
+For click-by-click instructions, read [CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md).
 
 ## 1. Prepare the owner's PC
 

@@ -26,11 +26,18 @@
 - Windows x64 GUI binaries cross-compiled. Installer's embedded main program and
   uninstaller exactly match the standalone outputs.
 
+## Passed in GitHub Actions
+
+[Run 2](https://github.com/vsshegur/TallyBridge/actions/runs/36102780940), source
+commit `88d7107884c796e7b18c4ecfc7d215891e11a266`:
+- Windows backend tests, vet and all three executable builds.
+- Android SDK 35 compilation, D8, debug APK packaging/signing and lint.
+- Both build artifacts downloaded; archive SHA-256 matched GitHub's artifact digests.
+- Lint errors fixed using named layout constants; explicit backup/transfer exclusions
+  added and failed preference clearing now reported. Nonblocking warnings remain.
+
 ## Not passed / still required
 
-- Android SDK compile/API type checking, Android lint, D8 and APK signing were
-  not run here: SDK downloads and dependency hosts time out through the available
-  network. There is no installable APK in this package.
 - Build-Android.cmd/ps1 and build-offline.sh were provided but not executed against
   a real Android SDK. They are reproducible build entry points, not proof of a
   successful Android build.
@@ -42,4 +49,4 @@
   Existing PDF tests validate templates/data, not the Windows runtime here.
 
 The implementation remains a preview until these release gates are completed.
-Do not describe it as bug-free, production-ready, fully tested or an APK delivery.
+Do not describe it as bug-free, production-ready, fully tested or a production release.

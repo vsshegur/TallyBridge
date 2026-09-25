@@ -1,6 +1,7 @@
 # Git and automatic builds
 
-This project is stored in a local Git repository on branch `main`. Its source
+This project is published at https://github.com/vsshegur/TallyBridge on branch `main`.
+Windows and Android builds passed in Actions run 2. Its source
 includes a GitHub Actions workflow that builds Windows executables and a native
 Android preview APK when pushed to `main`, or when Run workflow is selected.
 

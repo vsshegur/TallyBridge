@@ -3,7 +3,9 @@
 ## What is ready
 
 The Windows x64 installer and committed Git source are included. Android source
-and automated build scripts are included. **An APK has not yet been compiled.**
+and automated build scripts are included. **The APK and Windows installer now build successfully in GitHub Actions.**
+Download both artifacts from https://github.com/vsshegur/TallyBridge/actions/runs/36102780940.
+Read `docs/CLOUDFLARE_SETUP.md` for detailed Cloudflare and Google setup.
 This is a preview, not a verified final release. Keep your working version until
 the Android build and real PC/phone checks below pass.
 

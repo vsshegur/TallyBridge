@@ -1,13 +1,14 @@
 # TallyBridge 2.0 Native Preview
 
-**Status: implementation preview, not a completed Android release.** The Windows
-binaries were cross-compiled and the backend tests passed. The Android source was
-syntax checked and its signing protocol checked on the JVM. No APK was produced:
-the build environment has no Android SDK and cannot download the required SDK or
-Gradle dependencies. Android API compilation, Android lint, device testing, live
-Cloudflare sign-in, and live Windows/Tally testing remain outstanding.
+**Status: installable preview; Windows and Android CI builds passed.**
+[Download both build artifacts](https://github.com/vsshegur/TallyBridge/actions/runs/36102780940).
+Android compilation, APK packaging/signing and lint passed; Windows backend tests,
+vet and installer compilation passed. Real-device, Google/Cloudflare login and
+live Tally/Edge verification remain outstanding.
 
-Keep your working 1.6 installation until the native APK is built and tested. The
+Start with [the detailed Cloudflare setup guide](docs/CLOUDFLARE_SETUP.md).
+
+Keep your working 1.6 installation until the native APK is tested on your devices. The
 2.0 Windows installer replaces the browser-phone workflow with Android access.
 It retains PC settings, bank defaults and report cache, but old browser pairing
 credentials cannot authorize a native phone.
@@ -20,7 +21,7 @@ credentials cannot authorize a native phone.
   Capacitor, React Native, HTML accounting screens or external app libraries.
 - `internal/app/`: the read-only Go Tally bridge, existing report/PDF engines,
   isolated Android listener and new authorization checks.
-- `build/`: Windows x64 preview installer, bridge and uninstaller.
+- GitHub Actions artifacts: Windows x64 installer, bridge, uninstaller and Android APK.
 - `docs/SETUP.md`: owner setup and Cloudflare requirements.
 - `docs/FEATURE_PARITY.md`: feature inventory and implementation locations.
 - `docs/VERIFICATION.md`: exactly what was and was not verified.
