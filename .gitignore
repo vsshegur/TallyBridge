@@ -1,0 +1,27 @@
+# Compiled packages and generated build files
+/build/
+/cmd/setup/payload/*.exe
+*.apk
+*.aab
+*.exe
+*.bundle
+*.zip
+android/.tools/
+android/.offline-build/
+android/.gradle/
+android/**/build/
+android/output/
+android/local.properties
+# Never commit an owner's data or credentials
+.env
+.env.*
+*.jks
+*.keystore
+*.pem
+*.key
+settings.json
+phone.json
+native-security.json
+pdf-banks.json
+cache-v3/
+*.log

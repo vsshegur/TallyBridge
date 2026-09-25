@@ -1,0 +1,24 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'in.tallybridge.app'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'in.tallybridge.app'
+        minSdk 28
+        targetSdk 35
+        versionCode 20000
+        versionName '2.0.0-preview'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    signingConfigs {
+        release {
+            if (System.getenv('TB_KEYSTORE')) {
+                storeFile file(System.getenv('TB_KEYSTORE'))
+                storePassword System.getenv('TB_STORE_PASSWORD')
+                keyAlias System.getenv('TB_KEY_ALIAS')
+                keyPassword System.getenv('TB_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
+}
