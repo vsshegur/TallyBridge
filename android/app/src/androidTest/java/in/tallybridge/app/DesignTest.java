@@ -37,7 +37,7 @@ public class DesignTest {
    call("renderHome");
   }catch(Exception e){throw new RuntimeException(e);}});
   capture("02-overview");
-  ui(()->{try{call("reports");}catch(Exception e){throw new RuntimeException(e);}});
+  ui(()->{try{field("tab","Reports");call("reports");}catch(Exception e){throw new RuntimeException(e);}});
   capture("03-reports");
   ui(()->{try{call("connectScreen");}catch(Exception e){throw new RuntimeException(e);}});
   capture("04-connect");
