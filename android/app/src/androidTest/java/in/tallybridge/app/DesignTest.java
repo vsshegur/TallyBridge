@@ -24,7 +24,7 @@ public class DesignTest {
  private void capture(String name)throws Exception {
   Thread.sleep(400);
   Bitmap b=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(b);
-  File dir=new File(rule.getActivity().getExternalFilesDir(null),"ui");assertTrue(dir.exists()||dir.mkdirs());
+  File dir=new File(rule.getActivity().getFilesDir(),"ui");assertTrue(dir.exists()||dir.mkdirs());
   try(FileOutputStream out=new FileOutputStream(new File(dir,name+".png"))){assertTrue(b.compress(Bitmap.CompressFormat.PNG,100,out));}b.recycle();
  }
  @Test public void screensRenderWithLongCompanyAndLargeAmounts()throws Exception {
