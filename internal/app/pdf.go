@@ -269,13 +269,15 @@ func pdfBrowser() string {
 	}
 	for _, env := range []string{"ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"} {
 		if base := os.Getenv(env); base != "" {
-			p := filepath.Join(base, "Microsoft", "Edge", "Application", "msedge.exe")
-			if _, e := os.Stat(p); e == nil {
-				return p
+			for _, relative := range [][]string{{"Microsoft", "Edge", "Application", "msedge.exe"}, {"Google", "Chrome", "Application", "chrome.exe"}} {
+				p := filepath.Join(append([]string{base}, relative...)...)
+				if info, e := os.Stat(p); e == nil && !info.IsDir() {
+					return p
+				}
 			}
 		}
 	}
-	for _, name := range []string{"msedge.exe", "microsoft-edge", "chromium", "google-chrome", "chromium-browser"} {
+	for _, name := range []string{"msedge.exe", "chrome.exe", "microsoft-edge", "chromium", "google-chrome", "chromium-browser"} {
 		if p, e := exec.LookPath(name); e == nil {
 			return p
 		}
@@ -299,7 +301,7 @@ func renderPDF(document string) ([]byte, error) {
 	}
 	browser := pdfBrowser()
 	if browser == "" {
-		return nil, errors.New("Microsoft Edge is required to create PDFs; install or repair Edge on the Windows PC")
+		return nil, errors.New("Microsoft Edge or Google Chrome is required to create PDFs; install or repair one on the Windows PC")
 	}
 	dir, e := os.MkdirTemp("", "tallybridge-pdf-")
 	if e != nil {
@@ -323,15 +325,21 @@ func renderPDF(document string) ([]byte, error) {
 		args = append([]string{"--no-sandbox"}, args...)
 	}
 	cmd := pdfCommand(ctx, browser, args...)
-	if e = cmd.Run(); e != nil {
-		return nil, fmt.Errorf("PDF generation failed: %w", e)
-	}
-	data, e := os.ReadFile(output)
-	if e != nil {
-		return nil, e
-	}
-	if !bytes.HasPrefix(data, []byte("%PDF-")) {
-		return nil, errors.New("PDF renderer returned an invalid document")
+	runErr := cmd.Run()
+	data, readErr := os.ReadFile(output)
+	// Edge may finish printing before its background process exits or times out.
+	// Accept only a complete PDF, never a partially written file.
+	if readErr != nil || !completePDF(data) {
+		if ctx.Err() != nil {
+			return nil, errors.New("PDF generation timed out on the PC; open or repair Edge/Chrome and retry")
+		}
+		if runErr != nil {
+			return nil, fmt.Errorf("PDF generation failed on the PC: %w; open or repair Edge/Chrome and retry", runErr)
+		}
+		if readErr != nil {
+			return nil, errors.New("the PC browser did not create a PDF; open or repair Edge/Chrome and retry")
+		}
+		return nil, errors.New("the PC browser returned an incomplete PDF; retry")
 	}
 	renderedPDFMu.Lock()
 	if len(renderedPDFs) >= 8 || renderedPDFBytes+len(data) > 24<<20 {
@@ -344,4 +352,8 @@ func renderPDF(document string) ([]byte, error) {
 	}
 	renderedPDFMu.Unlock()
 	return data, nil
+}
+
+func completePDF(data []byte) bool {
+	return bytes.HasPrefix(data, []byte("%PDF-")) && bytes.HasSuffix(bytes.TrimSpace(data), []byte("%%EOF"))
 }

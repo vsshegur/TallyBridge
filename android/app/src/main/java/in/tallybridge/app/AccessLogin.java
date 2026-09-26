@@ -53,7 +53,7 @@ final class AccessLogin {
    JSONObject claims=new JSONObject(new String(Base64.decode(parts[1],Base64.URL_SAFE|Base64.NO_WRAP),StandardCharsets.UTF_8));
    long expiry=claims.getLong("exp")*1000;
    // Parsing here only controls refresh UX. The Windows verifier validates all claims and signature.
-   synchronized(this){if(session!=attempt)throw new Exception("Sign-in cancelled");store.putSecret("access",token);store.putSecret("refresh","");store.put("base",base);store.put("expires",Long.toString(expiry));}
+   synchronized(this){if(session!=attempt)throw new Exception("Sign-in cancelled");store.putSecret("session","");store.putSecret("access",token);store.putSecret("refresh","");store.put("base",base);store.put("expires",Long.toString(expiry));}
   }finally{cancellation.cancel();synchronized(this){if(session==attempt){pending=null;signal=null;}}}
  }
  synchronized String token()throws Exception{

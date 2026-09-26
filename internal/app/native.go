@@ -38,15 +38,17 @@ type CloudConfig struct {
 	AllowedEmail   string `json:"allowedEmail"`
 }
 type NativeDevice struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Email       string    `json:"email"`
-	PublicKey   string    `json:"publicKey"`
-	Fingerprint string    `json:"fingerprint"`
-	Created     time.Time `json:"createdAt"`
-	LastSeen    time.Time `json:"lastSeen"`
-	Approved    bool      `json:"approved"`
-	Revoked     bool      `json:"revoked"`
+	SessionHash   string    `json:"sessionHash,omitempty"`
+	SessionIssued time.Time `json:"sessionIssued,omitempty"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Email         string    `json:"email"`
+	PublicKey     string    `json:"publicKey"`
+	Fingerprint   string    `json:"fingerprint"`
+	Created       time.Time `json:"createdAt"`
+	LastSeen      time.Time `json:"lastSeen"`
+	Approved      bool      `json:"approved"`
+	Revoked       bool      `json:"revoked"`
 }
 type NativeSecurity struct {
 	mu             sync.Mutex
@@ -242,7 +244,15 @@ func (s *Server) NativeHandler() http.Handler {
 		var email string
 		var e error
 		if s.native.config().GoogleClientID != "" {
-			email, e = s.verifyGoogleRequest(r)
+			if strings.HasPrefix(r.Header.Get("Authorization"), "TallyBridge ") {
+				if r.URL.Path == "/api/v2/native/identity" || r.URL.Path == "/api/v2/native/pair" {
+					jsonErr(w, 401, errors.New("Google sign-in required for pairing"))
+					return
+				}
+				email, e = s.native.verifySession(r)
+			} else {
+				email, e = s.verifyGoogleRequest(r)
+			}
 		} else {
 			email, e = s.native.verifyAccess(r.Context(), r.Header.Get("Cf-Access-Jwt-Assertion"))
 		}
@@ -265,7 +275,16 @@ func (s *Server) NativeHandler() http.Handler {
 				jsonErr(w, 403, e)
 				return
 			}
-			jsonOut(w, map[string]any{"approved": d.Approved, "fingerprint": d.Fingerprint, "name": d.Name, "email": d.Email})
+			response := map[string]any{"approved": d.Approved, "fingerprint": d.Fingerprint, "name": d.Name, "email": d.Email}
+			if d.Approved && s.native.config().GoogleClientID != "" && !strings.HasPrefix(r.Header.Get("Authorization"), "TallyBridge ") {
+				token, err := s.native.issueSession(d.ID)
+				if err != nil {
+					jsonErr(w, 503, err)
+					return
+				}
+				response["sessionToken"] = token
+			}
+			jsonOut(w, response)
 			return
 		}
 		mobile.ServeHTTP(w, r)
@@ -523,7 +542,7 @@ func (s *Server) verifyNativeRequest(r *http.Request, requireApproval bool) (Nat
 	defer n.mu.Unlock()
 	for i, x := range n.Devices {
 		if x.ID == id {
-			if x.Revoked || (requireApproval && !x.Approved) {
+			if x.Revoked || x.Email != n.Config.AllowedEmail || x.Email != email || (requireApproval && !x.Approved) {
 				return d, errors.New("phone authorization revoked")
 			}
 			if time.Since(x.LastSeen) > time.Minute {

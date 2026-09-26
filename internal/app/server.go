@@ -358,7 +358,7 @@ func (s *Server) handleTailscaleConfigure(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) probeLive() (LiveState, error) {
-	b, _, _, e := s.tally.request("Live probe", "", companyListXML(), 3*time.Second)
+	b, _, _, e := s.tally.request("Live probe", "", companyListXML(), 6*time.Second)
 	if e != nil {
 		return s.stateSnapshot(), e
 	}
@@ -459,6 +459,7 @@ func (s *Server) bootstrapPayload() map[string]any {
 	return map[string]any{"bridgeOnline": true, "tallyOnline": st.TallyOnline, "companies": cs, "lastSuccess": st.LastSuccess, "cacheLatestAt": s.cache.Stats().LatestAt, "summaries": s.summaries(cs), "autoSync": s.autoSyncSnapshot(), "version": Version, "pdfBanks": s.store.PDFBankNames()}
 }
 func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
+	s.ensureAutoSync()
 	jsonOut(w, s.bootstrapPayload())
 }
 func (s *Server) handleMobileStatus(w http.ResponseWriter, r *http.Request) {

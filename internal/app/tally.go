@@ -607,6 +607,32 @@ func parsePartyBills(b []byte, party string) []BillRow {
 	if e != nil {
 		return nil
 	}
+	// Some report exports emit BILLFIXED followed by sibling amount/date fields.
+	// Group only adjacent bill fields; never borrow values from another bill or party.
+	var normalize func(*xnode)
+	normalize = func(n *xnode) {
+		var children []*xnode
+		for i := 0; i < len(n.Children); i++ {
+			c := n.Children[i]
+			if c.Name == "BILLFIXED" {
+				bill := &xnode{Name: "BILL", Children: append([]*xnode(nil), c.Children...)}
+				for i+1 < len(n.Children) {
+					next := n.Children[i+1]
+					if next.Name != "BILLCL" && next.Name != "BILLOP" && next.Name != "BILLDUE" && next.Name != "BILLOVERDUE" {
+						break
+					}
+					bill.Children = append(bill.Children, next)
+					i++
+				}
+				children = append(children, bill)
+			} else {
+				normalize(c)
+				children = append(children, c)
+			}
+		}
+		n.Children = children
+	}
+	normalize(root)
 	var rows []BillRow
 	// Read only the innermost bill containers. Broad ancestor scans can pair unrelated names/amounts.
 	var walk func(*xnode) bool
@@ -624,8 +650,18 @@ func parsePartyBills(b []byte, party string) []BillRow {
 		if !allowed {
 			return false
 		}
+		reportedParty := firstDeep(n, "BILLPARTY", "PARTYLEDGERNAME")
+		if reportedParty != "" && !strings.EqualFold(strings.TrimSpace(reportedParty), strings.TrimSpace(party)) {
+			return false
+		}
 		bn := firstDeep(n, "BILLREF", "BILLNAME", "DSPDISPNAME", "VOUCHERNUMBER", "REFERENCE", "NAME")
-		raw := firstDeep(n, "PENDINGAMOUNT", "DSPCLAMT", "DSPCLAMOUNT", "CLOSINGBALANCE", "BILLCL", "AMOUNT")
+		raw := ""
+		// Closing/pending balance must take precedence over opening/original amounts.
+		for _, tag := range []string{"PENDINGAMOUNT", "BILLCL", "CLOSINGBALANCE", "DSPCLAMT", "DSPCLAMOUNT", "AMOUNT"} {
+			if raw = firstDeep(n, tag); raw != "" {
+				break
+			}
+		}
 		if bn == "" || raw == "" || strings.EqualFold(strings.TrimSpace(bn), strings.TrimSpace(party)) {
 			return false
 		}
@@ -634,12 +670,12 @@ func parsePartyBills(b []byte, party string) []BillRow {
 			return false
 		}
 		date := normISODate(firstDeep(n, "BILLDATE", "DSPBILLDATE", "DATE"))
-		due := normISODate(firstDeep(n, "DUEDATE", "DSPDUEDATE"))
+		due := normISODate(firstDeep(n, "DUEDATE", "DSPDUEDATE", "BILLDUE"))
 		age := 0
 		if dt := parseISOOrZero(firstNonBlank(due, date)); !dt.IsZero() && time.Now().After(dt) {
 			age = int(time.Since(dt).Hours() / 24)
 		}
-		rows = append(rows, BillRow{Party: party, BillNumber: bn, Date: date, DueDate: due, PendingAmount: abs(amt), SignedAmount: amt, DrCr: balanceSide(amt), Ageing: age, OriginalAmount: abs(parseAmount(firstDeep(n, "ORIGINALAMOUNT", "OPENINGAMOUNT", "DSPORIGINALAMT")))})
+		rows = append(rows, BillRow{Party: party, BillNumber: bn, Date: date, DueDate: due, PendingAmount: abs(amt), SignedAmount: amt, DrCr: balanceSide(amt), Ageing: age, OriginalAmount: abs(parseAmount(firstDeep(n, "ORIGINALAMOUNT", "OPENINGAMOUNT", "DSPORIGINALAMT", "BILLOP")))})
 		return true
 	}
 	walk(root)
@@ -854,7 +890,7 @@ func ledgerOutstandingShareText(x LedgerOutstandingData) string {
 			if v.DueDate != "" {
 				due = " | Due: " + displayDate(v.DueDate)
 			}
-			fmt.Fprintf(&b, "%d. %s | %s%s | ₹%s\n", i+1, dash(v.BillNumber), displayDate(v.Date), due, indianNumber(v.PendingAmount))
+			fmt.Fprintf(&b, "%d. %s | %s%s | ₹%s %s\n", i+1, dash(v.BillNumber), displayDate(v.Date), due, indianNumber(v.PendingAmount), v.DrCr)
 		}
 	}
 	fmt.Fprintf(&b, "\nTotal Outstanding - ₹%s %s", indianNumber(x.Total), x.DrCr)

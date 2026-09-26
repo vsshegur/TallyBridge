@@ -8,14 +8,15 @@ final class BridgeApi {
  final CryptoStore store;final AccessLogin login;
  BridgeApi(CryptoStore store){this.store=store;login=new AccessLogin(store);}
  private Map<String,String> headers(String path,String method,String body,boolean signed)throws Exception{
-  Map<String,String> h=Http.pairs("Authorization","Bearer "+login.token(),"Accept","application/json","Content-Type","application/json");
+  String session=signed?store.secret("session"):"";
+  Map<String,String> h=Http.pairs("Authorization",session.isEmpty()?"Bearer "+login.token():"TallyBridge "+session,"Accept","application/json","Content-Type","application/json");
   h.put("X-TB-Public-Key",store.publicKey());
   {String date=Instant.now().toString(),nonce=CryptoStore.random();String message=Protocol.canonical(method,path,date,nonce,body);
    h.put("X-TB-Device",store.get("device"));h.put("X-TB-Date",date);h.put("X-TB-Nonce",nonce);h.put("X-TB-Signature",store.sign(message));}
   return h;
  }
  JSONObject call(String path,String method,String body)throws Exception{return Http.json(store.get("base")+path,method,method.equals("GET")?null:body,headers(path,method,body,true));}
- JSONObject get(String path)throws Exception{return call(path,"GET","");}
+ JSONObject get(String path)throws Exception{JSONObject data=call(path,"GET","");if(path.equals("/api/v2/native/status")&&data.optBoolean("approved")&&!data.optString("sessionToken").isEmpty())store.putSecret("session",data.getString("sessionToken"));return data;}
  JSONObject identity()throws Exception{String p="/api/v2/native/identity";return Http.json(store.get("base")+p,"GET",null,headers(p,"GET","",false));}
  JSONObject pair(String code,String name)throws Exception{
   String path="/api/v2/native/pair";String body=new JSONObject().put("code",code).put("name",name).put("publicKey",store.publicKey()).toString();

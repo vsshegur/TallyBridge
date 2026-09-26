@@ -31,18 +31,14 @@ func (s *Server) runAutoSync(company, reason string) {
 		companies = []string{company}
 	} else {
 		// Probe is intentionally tiny. If it fails, keep saved data and retry later.
-		if st, e := s.probeLive(); e == nil {
-			for _, c := range st.Companies {
-				if c.Name != "" {
-					companies = append(companies, c.Name)
-				}
-			}
+		st, e := s.probeLive()
+		if e != nil {
+			s.setAuto(func(a *AutoSyncState) { a.LastError = "Tally connection: " + e.Error() })
+			return
 		}
-		if len(companies) == 0 {
-			if cs, _ := s.cache.Companies(); len(cs) > 0 {
-				for _, c := range cs {
-					companies = append(companies, c.Name)
-				}
+		for _, c := range st.Companies {
+			if c.Name != "" {
+				companies = append(companies, c.Name)
 			}
 		}
 	}
@@ -50,6 +46,7 @@ func (s *Server) runAutoSync(company, reason string) {
 		s.setAuto(func(a *AutoSyncState) { a.LastError = "No open Tally company detected yet" })
 		return
 	}
+	var failures []string
 	for _, c := range companies {
 		s.setAuto(func(a *AutoSyncState) { a.Company = c })
 		steps := []struct {
@@ -100,21 +97,44 @@ func (s *Server) runAutoSync(company, reason string) {
 		for _, st := range steps {
 			s.setAuto(func(a *AutoSyncState) { a.Step = st.name })
 			if e := st.fn(); e != nil {
-				s.setAuto(func(a *AutoSyncState) { a.LastError = fmt.Sprintf("%s: %v", st.name, e) })
-				return
+				failures = append(failures, fmt.Sprintf("%s / %s: %v", c, st.name, e))
+				s.setAuto(func(a *AutoSyncState) { a.LastError = strings.Join(failures, "; ") })
+				// Stop on transport/cooldown failures; continue past a single unsupported report.
+				if _, _, pending := s.tally.Pending(); pending {
+					return
+				}
+				continue
 			}
 		}
 	}
-	s.setAuto(func(a *AutoSyncState) { a.LastOK = time.Now(); a.LastError = "" })
+	if len(failures) == 0 {
+		s.setAuto(func(a *AutoSyncState) { a.LastOK = time.Now(); a.LastError = "" })
+	}
 }
 func (s *Server) StartBackground() {
 	go func() {
 		time.Sleep(4 * time.Second)
 		s.startAutoSync("", "startup")
-		t := time.NewTicker(3 * time.Minute)
+		t := time.NewTicker(30 * time.Second)
 		defer t.Stop()
 		for range t.C {
-			s.startAutoSync("", "periodic")
+			s.ensureAutoSync()
 		}
 	}()
+}
+
+// Retry failed cycles after cooldown; healthy cycles retain the 3-minute cadence.
+func (s *Server) ensureAutoSync() {
+	a := s.autoSyncSnapshot()
+	interval := 3 * time.Minute
+	if a.LastError != "" {
+		interval = 30 * time.Second
+	}
+	if a.Running || time.Since(a.StartedAt) < interval {
+		return
+	}
+	if _, _, pending := s.tally.Pending(); pending {
+		return
+	}
+	s.startAutoSync("", "recovery")
 }
