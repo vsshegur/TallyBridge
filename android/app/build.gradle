@@ -6,8 +6,8 @@ android {
         applicationId 'in.tallybridge.app'
         minSdk 28
         targetSdk 35
-        versionCode 20000
-        versionName '2.0.0-preview'
+        versionCode 20001
+        versionName '2.0.1-google-preview'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     signingConfigs {
@@ -21,4 +21,10 @@ android {
         }
     }
     buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
+}
+
+dependencies {
+    implementation 'androidx.credentials:credentials:1.5.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.5.0'
+    implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
 }

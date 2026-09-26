@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -30,10 +31,11 @@ import (
 
 type nativeContextKey struct{}
 type CloudConfig struct {
-	PublicURL    string `json:"publicUrl"`
-	TeamDomain   string `json:"teamDomain"`
-	Audience     string `json:"audience"`
-	AllowedEmail string `json:"allowedEmail"`
+	PublicURL      string `json:"publicUrl"`
+	GoogleClientID string `json:"googleClientId"`
+	TeamDomain     string `json:"teamDomain"`
+	Audience       string `json:"audience"`
+	AllowedEmail   string `json:"allowedEmail"`
 }
 type NativeDevice struct {
 	ID          string    `json:"id"`
@@ -83,6 +85,16 @@ func validateCloudConfig(c CloudConfig) error {
 	if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") || u.Port() != "" {
 		return errors.New("enter an HTTPS subdomain without a path or port")
 	}
+	if c.GoogleClientID != "" {
+		if !regexp.MustCompile(`^[0-9]+-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$`).MatchString(c.GoogleClientID) {
+			return errors.New("enter the Google Web application client ID")
+		}
+		a, e := mail.ParseAddress(c.AllowedEmail)
+		if e != nil || a.Address != c.AllowedEmail {
+			return errors.New("enter exactly one allowed Google email")
+		}
+		return nil
+	}
 	team := strings.TrimSuffix(c.TeamDomain, ".cloudflareaccess.com")
 	if team == c.TeamDomain || team == "" || strings.ContainsAny(team, "/.:@ ") || strings.ContainsAny(c.TeamDomain, "?#\\") {
 		return errors.New("team domain must be your-team.cloudflareaccess.com")
@@ -123,6 +135,7 @@ func (s *Server) handleCloudConfig(w http.ResponseWriter, r *http.Request) {
 	c.TeamDomain = strings.ToLower(strings.TrimSpace(c.TeamDomain))
 	c.AllowedEmail = strings.ToLower(strings.TrimSpace(c.AllowedEmail))
 	c.Audience = strings.TrimSpace(c.Audience)
+	c.GoogleClientID = strings.TrimSpace(c.GoogleClientID)
 	if e := validateCloudConfig(c); e != nil {
 		jsonErr(w, 400, e)
 		return
@@ -201,6 +214,19 @@ func (s *Server) NativeHandler() http.Handler {
 		allowed["/api/v1/mobile/"+p] = true
 	}
 	return securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v2/native/config" {
+			if r.Method != "GET" {
+				jsonErr(w, 405, errors.New("GET required"))
+				return
+			}
+			c := s.native.config()
+			if c.GoogleClientID == "" || validateCloudConfig(c) != nil {
+				jsonErr(w, 503, errors.New("save Google client ID and allowed email in desktop setup first"))
+				return
+			}
+			jsonOut(w, map[string]any{"googleClientId": c.GoogleClientID, "server": c.PublicURL})
+			return
+		}
 		if r.URL.Path != "/api/v2/native/identity" && r.URL.Path != "/api/v2/native/pair" && r.URL.Path != "/api/v2/native/status" && !allowed[r.URL.Path] {
 			http.NotFound(w, r)
 			return
@@ -213,7 +239,13 @@ func (s *Server) NativeHandler() http.Handler {
 			jsonErr(w, 405, errors.New("method not allowed"))
 			return
 		}
-		email, e := s.native.verifyAccess(r.Context(), r.Header.Get("Cf-Access-Jwt-Assertion"))
+		var email string
+		var e error
+		if s.native.config().GoogleClientID != "" {
+			email, e = s.verifyGoogleRequest(r)
+		} else {
+			email, e = s.native.verifyAccess(r.Context(), r.Header.Get("Cf-Access-Jwt-Assertion"))
+		}
 		if e != nil {
 			jsonErr(w, 401, e)
 			return
@@ -314,18 +346,18 @@ func (n *NativeSecurity) accessKey(ctx context.Context, team, kid string) (*rsa.
 	}
 	n.lastKeyAttempt = time.Now()
 	n.keysTeam = team
-	req, e := http.NewRequestWithContext(ctx, "GET", "https://"+team+"/cdn-cgi/access/certs", nil)
+	req, e := http.NewRequestWithContext(ctx, "GET", keyURL(team), nil)
 	if e != nil {
 		return nil, e
 	}
 	client := &http.Client{Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	res, e := client.Do(req)
 	if e != nil {
-		return nil, errors.New("cannot verify Cloudflare identity while its signing keys are unavailable")
+		return nil, errors.New("cannot verify identity while its signing keys are unavailable")
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return nil, errors.New("Cloudflare signing key request failed")
+		return nil, errors.New("identity signing key request failed")
 	}
 	var j struct {
 		Keys []struct {
@@ -381,6 +413,10 @@ func (s *Server) handleNativePair(w http.ResponseWriter, r *http.Request) {
 	}
 	if readJSON(r, &q) != nil || len(q.Name) > 100 || len(q.PublicKey) > 512 {
 		jsonErr(w, 400, errors.New("invalid pairing request"))
+		return
+	}
+	if s.native.config().GoogleClientID != "" && q.PublicKey != r.Header.Get("X-TB-Public-Key") {
+		jsonErr(w, 403, errors.New("pairing key does not match Google sign-in"))
 		return
 	}
 	if _, e := parseNativeKey(q.PublicKey); e != nil {

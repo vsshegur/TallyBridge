@@ -9,7 +9,8 @@ final class BridgeApi {
  BridgeApi(CryptoStore store){this.store=store;login=new AccessLogin(store);}
  private Map<String,String> headers(String path,String method,String body,boolean signed)throws Exception{
   Map<String,String> h=Http.pairs("Authorization","Bearer "+login.token(),"Accept","application/json","Content-Type","application/json");
-  if(signed){String date=Instant.now().toString(),nonce=CryptoStore.random();String message=Protocol.canonical(method,path,date,nonce,body);
+  h.put("X-TB-Public-Key",store.publicKey());
+  {String date=Instant.now().toString(),nonce=CryptoStore.random();String message=Protocol.canonical(method,path,date,nonce,body);
    h.put("X-TB-Device",store.get("device"));h.put("X-TB-Date",date);h.put("X-TB-Nonce",nonce);h.put("X-TB-Signature",store.sign(message));}
   return h;
  }
