@@ -41,5 +41,17 @@ public class DesignTest {
   capture("03-reports");
   ui(()->{try{call("connectScreen");}catch(Exception e){throw new RuntimeException(e);}});
   capture("04-connect");
+  ui(()->{try{
+   rule.getActivity().getSharedPreferences("appearance",0).edit().putString("mode","Dark").commit();
+   call("applyAppearance");field("tab","Home");call("renderHome");
+   Field f=MainActivity.class.getDeclaredField("dark");f.setAccessible(true);assertTrue(f.getBoolean(rule.getActivity()));
+  }catch(Exception e){throw new RuntimeException(e);}});
+  capture("05-dark-overview");
+  ui(()->{try{field("tab","Reports");call("reports");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("06-dark-reports");
+  ui(()->{try{call("connectScreen");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("07-dark-connect");
+  ui(()->{try{field("tab","More");call("more");call("chooseAppearance");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("08-dark-appearance");
  }
 }

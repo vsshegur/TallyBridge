@@ -88,7 +88,7 @@ jobs:
           adb shell am instrument -w in.tallybridge.app.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/design-results.txt
           grep -q 'OK (1 test)' /tmp/design-results.txt
           mkdir -p android/ui-screenshots
-          for screen in 01-unlock 02-overview 03-reports 04-connect; do
+          for screen in 01-unlock 02-overview 03-reports 04-connect 05-dark-overview 06-dark-reports 07-dark-connect 08-dark-appearance; do
             adb exec-out run-as in.tallybridge.app cat "files/ui/$screen.png" > "android/ui-screenshots/$screen.png"
             test -s "android/ui-screenshots/$screen.png"
           done
