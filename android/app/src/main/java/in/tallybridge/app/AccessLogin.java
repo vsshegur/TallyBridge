@@ -44,7 +44,7 @@ final class AccessLogin {
      if(!GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(c.getType()))throw new Exception("Unexpected sign-in credential");
      result.complete(GoogleIdTokenCredential.createFrom(c.getData()).getIdToken());
     }catch(Exception e){result.completeExceptionally(e);}}
-    @Override public void onError(GetCredentialException e){result.completeExceptionally(new Exception("Google sign-in could not finish. Check your Android OAuth client, APK SHA-1 and test-user email. "+e.getType()));}
+    @Override public void onError(GetCredentialException e){result.completeExceptionally(new Exception("Google sign-in could not finish. Check your Android OAuth client, APK SHA-1 and test-user email."));}
    });}catch(Exception e){result.completeExceptionally(e);}
   });
   try{
