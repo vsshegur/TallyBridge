@@ -66,11 +66,14 @@ jobs:
         timeout-minutes: 12
         run: |
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          trap 'cat /tmp/emulator.log || true' EXIT
+          sudo apt-get update -qq
+          sudo apt-get install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0
           sudo chmod 666 /dev/kvm
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "system-images;android-30;google_apis;x86_64" "emulator" "platform-tools"
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n design -k "system-images;android-30;google_apis;x86_64" --force
-          "$ANDROID_HOME/emulator/emulator" -avd design -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > /tmp/emulator.log 2>&1 &
-          adb wait-for-device
+          "$ANDROID_HOME/emulator/emulator" -avd design -no-window -no-audio -no-boot-anim -gpu swiftshader -no-snapshot > /tmp/emulator.log 2>&1 &
+          timeout 90 adb wait-for-device
           timeout 240 bash -c 'until adb shell getprop sys.boot_completed | tr -d "\r" | grep -q 1; do sleep 3; done'
           adb shell wm size 1080x1920
           adb shell wm density 420
