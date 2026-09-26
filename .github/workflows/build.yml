@@ -28,6 +28,18 @@ jobs:
           go test ./internal/app -run TestWritePDFSmoke -count=1 -v
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           if (!(Test-Path $env:TB_PDF_SMOKE)) { throw 'PDF was not created' }
+      - name: Verify PDF fallback when first browser creates no file
+        shell: pwsh
+        run: |
+          $stubSource = Join-Path $env:RUNNER_TEMP 'no-pdf-browser.go'
+          Set-Content -Path $stubSource -Value 'package main; func main() {}'
+          $env:TALLYBRIDGE_PDF_BROWSER = Join-Path $env:RUNNER_TEMP 'no-pdf-browser.exe'
+          go build -o $env:TALLYBRIDGE_PDF_BROWSER $stubSource
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:TB_PDF_SMOKE = Join-Path $env:RUNNER_TEMP 'tallybridge-fallback.pdf'
+          go test ./internal/app -run TestWritePDFSmoke -count=1 -v
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if (!(Test-Path $env:TB_PDF_SMOKE)) { throw 'Fallback PDF was not created' }
       - name: Build Windows installers
         shell: pwsh
         run: ./scripts/Build-Windows.ps1

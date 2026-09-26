@@ -263,26 +263,82 @@ func trimPDF(s string, n int) string {
 	return s
 }
 
-func pdfBrowser() string {
-	if p := os.Getenv("TALLYBRIDGE_PDF_BROWSER"); p != "" {
-		return p
+func pdfBrowsers() []string {
+	var paths []string
+	seen := map[string]bool{}
+	add := func(p string) {
+		if p != "" && !seen[strings.ToLower(p)] {
+			seen[strings.ToLower(p)] = true
+			paths = append(paths, p)
+		}
 	}
-	for _, env := range []string{"ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"} {
-		if base := os.Getenv(env); base != "" {
-			for _, relative := range [][]string{{"Microsoft", "Edge", "Application", "msedge.exe"}, {"Google", "Chrome", "Application", "chrome.exe"}} {
+	add(os.Getenv("TALLYBRIDGE_PDF_BROWSER"))
+	// Prefer Chrome, but try Edge automatically if Chrome cannot print.
+	for _, relative := range [][]string{{"Google", "Chrome", "Application", "chrome.exe"}, {"Microsoft", "Edge", "Application", "msedge.exe"}} {
+		for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"} {
+			if base := os.Getenv(env); base != "" {
 				p := filepath.Join(append([]string{base}, relative...)...)
 				if info, e := os.Stat(p); e == nil && !info.IsDir() {
-					return p
+					add(p)
 				}
 			}
 		}
 	}
-	for _, name := range []string{"msedge.exe", "chrome.exe", "microsoft-edge", "chromium", "google-chrome", "chromium-browser"} {
+	for _, name := range []string{"chrome.exe", "msedge.exe", "google-chrome", "microsoft-edge", "chromium", "chromium-browser"} {
 		if p, e := exec.LookPath(name); e == nil {
-			return p
+			add(p)
 		}
 	}
-	return ""
+	return paths
+}
+
+// A launcher's successful exit does not prove it printed anything. Some Windows
+// browser launchers hand off to a child, so watch for the complete file as well.
+func waitForPDF(ctx context.Context, output string, exited <-chan error) ([]byte, error) {
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		if data, e := os.ReadFile(output); e == nil && completePDF(data) {
+			return data, nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil, errors.New("no completed PDF before timeout")
+		case err := <-exited:
+			exited = nil
+			if err != nil {
+				if data, e := os.ReadFile(output); e == nil && completePDF(data) {
+					return data, nil
+				}
+				return nil, fmt.Errorf("browser exited: %w", err)
+			}
+		case <-tick.C:
+		}
+	}
+}
+func printPDF(parent context.Context, browser, dir, inputURL string, index int) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(parent, 15*time.Second)
+	defer cancel()
+	output := filepath.Join(dir, fmt.Sprintf("report-%d.pdf", index))
+	args := []string{"--headless", "--disable-gpu", "--disable-extensions", "--disable-background-networking", "--no-first-run", "--no-default-browser-check", "--disable-sync", "--no-pdf-header-footer", "--allow-file-access-from-files", "--user-data-dir=" + filepath.Join(dir, fmt.Sprintf("profile-%d", index)), "--print-to-pdf=" + output, "--timeout=10000", inputURL}
+	if runtime.GOOS != "windows" && os.Geteuid() == 0 {
+		args = append([]string{"--no-sandbox"}, args...)
+	}
+	cmd := pdfCommand(ctx, browser, args...)
+	cmd.Dir = dir
+	if e := cmd.Start(); e != nil {
+		return nil, e
+	}
+	exited := make(chan error, 1)
+	done := make(chan struct{})
+	go func() { exited <- cmd.Wait(); close(done) }()
+	data, err := waitForPDF(ctx, output, exited)
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+	}
+	return data, err
 }
 func renderPDF(document string) ([]byte, error) {
 	key := sha256.Sum256([]byte(document))
@@ -299,8 +355,8 @@ func renderPDF(document string) ([]byte, error) {
 	default:
 		return nil, errors.New("another PDF is being prepared; please try again shortly")
 	}
-	browser := pdfBrowser()
-	if browser == "" {
+	browsers := pdfBrowsers()
+	if len(browsers) == 0 {
 		return nil, errors.New("Microsoft Edge or Google Chrome is required to create PDFs; install or repair one on the Windows PC")
 	}
 	dir, e := os.MkdirTemp("", "tallybridge-pdf-")
@@ -308,7 +364,7 @@ func renderPDF(document string) ([]byte, error) {
 		return nil, e
 	}
 	defer os.RemoveAll(dir)
-	input, output := filepath.Join(dir, "report.html"), filepath.Join(dir, "report.pdf")
+	input := filepath.Join(dir, "report.html")
 	if e = os.WriteFile(input, []byte(document), 0600); e != nil {
 		return nil, e
 	}
@@ -317,30 +373,24 @@ func renderPDF(document string) ([]byte, error) {
 		fp = "/" + fp
 	}
 	u := (&url.URL{Scheme: "file", Path: fp}).String()
-	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
-	args := []string{"--headless=new", "--disable-gpu", "--disable-extensions", "--disable-background-networking", "--no-first-run", "--no-default-browser-check", "--disable-sync", "--no-pdf-header-footer", "--allow-file-access-from-files", "--user-data-dir=" + filepath.Join(dir, "profile"), "--print-to-pdf=" + output, "--timeout=25000", u}
-	// Linux container verification only. Windows uses the normal browser sandbox.
-	if runtime.GOOS != "windows" && os.Geteuid() == 0 {
-		args = append([]string{"--no-sandbox"}, args...)
-	}
-	cmd := pdfCommand(ctx, browser, args...)
-	runErr := cmd.Run()
-	data, readErr := os.ReadFile(output)
-	// Edge may finish printing before its background process exits or times out.
-	// Accept only a complete PDF, never a partially written file.
-	if readErr != nil || !completePDF(data) {
+	var data []byte
+	var failures []string
+	for i, browser := range browsers {
+		data, e = printPDF(ctx, browser, dir, u, i)
+		if e == nil {
+			break
+		}
+		failures = append(failures, filepath.Base(browser)+": "+e.Error())
 		if ctx.Err() != nil {
-			return nil, errors.New("PDF generation timed out on the PC; open or repair Edge/Chrome and retry")
+			break
 		}
-		if runErr != nil {
-			return nil, fmt.Errorf("PDF generation failed on the PC: %w; open or repair Edge/Chrome and retry", runErr)
-		}
-		if readErr != nil {
-			return nil, errors.New("the PC browser did not create a PDF; open or repair Edge/Chrome and retry")
-		}
-		return nil, errors.New("the PC browser returned an incomplete PDF; retry")
 	}
+	if e != nil {
+		return nil, fmt.Errorf("PDF creation failed on the PC (%s). Install/update Google Chrome, then retry. Keep TallyBridge open", strings.Join(failures, "; "))
+	}
+
 	renderedPDFMu.Lock()
 	if len(renderedPDFs) >= 8 || renderedPDFBytes+len(data) > 24<<20 {
 		renderedPDFs = map[[32]byte][]byte{}

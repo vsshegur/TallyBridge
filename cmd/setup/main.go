@@ -82,5 +82,5 @@ func main() {
 	}
 	cmd := hidden(exe)
 	_ = cmd.Start()
-	message("TallyBridge Setup", "TallyBridge v2.0.4 has been installed.\n\nYour settings, approved phones, bank defaults and saved reports were kept.\n\nAutomatic startup is configured during installation. TallyBridge runs quietly when you sign into Windows. Open the desktop shortcut whenever you need setup.")
+	message("TallyBridge Setup", "TallyBridge v2.0.5 has been installed.\n\nYour settings, approved phones, bank defaults and saved reports were kept.\n\nAutomatic startup is configured during installation. TallyBridge runs quietly when you sign into Windows. Open the desktop shortcut whenever you need setup.")
 }
