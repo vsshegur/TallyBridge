@@ -65,8 +65,9 @@ jobs:
       - name: Check native layouts on Android emulator
         timeout-minutes: 12
         run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           sudo chmod 666 /dev/kvm
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "system-images;android-30;google_apis;x86_64" "emulator"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "system-images;android-30;google_apis;x86_64" "emulator" "platform-tools"
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n design -k "system-images;android-30;google_apis;x86_64" --force
           "$ANDROID_HOME/emulator/emulator" -avd design -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > /tmp/emulator.log 2>&1 &
           adb wait-for-device
