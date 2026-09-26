@@ -1,10 +1,12 @@
-# TallyBridge 2.0.1 Google sign-in preview
+# TallyBridge 2.0.2 native design preview
+
+Upgrading? Read [2.0.2 installation and design changes](docs/UPDATE_2_0_2.md).
 
 Start with [the no-card setup guide](docs/NO_CARD_SETUP.md). This version uses
 Cloudflare Tunnel plus direct native Google sign-in. Cloudflare Access, its team
 name and its payment-card signup are not required.
 
-**Windows and Android builds passed:** [download run 4 artifacts](https://github.com/vsshegur/TallyBridge/actions/runs/36214327650). Android compilation/signing/lint and Windows tests/vet/build passed.
+**Windows and Android builds passed:** [download run 11 artifacts](https://github.com/vsshegur/TallyBridge/actions/runs/36229848684). Android compilation/signing/lint and Windows tests/vet/build passed.
 
 ## What is included
 

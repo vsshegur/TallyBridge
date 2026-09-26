@@ -1,3 +1,22 @@
+# Design/startup update — 26 September 2026
+
+Windows backend tests/vet and installer build passed. Android compilation and
+lint passed. The Android 11 emulator installed the app and passed the fixture
+screen test (unlock, dashboard with long company/large balance, reports, connect).
+The CI tools now use one explicit AVD directory and app-owned screenshot files.
+
+The first screenshot review found balance text wrapping on very narrow screens.
+Dashboard amounts now resize to fit one line. Final screenshots were reviewed at a phone-size display configuration.
+Run 11 (36229848684), source e924949be5ded543d981656f01d1fa1be1f29758,
+passed both Windows and Android jobs including emulator checks and screenshot export.
+Downloaded artifacts matched GitHub SHA-256 digests.
+
+Actual Windows restart/sign-in and physical-device interaction remain to be
+checked. The owner reported the preceding version's Google/Tally flow working;
+authentication and report request logic are unchanged in this design update.
+
+---
+
 # Direct Google update — 26 September 2026
 
 [GitHub Actions run 4](https://github.com/vsshegur/TallyBridge/actions/runs/36214327650),

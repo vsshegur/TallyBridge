@@ -1,3 +1,5 @@
+> For the redesigned 2.0.2 APK, use the fingerprint in [UPDATE_2_0_2.md](UPDATE_2_0_2.md). The older run 4 fingerprint below only applies to the old APK.
+
 # TallyBridge 2.0.1: setup without Cloudflare Access
 
 This version uses Cloudflare Tunnel for HTTPS connectivity and native Google sign-in for identity. It does not need a Zero Trust team name, Access audience, Access subscription or payment-card signup. Your already healthy tunnel can be reused. This is an installable preview; live phone/Google/Tally testing is still required.
