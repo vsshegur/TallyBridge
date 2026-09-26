@@ -1,64 +1,42 @@
-# TallyBridge 2.0 Native Preview
+# TallyBridge 2.0.1 Google sign-in preview
 
-**Status: installable preview; Windows and Android CI builds passed.**
-[Download both build artifacts](https://github.com/vsshegur/TallyBridge/actions/runs/36102780940).
-Android compilation, APK packaging/signing and lint passed; Windows backend tests,
-vet and installer compilation passed. Real-device, Google/Cloudflare login and
-live Tally/Edge verification remain outstanding.
+Start with [the no-card setup guide](docs/NO_CARD_SETUP.md). This version uses
+Cloudflare Tunnel plus direct native Google sign-in. Cloudflare Access, its team
+name and its payment-card signup are not required.
 
-Start with [the detailed Cloudflare setup guide](docs/CLOUDFLARE_SETUP.md).
-
-Keep your working 1.6 installation until the native APK is tested on your devices. The
-2.0 Windows installer replaces the browser-phone workflow with Android access.
-It retains PC settings, bank defaults and report cache, but old browser pairing
-credentials cannot authorize a native phone.
+**Windows and Android builds passed:** [download run 4 artifacts](https://github.com/vsshegur/TallyBridge/actions/runs/36214327650). Android compilation/signing/lint and Windows tests/vet/build passed.
 
 ## What is included
 
-- `android/`: native Java Android app (Android 9/API 28 or newer), using platform
-  Views, ListView recycling, Android Keystore, screen-lock authentication,
-  PdfRenderer, system share sheet, and the Android file picker. No WebView,
-  Capacitor, React Native, HTML accounting screens or external app libraries.
-- `internal/app/`: the read-only Go Tally bridge, existing report/PDF engines,
-  isolated Android listener and new authorization checks.
-- GitHub Actions artifacts: Windows x64 installer, bridge, uninstaller and Android APK.
-- `docs/SETUP.md`: owner setup and Cloudflare requirements.
-- `docs/FEATURE_PARITY.md`: feature inventory and implementation locations.
-- `docs/VERIFICATION.md`: exactly what was and was not verified.
+- Native Java Android app, Android 9+, using platform Views, AndroidX Credential
+  Manager, Google sign-in, Android Keystore, screen-lock authentication, native
+  PDF rendering and sharing. Accounting screens do not use a WebView.
+- Read-only Go Tally bridge with local desktop setup on 8765 and an isolated
+  Android listener on 8766.
+- Saved default PDF bank per company, reports and existing PDF engines.
+- Windows installer and Android preview APK built by GitHub Actions.
 
-## Owner email + PC code authorization
+## Owner email and PC approval
 
-This is reusable software, not a shared accounting service. Each owner installs
-it on their own Windows PC and configures their own subdomain, Cloudflare Access
-application and allowed Google email. No owner account or production data is
-bundled in the distributable.
+Each owner runs their own PC and configures their own hostname, Google Web client
+ID and exact allowed Gmail or Workspace email. The native app signs in with
+Google; the PC verifies Google's signature, issuer, audience, expiry and email.
+The Google token is bound to the phone key, and requests require signatures.
 
-1. On desktop setup, the owner enters the one Google email that may access this PC.
-2. The same exact email must be allowed in the owner's Cloudflare Access policy,
-   with Google as the only login method.
-3. Android signs in through the system browser. The PC verifies the signed
-   Cloudflare assertion, issuer, audience, expiry, token type and exact email.
-4. Android displays that verified email, then requests the PC's temporary code.
-5. The code is single-use and expires after five minutes. At most five pairing
-   attempts are accepted per minute.
-6. The PC shows the phone's public-key fingerprint for approval. Match it against
-   Android. An unapproved phone cannot read reports. Approval expires after ten
-   minutes if not completed.
-7. Approved requests require that phone's P-256 signature and a valid Google/
-   Access session. Timestamp checks and one-use nonces reject replay attempts.
-8. Revocation blocks subsequent server requests. Changing owner email, subdomain,
-   team domain or Access audience revokes every previously approved phone.
+A new phone also needs a one-use five-minute PC code and matching fingerprint
+approval on the PC. Unapproved/revoked phones cannot read reports. Configuration
+changes revoke previous approvals. Google sign-in must be repeated when the
+short-lived token expires; existing device approval remains.
 
-Each independent PC maintains its own device allowlist, settings, cache and bank
-choices. A phone approved by one installation is not approved by another. There
-is no central Tally database in this project. The APK is generic; connection
-settings are entered on each phone. One server connection is active per app
-installation; reset pairing before changing to a different server.
+There is no central accounting database. Each PC keeps its own data and device
+allowlist. Exported PDFs cannot be recalled. Cloudflare proxies HTTP content at
+its edge; this is not an end-to-end private VPN.
 
-Exported PDFs/messages cannot be recalled from other apps. Cloudflare processes
-proxied HTTP content at its edge; this is not the same privacy model as
-Tailscale's end-to-end encrypted device network. Windows account security and
-correct Cloudflare configuration still matter. No system can promise zero risk.
+This is a preview: live Google sign-in, physical-device use and Windows/Tally PDF
+integration still require testing. Keep your working installation backed up.
+CI uses temporary debug signing keys, so future APKs may require a new Google
+Android OAuth SHA1 entry and reinstall/re-pairing. Stable release signing is
+still required for dependable public updates.
 
 ## Build Android on a Windows PC
 
@@ -73,9 +51,8 @@ fails, retain the output and resolve it before treating the APK as tested.
 Android Studio can also open the `android` directory directly. The pinned build
 is AGP 8.9.2 / Gradle 8.11.1 / compile and target SDK 35 / JDK 17.
 
-For an offline Linux builder with SDK platform 35 and build-tools 35.0.0 already
-installed, `android/build-offline.sh` uses javac, aapt2, D8, zipalign and apksigner
-without Gradle or external app dependencies. Set ANDROID_HOME first.
+The raw offline SDK builder is disabled because native Google sign-in now needs
+AndroidX and Google dependencies. Use Gradle or Build-Android.cmd.
 
 Preview builds use a locally generated debug/preview signing key. Do not publish
 a preview as a production release. For a release, retain a private signing key

@@ -1,3 +1,26 @@
+# Direct Google update — 26 September 2026
+
+[GitHub Actions run 4](https://github.com/vsshegur/TallyBridge/actions/runs/36214327650),
+source 2ac5874ce339adfeb4b338e05dc7fc034dda1f85: Windows tests/vet and installer
+build passed; Android compilation, signing and lint passed. Both artifact ZIP
+SHA-256 values matched GitHub's recorded digests. Nonblocking lint warnings remain.
+
+Passed locally: Go package tests, race detector and vet; desktop JavaScript syntax.
+New authentication tests cover Google signature/claims, exact owner email, hosted
+Workspace identity, phone-key token binding, request tampering, nonce replay,
+pair-key substitution, pending approval, successful approval and revocation.
+The public configuration endpoint is tested not to expose the owner email.
+
+Android now uses AndroidX/Google dependencies. The old raw offline SDK build is
+intentionally disabled; use Gradle or Build-Android.cmd. The tests use simulated
+Google keys, not a live Google account. Live sign-in, token-expiry UX, phone
+Keystore/biometrics, Tally and Windows Edge PDF rendering remain unverified.
+
+The older verification record below applies to the previous Access preview;
+its browser callback/Managed OAuth steps are not part of the new flow.
+
+---
+
 # Verification record — 25 September 2026
 
 ## Passed in the build environment

@@ -1,3 +1,5 @@
+> **Legacy 2.0 Access preview document.** For 2.0.1 direct Google sign-in without a Cloudflare payment card, follow [NO_CARD_SETUP.md](NO_CARD_SETUP.md). The Access/team/AUD instructions below do not apply to the new setup.
+
 # TallyBridge: Cloudflare setup, step by step
 
 Updated 25 September 2026. For the native Android preview at commit `88d7107`.

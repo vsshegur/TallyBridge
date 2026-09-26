@@ -1,3 +1,5 @@
+> **Legacy 2.0 Access preview document.** For 2.0.1 direct Google sign-in without a Cloudflare payment card, follow [NO_CARD_SETUP.md](NO_CARD_SETUP.md). The Access/team/AUD instructions below do not apply to the new setup.
+
 # Owner setup — each installation is independent
 
 Do not install the 2.0 Windows preview over your working 1.6 setup until the
