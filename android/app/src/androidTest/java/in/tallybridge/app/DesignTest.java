@@ -53,5 +53,12 @@ public class DesignTest {
   capture("07-dark-connect");
   ui(()->{try{field("tab","More");call("more");call("chooseAppearance");}catch(Exception e){throw new RuntimeException(e);}});
   capture("08-dark-appearance");
+  ui(()->{try{
+   rule.getActivity().getSharedPreferences("appearance",0).edit().putString("mode","Light").commit();call("applyAppearance");
+   Field f=MainActivity.class.getDeclaredField("dark");f.setAccessible(true);assertFalse(f.getBoolean(rule.getActivity()));
+   rule.getActivity().getSharedPreferences("appearance",0).edit().putString("mode","System").commit();call("applyAppearance");
+   boolean systemDark=(rule.getActivity().getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;
+   assertEquals(systemDark,f.getBoolean(rule.getActivity()));
+  }catch(Exception e){throw new RuntimeException(e);}});
  }
 }
