@@ -32,6 +32,7 @@ func main() {
 	if r == 2 {
 		return
 	}
+	_ = hidden("reg.exe", "delete", `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "TallyBridge", "/f").Run()
 	removeData := r == 7
 	base := os.Getenv("LOCALAPPDATA")
 	if base == "" {

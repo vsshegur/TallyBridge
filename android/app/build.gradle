@@ -6,8 +6,9 @@ android {
         applicationId 'in.tallybridge.app'
         minSdk 28
         targetSdk 35
-        versionCode 20001
-        versionName '2.0.1-google-preview'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        versionCode 20002
+        versionName '2.0.2-design-preview'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     signingConfigs {
@@ -24,6 +25,9 @@ android {
 }
 
 dependencies {
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test:rules:1.6.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     implementation 'androidx.credentials:credentials:1.5.0'
     implementation 'androidx.credentials:credentials-play-services-auth:1.5.0'
     implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'

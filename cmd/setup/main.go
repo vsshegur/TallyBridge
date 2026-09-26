@@ -75,7 +75,12 @@ func main() {
 	ustart := filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "TallyBridge Uninstall.lnk")
 	script := fmt.Sprintf(`$ws=New-Object -ComObject WScript.Shell;$s=$ws.CreateShortcut('%s');$s.TargetPath='%s';$s.WorkingDirectory='%s';$s.IconLocation='%s,0';$s.Save()`, psQuote(ustart), psQuote(un), psQuote(dir), psQuote(ico))
 	_ = hidden("powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script).Run()
+	// Start for this Windows user after sign-in. Quoting supports paths with spaces.
+	startupErr := hidden("reg.exe", "add", `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, "/v", "TallyBridge", "/t", "REG_SZ", "/d", `"`+exe+`" --background`, "/f").Run()
+	if startupErr != nil {
+		message("TallyBridge startup", "The app was installed, but automatic startup could not be enabled. Run Setup again to retry.\n\n"+startupErr.Error())
+	}
 	cmd := hidden(exe)
 	_ = cmd.Start()
-	message("TallyBridge Setup", "TallyBridge Native v2.0 PREVIEW has been installed.\n\nYour Tally settings, bank defaults and saved reports were kept. Android phones require new Google sign-in and code approval.\n\nOpen Cloudflare to configure your own connection, then Android Phones to pair. The old browser phone interface is disabled in this build.")
+	message("TallyBridge Setup", "TallyBridge v2.0.2 has been installed.\n\nYour settings, approved phones, bank defaults and saved reports were kept.\n\nAutomatic startup is configured during installation. TallyBridge runs quietly when you sign into Windows. Open the desktop shortcut whenever you need setup.")
 }

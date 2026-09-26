@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 )
 
 func main() {
+	background := flag.Bool("background", false, "Run without opening desktop setup")
+	flag.Parse()
 	base := os.Getenv("LOCALAPPDATA")
 	if base == "" {
 		base, _ = os.UserHomeDir()
@@ -24,7 +27,9 @@ func main() {
 	addr := fmt.Sprintf("127.0.0.1:%d", cfg.Port)
 	ln, e := net.Listen("tcp", addr)
 	if e != nil {
-		_ = app.OpenDesktop(fmt.Sprintf("http://127.0.0.1:%d/admin", cfg.Port))
+		if !*background {
+			_ = app.OpenDesktop(fmt.Sprintf("http://127.0.0.1:%d/admin", cfg.Port))
+		}
 		return
 	}
 	h := &http.Server{Handler: srv.DesktopHandler(), ReadHeaderTimeout: 5 * time.Second}
@@ -38,6 +43,8 @@ func main() {
 	srv.StartBackground()
 	go h.Serve(ln)
 	time.Sleep(250 * time.Millisecond)
-	_ = app.OpenDesktop(fmt.Sprintf("http://127.0.0.1:%d/admin", cfg.Port))
+	if !*background {
+		_ = app.OpenDesktop(fmt.Sprintf("http://127.0.0.1:%d/admin", cfg.Port))
+	}
 	select {}
 }

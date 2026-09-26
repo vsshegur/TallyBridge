@@ -58,3 +58,30 @@ jobs:
           name: Android-Lint-Report
           path: android/app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
+
+      - name: Build visual checks
+        working-directory: android
+        run: gradle --no-daemon assembleDebugAndroidTest
+      - name: Check native layouts on Android emulator
+        timeout-minutes: 12
+        run: |
+          sudo chmod 666 /dev/kvm
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "system-images;android-30;google_apis;x86_64" "emulator"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n design -k "system-images;android-30;google_apis;x86_64" --force
+          "$ANDROID_HOME/emulator/emulator" -avd design -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > /tmp/emulator.log 2>&1 &
+          adb wait-for-device
+          timeout 240 bash -c 'until adb shell getprop sys.boot_completed | tr -d "\r" | grep -q 1; do sleep 3; done'
+          adb shell wm size 1080x1920
+          adb shell wm density 420
+          adb shell input keyevent 82
+          adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+          adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell am instrument -w in.tallybridge.app.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/design-results.txt
+          grep -q 'OK (1 test)' /tmp/design-results.txt
+          adb pull /sdcard/Android/data/in.tallybridge.app/files/ui android/ui-screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Android-Design-Screenshots
+          path: android/ui-screenshots/*.png
+          if-no-files-found: ignore
