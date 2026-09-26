@@ -18,11 +18,11 @@ public class PdfFlowTest {
   android.content.Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();
   File dir=new File(context.getCacheDir(),"pdf");assertTrue(dir.exists()||dir.mkdirs());
   File file=new File(dir,"Outstanding-test.pdf");
-  try(PdfDocument doc=new PdfDocument()){
+  PdfDocument doc=new PdfDocument();try{
    PdfDocument.Page page=doc.startPage(new PdfDocument.PageInfo.Builder(595,842,1).create());
    page.getCanvas().drawText("Outstanding bill TEST-1",40,60,new android.graphics.Paint());doc.finishPage(page);
    try(OutputStream out=new FileOutputStream(file)){doc.writeTo(out);}
-  }
+  }finally{doc.close();}
   Uri uri=Uri.parse("content://in.tallybridge.app.pdf/Outstanding-test.pdf");
   assertEquals("application/pdf",context.getContentResolver().getType(uri));
   try(Cursor c=context.getContentResolver().query(uri,null,null,null,null)){assertNotNull(c);assertTrue(c.moveToFirst());assertEquals(file.length(),c.getLong(c.getColumnIndexOrThrow(OpenableColumns.SIZE)));}
