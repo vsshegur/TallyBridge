@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+	"tallybridge-live/internal/app"
 )
 
 //go:embed payload/TallyBridge.exe payload/TallyBridge_Uninstall.exe payload/TallyBridge.ico
@@ -82,5 +83,5 @@ func main() {
 	}
 	cmd := hidden(exe)
 	_ = cmd.Start()
-	message("TallyBridge Setup", "TallyBridge v2.0.9 has been installed.\n\nYour settings, approved phones, bank defaults and saved reports were kept.\n\nAutomatic startup is configured during installation. TallyBridge runs quietly when you sign into Windows. Open the desktop shortcut whenever you need setup.")
+	message("TallyBridge Setup", "TallyBridge "+app.Version+" has been installed.\n\nYour settings, approved phones, bank defaults and saved reports were kept.\n\nTallyBridge will start automatically when you sign into Windows and stay in the system tray. Double-click the tray icon, or right-click it and choose Open TallyBridge, to open setup. Choose Exit TallyBridge from the tray when you want to stop it.")
 }
