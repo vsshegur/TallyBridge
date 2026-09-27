@@ -250,12 +250,16 @@ func (s *Server) handleProforma(w http.ResponseWriter, r *http.Request) {
 }
 func proformaHTML(p Proforma) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, `<div class="note"><b>PROFORMA ONLY - NOT A TAX INVOICE</b><br>For quotation and payment discussion. No entry has been posted to Tally.</div><div class="grid"><section class="panel"><h3>From</h3><p><b>%s</b></p><p>%s</p><p>GSTIN: %s</p><p>State code: %s</p></section><section class="panel"><h3>Bill to</h3><p><b>%s</b></p><p>%s</p><p>%s</p><p>GSTIN: %s</p><p>Place of supply: %s</p></section></div><table class="kv"><tr><td>Proforma number</td><td>%s</td></tr><tr><td>Date</td><td>%s</td></tr><tr><td>Dispatched through</td><td>%s</td></tr><tr><td>LR / RR number</td><td>%s</td></tr></table>`, he(p.Company), he(p.SupplierAddress), he(p.SupplierGST), he(p.SupplierState), he(p.Buyer), he(p.Address), he(p.City), he(p.BuyerGST), he(p.PlaceState), he(p.Number), he(displayDate(p.Date)), he(p.Dispatch), he(p.LR))
+	fmt.Fprintf(&b, `<div class="note"><b>PROFORMA ONLY - NOT A TAX INVOICE</b><br>For quotation and payment discussion.</div><div class="grid"><section class="panel"><h3>From</h3><p><b>%s</b></p><p>%s</p><p>GSTIN: %s</p><p>State code: %s</p></section><section class="panel"><h3>Bill to</h3><p><b>%s</b></p><p>%s</p><p>%s</p><p>GSTIN: %s</p><p>Place of supply: %s</p></section></div><table class="kv"><tr><td>Proforma number</td><td>%s</td></tr><tr><td>Date</td><td>%s</td></tr><tr><td>Dispatched through</td><td>%s</td></tr><tr><td>LR / RR number</td><td>%s</td></tr></table>`, he(p.Company), he(p.SupplierAddress), he(p.SupplierGST), he(p.SupplierState), he(p.Buyer), he(p.Address), he(p.City), he(p.BuyerGST), he(p.PlaceState), he(p.Number), he(displayDate(p.Date)), he(p.Dispatch), he(p.LR))
 	b.WriteString(`<table class="items"><colgroup><col style="width:5%"><col style="width:29%"><col style="width:12%"><col style="width:14%"><col style="width:10%"><col style="width:10%"><col style="width:20%"></colgroup><thead><tr><th>#</th><th>Item / HSN</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Disc %</th><th class="num">GST %</th><th class="num">Taxable INR</th></tr></thead><tbody>`)
 	for i, r := range p.Items {
 		fmt.Fprintf(&b, `<tr><td>%d</td><td><b>%s</b>%s%s</td><td class="num">%s %s</td><td class="num">%s</td><td class="num">%s</td><td class="num">%s</td><td class="num">%s</td></tr>`, i+1, he(r.Name), descriptionHTML(r.Description), descriptionHTML("HSN: "+r.HSN), he(r.Quantity), he(r.Unit), he(r.Rate), he(r.Discount), he(r.GST), he(indianNumber(r.Taxable)))
 	}
-	b.WriteString(`</tbody></table><table class="totals">`)
+	b.WriteString(`</tbody></table><style>.proforma-bottom{display:table;width:100%;table-layout:fixed;break-inside:avoid}.proforma-bottom>section{display:table-cell;vertical-align:top}.proforma-bottom .bank{margin-top:0;padding:3mm;font-size:8pt}.proforma-bottom .totals{width:100%;margin:0;font-size:8.5pt}.proforma-bottom .totals td{padding:1.6mm 1.5mm}.proforma-bottom .grand td{font-size:10pt}</style><div class="proforma-bottom"><section style="width:44%;padding-right:5mm">`)
+	if p.Bank.AccountNumber != "" || p.Bank.UPI != "" {
+		b.WriteString(bankHTML([]BankDetails{p.Bank}))
+	}
+	b.WriteString(`</section><section style="width:56%"><table class="totals">`)
 	for _, f := range []struct {
 		label string
 		value float64
@@ -265,9 +269,7 @@ func proformaHTML(p Proforma) string {
 		}
 	}
 	fmt.Fprintf(&b, `<tr class="grand"><td>Total INR</td><td>%s</td></tr></table>`, he(inr(p.Total)))
-	if p.Bank.AccountNumber != "" || p.Bank.UPI != "" {
-		b.WriteString(bankHTML([]BankDetails{p.Bank}))
-	}
+	b.WriteString(`</section></div>`)
 	if p.Notes != "" {
 		b.WriteString(`<div class="narration">` + he(p.Notes) + `</div>`)
 	}
