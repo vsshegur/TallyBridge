@@ -75,12 +75,23 @@ jobs:
         run: |
           gradle --no-daemon assembleDebug lintDebug
           gradle --no-daemon signingReport > app/build/outputs/apk/debug/SIGNING-REPORT.txt
+      - name: Verify packaged APK version
+        working-directory: android
+        run: |
+          EXPECTED_CODE=$(sed -nE "s/.*versionCode ([0-9]+).*/\1/p" app/build.gradle | head -1)
+          EXPECTED_NAME=$(sed -nE "s/.*versionName '([^']+)'.*/\1/p" app/build.gradle | head -1)
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          test -n "$AAPT"
+          "$AAPT" dump badging app/build/outputs/apk/debug/app-debug.apk | tee app/build/outputs/apk/debug/APK-VERSION.txt
+          grep -q "versionCode='$EXPECTED_CODE'" app/build/outputs/apk/debug/APK-VERSION.txt
+          grep -q "versionName='$EXPECTED_NAME'" app/build/outputs/apk/debug/APK-VERSION.txt
       - uses: actions/upload-artifact@v4
         with:
           name: TallyBridge-Android-Preview
           path: |
             android/app/build/outputs/apk/debug/app-debug.apk
             android/app/build/outputs/apk/debug/SIGNING-REPORT.txt
+            android/app/build/outputs/apk/debug/APK-VERSION.txt
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
