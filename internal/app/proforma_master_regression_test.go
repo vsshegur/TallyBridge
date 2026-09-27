@@ -37,11 +37,11 @@ func TestVoucherDetailEnrichmentAvoidsFragileObjectID(t *testing.T) {
 
 func TestModernMasterFallbackQueries(t *testing.T) {
 	stock := string(stockItemsXML("Demo Company"))
-	for _, want := range []string{"HSNDetails.*", "HSNCode", "HSNMasterName"} {
+	for _, want := range []string{"HSNDetails.*", "HSNCode", "TBHSN"} {
 		if !strings.Contains(stock, want) { t.Fatalf("stock query missing %s", want) }
 	}
 	gst := string(companyGSTXML("Demo Company"))
-	if !strings.Contains(gst, "@@CMPGSTaxNumber") || !strings.Contains(gst, "<TALLYREQUEST>Export</TALLYREQUEST>") { t.Fatal(gst) }
+	if !strings.Contains(gst, "$GSTRegNumber:TaxUnit:($ExciseUnitName:Company:##SVCurrentCompany)") || !strings.Contains(gst, "<TALLYREQUEST>Export</TALLYREQUEST>") { t.Fatal(gst) }
 	ledger := string(ledgerDetailCollectionXML("Demo Company", "ABC & Co"))
 	if !strings.Contains(ledger, "LedGSTRegDetails.*") || !strings.Contains(ledger, "LedMailingDetails.*") || !strings.Contains(ledger, "ABC &amp; Co") { t.Fatal(ledger) }
 	hint := VoucherRow{Number:"INV-22", Date:"2026-09-27", VoucherType:"Sales"}
