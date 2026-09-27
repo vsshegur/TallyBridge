@@ -307,7 +307,7 @@ func ledgerDetailXML(company, ledger string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Ledger</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>*</FETCH><FETCH>City</FETCH><FETCH>Pincode</FETCH><FETCH>LedStateName</FETCH><FETCH>PartyGSTIN</FETCH><FETCH>Address.*</FETCH><FETCH>LedMailingDetails.*</FETCH><FETCH>LedGSTRegDetails.*</FETCH><FETCH>LedMultiAddressList.*</FETCH><FETCH>GSTDetails.*</FETCH><FETCH>BankDetails.*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(ledger), escXML(company)))
 }
 func ledgerDetailCollectionXML(company, ledger string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLedgerDetailFallback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLedgerDetailFallback" ISMODIFY="No"><TYPE>Ledger</TYPE><FILTER>TBLedgerNameFilter</FILTER><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>MailingName</NATIVEMETHOD><NATIVEMETHOD>Address</NATIVEMETHOD><NATIVEMETHOD>City</NATIVEMETHOD><NATIVEMETHOD>Pincode</NATIVEMETHOD><NATIVEMETHOD>LedStateName</NATIVEMETHOD><NATIVEMETHOD>PartyGSTIN</NATIVEMETHOD><FETCH>Address.*,LedMailingDetails.*,LedMultiAddressList.*,LedGSTRegDetails.*,GSTDetails.*</FETCH><METHOD>TBGSTIN:$PartyGSTIN</METHOD><METHOD>TBSTATE:$LedStateName</METHOD><METHOD>TBCITY:$City</METHOD><METHOD>TBPINCODE:$Pincode</METHOD></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBLedgerNameFilter" ISMODIFY="No">$Name = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), escXML(strings.TrimSpace(ledger))))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLedgerDetailFallback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLedgerDetailFallback" ISMODIFY="No"><TYPE>Ledger</TYPE><FILTER>TBLedgerNameFilter</FILTER><NATIVEMETHOD>*</NATIVEMETHOD><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>MailingName</NATIVEMETHOD><NATIVEMETHOD>Address</NATIVEMETHOD><NATIVEMETHOD>City</NATIVEMETHOD><NATIVEMETHOD>Pincode</NATIVEMETHOD><NATIVEMETHOD>LedStateName</NATIVEMETHOD><NATIVEMETHOD>PartyGSTIN</NATIVEMETHOD><FETCH>Address.*,LedMailingDetails.*,LedMultiAddressList.*,LedGSTRegDetails.*,GSTDetails.*</FETCH><METHOD>TBGSTIN:$PartyGSTIN</METHOD><METHOD>TBSTATE:$LedStateName</METHOD><METHOD>TBCITY:$City</METHOD><METHOD>TBPINCODE:$Pincode</METHOD></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBLedgerNameFilter" ISMODIFY="No">$Name = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), escXML(strings.TrimSpace(ledger))))
 }
 
 // Fetch the selected bank object completely: bank methods vary across Tally versions.
@@ -600,18 +600,22 @@ func parseVouchers(b []byte) []VoucherRow {
 	})
 	return out
 }
-func parseLedgerDetails(b []byte) map[string]string {
+func parseLedgerDetails(b []byte) map[string]string { return parseLedgerDetailsFor(b, "") }
+func parseLedgerDetailsFor(b []byte, wanted string) map[string]string {
 	r, e := parseTree(b)
-	if e != nil {
-		return nil
-	}
+	if e != nil { return nil }
 	var ledgers []*xnode
 	nodesByName(r, "LEDGER", &ledgers)
-	if len(ledgers) > 1 {
-		return nil
-	}
-	if len(ledgers) == 1 {
-		r = ledgers[0]
+	if len(ledgers) > 0 {
+		chosen := (*xnode)(nil)
+		for _, candidate := range ledgers {
+			name := strings.TrimSpace(firstDeep(candidate, "NAME"))
+			if wanted != "" && strings.EqualFold(name, strings.TrimSpace(wanted)) { chosen = candidate; break }
+		}
+		if chosen == nil && len(ledgers) == 1 { chosen = ledgers[0] }
+		if chosen == nil && wanted == "" { chosen = ledgers[0] }
+		if chosen == nil { return nil }
+		r = chosen
 	}
 	fields := []string{"NAME", "MAILINGNAME", "PARENT", "PARTYGSTIN", "GSTIN", "GSTREGISTRATIONNUMBER", "INCOMETAXNUMBER", "LEDGERPHONE", "EMAIL", "CITY", "COUNTRYNAME", "STATENAME", "LEDSTATENAME", "PINCODE", "CLOSINGBALANCE", "BANKNAME", "BANKACCOUNTNUMBER", "BANKACCHOLDERNAME", "IFSCCODE", "BRANCHNAME", "UPIID"}
 	m := map[string]string{}

@@ -2,7 +2,7 @@ package app
 
 import "time"
 
-const Version = "2.0.13-design-preview"
+const Version = "2.0.14-design-preview"
 
 type Settings struct {
 	TallyURL    string `json:"tallyUrl"`
@@ -23,6 +23,19 @@ type Device struct {
 type Company struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type CompanyProfile struct {
+	Name      string `json:"name"`
+	GSTIN     string `json:"gstin,omitempty"`
+	Address   string `json:"address,omitempty"`
+	City      string `json:"city,omitempty"`
+	State     string `json:"state,omitempty"`
+	Country   string `json:"country,omitempty"`
+	Pincode   string `json:"pincode,omitempty"`
+	Phone     string `json:"phone,omitempty"`
+	Email     string `json:"email,omitempty"`
+	StateCode string `json:"stateCode,omitempty"`
 }
 
 type RequestLog struct {
@@ -167,6 +180,8 @@ type VoucherDetail struct {
 	TotalAmount       float64       `json:"totalAmount"`
 	Narration         string        `json:"narration,omitempty"`
 	ShareText         string        `json:"shareText"`
+	ShareTextWithBank string        `json:"shareTextWithBank,omitempty"`
+	Bank              BankDetails   `json:"bank,omitempty"`
 }
 
 type LedgerStatementData struct {
@@ -223,6 +238,7 @@ type GroupBalanceData struct {
 
 type CommonData struct {
 	Live       bool      `json:"live"`
+	Supplier   CompanyProfile `json:"supplier,omitempty"`
 	Source     string    `json:"source,omitempty"`
 	Stale      bool      `json:"stale,omitempty"`
 	FetchedAt  time.Time `json:"fetchedAt"`
