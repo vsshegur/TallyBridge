@@ -28,7 +28,7 @@ func (s *Store) PDFBank(c string) (BankDetails, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	b, ok := s.pdfBanksLocked()[companyKey(c)]
-	return b, ok && b.Ledger != ""
+	return b, ok && (b.Ledger != "" || b.AccountNumber != "" || b.UPI != "" || b.IFSC != "")
 }
 func (s *Store) PDFBankNames() map[string]string {
 	s.mu.Lock()

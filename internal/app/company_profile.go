@@ -59,3 +59,16 @@ func (s *Server) companyProfile(company string, refresh bool) (CompanyProfile, e
 	if have { return cached, lastErr }
 	return p, lastErr
 }
+
+func companyProfileAddress(p CompanyProfile) string {
+	parts := []string{}
+	seen := map[string]bool{}
+	add := func(v string) {
+		v = strings.Trim(strings.TrimSpace(v), ",")
+		if v == "" { return }
+		k := strings.ToLower(v)
+		if !seen[k] { seen[k] = true; parts = append(parts, v) }
+	}
+	add(p.Address); add(p.City); add(p.State); add(p.Pincode); add(p.Country)
+	return strings.Join(parts, ", ")
+}

@@ -563,6 +563,15 @@ func voucherCacheKey(mid string, hint VoucherRow) string {
 	}
 	return "ref:" + strings.ToLower(strings.TrimSpace(hint.VoucherType)) + "|" + hint.Date + "|" + strings.TrimSpace(hint.Number)
 }
+func (s *Server) applyVoucherPresentation(company string, x *VoucherDetail) {
+	if x == nil { return }
+	profile, _ := s.companyProfile(company, false)
+	x.Supplier = profile
+	bank, _ := s.store.PDFBank(company)
+	x.Bank = bank
+	x.ShareText = dispatchShareText(*x)
+	x.ShareTextWithBank = x.ShareText + bankText(bank)
+}
 func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Request) {
 	c := strings.TrimSpace(r.URL.Query().Get("company"))
 	mid, hint := voucherRequestHint(r)
@@ -575,7 +584,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 		var old VoucherDetail
 		if at, ok := s.cache.Get("voucher-detail-v3", c, key, &old); ok && old.TotalsVersion == 2 {
 			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at
-			old.ShareText = dispatchShareText(old) + s.companyBankText(c)
+			s.applyVoucherPresentation(c, &old)
 			jsonOut(w, old); return
 		}
 		jsonOut(w, map[string]any{"pending": true, "reason": reason, "retryAfterMs": retry.Milliseconds()})
@@ -586,12 +595,12 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 		var old VoucherDetail
 		if at, ok := s.cache.Get("voucher-detail-v3", c, key, &old); ok && old.TotalsVersion == 2 {
 			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at; old.LiveError = e.Error()
-			old.ShareText = dispatchShareText(old) + s.companyBankText(c)
+			s.applyVoucherPresentation(c, &old)
 			jsonOut(w, old); return
 		}
 		jsonErr(w, 503, e); return
 	}
-	x.ShareText = dispatchShareText(x) + s.companyBankText(c)
+	s.applyVoucherPresentation(c, &x)
 	jsonOut(w, x)
 }
 func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) {
@@ -608,6 +617,8 @@ func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) 
 		x, e = s.fetchVoucherDetail(c, mid, hint)
 		if e != nil { jsonErr(w, 503, e); return }
 	}
+	profile, _ := s.companyProfile(c, false)
+	x.Supplier = profile
 	bank, e := s.optionalBank(c, r.URL.Query().Get("bank"))
 	if e != nil { jsonErr(w, 503, e); return }
 	data, pe := invoicePDF(x, bank...)
@@ -715,6 +726,8 @@ func (s *Server) handleLedgerStatementPDF(w http.ResponseWriter, r *http.Request
 			return
 		}
 	}
+	profile, _ := s.companyProfile(c, false)
+	x.Supplier = profile
 	bank, be := s.optionalBank(c, r.URL.Query().Get("bank"))
 	if be != nil {
 		jsonErr(w, 503, be)
@@ -843,6 +856,8 @@ func (s *Server) handleLedgerOutstandingPDF(w http.ResponseWriter, r *http.Reque
 		jsonErr(w, 409, e)
 		return
 	}
+	profile, _ := s.companyProfile(c, false)
+	x.Supplier = profile
 	bank, be := s.optionalBank(c, r.URL.Query().Get("bank"))
 	if be != nil {
 		jsonErr(w, 503, be)
@@ -915,6 +930,8 @@ func (s *Server) handleGroupBalancesPDF(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
+	profile, _ := s.companyProfile(c, false)
+	x.Supplier = profile
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="Group-%s.pdf"`, sanitizeFileName(g)))
 	banks, _ := s.optionalBank(c, "")
@@ -1266,6 +1283,8 @@ func (s *Server) handleCustomer360PDF(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	profile, _ := s.companyProfile(c, false)
+	x.Supplier = profile
 	bank, e := s.optionalBank(c, r.URL.Query().Get("bank"))
 	if e != nil {
 		jsonErr(w, 503, e)

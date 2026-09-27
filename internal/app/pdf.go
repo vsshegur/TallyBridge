@@ -17,6 +17,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 // Embedded fonts keep Marathi/Hindi text intact on PCs without extra fonts.
@@ -51,32 +53,73 @@ func pdfDataNote(x CommonData) string {
 	}
 	return label + ": " + x.FetchedAt.Local().Format("02 Jan 2006, 15:04")
 }
-func pdfDocument(company, title, subtitle, body string) string {
+func supplierHeaderHTML(p CompanyProfile) string {
+	if p.Name == "" && p.GSTIN == "" && p.Address == "" && p.Phone == "" && p.Email == "" { return "" }
+	var b strings.Builder
+	if address := companyProfileAddress(p); address != "" { fmt.Fprintf(&b, `<div class="supplier-line">%s</div>`, he(address)) }
+	bits := []string{}
+	if p.GSTIN != "" { bits = append(bits, "GSTIN: "+p.GSTIN) }
+	if p.Phone != "" { bits = append(bits, "Mobile: "+p.Phone) }
+	if p.Email != "" { bits = append(bits, "Email: "+p.Email) }
+	if len(bits) > 0 { fmt.Fprintf(&b, `<div class="supplier-line">%s</div>`, he(strings.Join(bits, "  |  "))) }
+	return b.String()
+}
+func pdfDocument(company, title, subtitle, body string, profiles ...CompanyProfile) string {
+	profile := CompanyProfile{Name: company}
+	if len(profiles) > 0 {
+		profile = profiles[0]
+		if profile.Name == "" { profile.Name = company }
+	}
 	return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:"><style>` + pdfFontCSS() + `
  @page{size:A4;margin:16mm 13mm 18mm;@bottom-left{content:"TallyBridge  |  READ ONLY";font:8pt Arial;color:#68758a;}@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt Arial;color:#68758a;}}
  *{box-sizing:border-box}body{margin:0;font:9pt ReportSans,ReportDevanagari,Arial,sans-serif;color:#22334b;line-height:1.45;overflow-wrap:anywhere}
- h1{font-size:22pt;line-height:1.25;letter-spacing:-.4pt;margin:0 0 4mm;color:#132c49}h2{font-size:12pt;margin:0 0 3mm}h3{font-size:9pt;margin:0 0 2mm;text-transform:uppercase;letter-spacing:.5pt;color:#52677f}
- .heading{border-bottom:2pt solid #193f62;padding-bottom:4mm;margin-bottom:5mm}.caption{font-size:8pt;color:#65758a}.title{font-size:10pt;letter-spacing:1pt;font-weight:bold;color:#204e74}.subtitle{margin-top:2mm}
+ h1{font-size:22pt;line-height:1.25;letter-spacing:-.4pt;margin:0 0 2mm;color:#132c49}h2{font-size:12pt;margin:0 0 3mm}h3{font-size:9pt;margin:0 0 2mm;text-transform:uppercase;letter-spacing:.5pt;color:#52677f}
+ .heading{border-bottom:2pt solid #193f62;padding-bottom:4mm;margin-bottom:5mm}.caption{font-size:8pt;color:#65758a}.title{font-size:10pt;letter-spacing:1pt;font-weight:bold;color:#204e74;margin-top:2mm}.subtitle{margin-top:1mm}.supplier-line{font-size:8.2pt;color:#40536b;margin-top:.7mm}
  .grid{display:table;width:100%;table-layout:fixed;margin-bottom:5mm}.panel{display:table-cell;vertical-align:top;padding:3.5mm;background:#f3f6fa;border:1pt solid #e0e7ef}.panel+.panel{border-left:5mm solid white}.panel p{margin:0 0 1.5mm}.label{color:#65758a;font-size:8pt}.kv{width:100%;border-collapse:collapse}.kv td{padding:1mm 0;vertical-align:top}.kv td:first-child{width:39%;color:#65758a;padding-right:3mm}
- table.items{border-collapse:collapse;width:100%;table-layout:fixed;margin:3mm 0 5mm;font-size:8.5pt}.items thead{display:table-header-group}.items th{background:#173f62;color:white;font-size:8pt;font-weight:bold;padding:2.5mm 2mm;text-align:left}.items td{padding:2.5mm 2mm;border-bottom:1pt solid #dce4ed;vertical-align:top}.items tbody tr:nth-child(even){background:#f7f9fc}.items tr{break-inside:avoid}.items .num{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#65758a}.totals{width:62%;margin-left:auto;break-inside:avoid;border-collapse:collapse}.totals td{padding:1.8mm 2mm;vertical-align:top}.totals td:last-child{text-align:right;font-variant-numeric:tabular-nums;width:45%}.grand td{background:#eaf0f7;border-top:1.5pt solid #173f62;font-size:11pt;font-weight:bold;padding:3mm 2mm}.note{padding:3mm;margin:4mm 0;background:#fff7e5;border-left:2pt solid #d6a550;font-size:8pt;break-inside:avoid}.bank{margin-top:6mm;padding:4mm;background:#f3f6fa;border:1pt solid #dce4ed;break-inside:avoid}.bank .kv td{padding:.7mm 0}.narration{margin-top:4mm;white-space:pre-wrap}.meta{margin-bottom:4mm;font-size:8pt;color:#65758a}
- </style></head><body><header class="heading"><h1>` + he(company) + `</h1><div class="title">` + he(title) + `</div><div class="subtitle">` + he(subtitle) + `</div></header>` + body + `</body></html>`
+ table.items{border-collapse:collapse;width:100%;table-layout:fixed;margin:3mm 0 5mm;font-size:8.5pt}.items thead{display:table-header-group}.items th{background:#173f62;color:white;font-size:8pt;font-weight:bold;padding:2.5mm 2mm;text-align:left}.items td{padding:2.5mm 2mm;border-bottom:1pt solid #dce4ed;vertical-align:top}.items tbody tr:nth-child(even){background:#f7f9fc}.items tr{break-inside:avoid}.items .num{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#65758a}.totals{width:62%;margin-left:auto;break-inside:avoid;border-collapse:collapse}.totals td{padding:1.8mm 2mm;vertical-align:top}.totals td:last-child{text-align:right;font-variant-numeric:tabular-nums;width:45%}.grand td{background:#eaf0f7;border-top:1.5pt solid #173f62;font-size:11pt;font-weight:bold;padding:3mm 2mm}.note{padding:3mm;margin:4mm 0;background:#fff7e5;border-left:2pt solid #d6a550;font-size:8pt;break-inside:avoid}.bank{margin-top:6mm;padding:4mm;background:#f3f6fa;border:1pt solid #dce4ed;break-inside:avoid}.bank .kv td{padding:.7mm 0}.bank-grid{display:table;width:100%;table-layout:fixed}.bank-details,.bank-qr{display:table-cell;vertical-align:middle}.bank-details{width:68%;padding-right:4mm}.bank-qr{width:32%;text-align:center}.bank-qr img{width:32mm;height:32mm}.bank-qr .caption{margin-top:1mm}.narration{margin-top:4mm;white-space:pre-wrap}.meta{margin-bottom:4mm;font-size:8pt;color:#65758a}
+ </style></head><body><header class="heading"><h1>` + he(firstNonBlank(profile.Name, company)) + `</h1>` + supplierHeaderHTML(profile) + `<div class="title">` + he(title) + `</div><div class="subtitle">` + he(subtitle) + `</div></header>` + body + `</body></html>`
 }
-func bankHTML(banks []BankDetails) string {
-	if len(banks) == 0 {
-		return ""
-	}
-	b := banks[0]
+type PaymentQR struct {
+	Amount    float64
+	Reference string
+	Payee     string
+}
+func upiPaymentURI(bank BankDetails, payment PaymentQR) string {
+	upi := strings.TrimSpace(bank.UPI)
+	if upi == "" { return "" }
+	q := url.Values{}
+	q.Set("pa", upi)
+	if payee := firstNonBlank(strings.TrimSpace(payment.Payee), strings.TrimSpace(bank.AccountHolder)); payee != "" { q.Set("pn", payee) }
+	if payment.Amount > 0 { q.Set("am", fmt.Sprintf("%.2f", payment.Amount)) }
+	q.Set("cu", "INR")
+	if ref := strings.TrimSpace(payment.Reference); ref != "" { q.Set("tn", trimPDF(ref, 80)) }
+	return "upi://pay?" + q.Encode()
+}
+func paymentQRDataURI(bank BankDetails, payment PaymentQR) string {
+	uri := upiPaymentURI(bank, payment)
+	if uri == "" { return "" }
+	png, err := qrcode.Encode(uri, qrcode.Medium, 256)
+	if err != nil { return "" }
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+}
+func bankHTML(banks []BankDetails, payments ...PaymentQR) string {
+	if len(banks) == 0 { return "" }
+	bank := banks[0]
+	if bank.AccountNumber == "" && bank.UPI == "" && bank.IFSC == "" { return "" }
+	payment := PaymentQR{}
+	if len(payments) > 0 { payment = payments[0] }
 	var out strings.Builder
-	out.WriteString(`<section class="bank"><h3>Payment bank details</h3><table class="kv">`)
-	for _, r := range [][2]string{{"Bank", firstNonBlank(b.BankName, b.Ledger)}, {"Account holder", b.AccountHolder}, {"Account number", b.AccountNumber}, {"IFSC", b.IFSC}, {"Branch", b.Branch}, {"UPI", b.UPI}} {
-		if r[1] != "" {
-			fmt.Fprintf(&out, "<tr><td>%s</td><td>%s</td></tr>", he(r[0]), he(r[1]))
-		}
+	out.WriteString(`<section class="bank"><h3>Payment bank details</h3><div class="bank-grid"><div class="bank-details"><table class="kv">`)
+	for _, r := range [][2]string{{"Bank", firstNonBlank(bank.BankName, bank.Ledger)}, {"Account holder", bank.AccountHolder}, {"Account number", bank.AccountNumber}, {"IFSC", bank.IFSC}, {"Branch", bank.Branch}, {"UPI", bank.UPI}} {
+		if r[1] != "" { fmt.Fprintf(&out, "<tr><td>%s</td><td>%s</td></tr>", he(r[0]), he(r[1])) }
 	}
-	out.WriteString(`</table></section>`)
+	out.WriteString(`</table></div>`)
+	if qr := paymentQRDataURI(bank, payment); qr != "" {
+		out.WriteString(`<div class="bank-qr"><img alt="UPI payment QR" src="`+he(qr)+`"><div class="caption">Scan to pay by UPI</div></div>`)
+	}
+	out.WriteString(`</div></section>`)
 	return out.String()
-}
-func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
+}func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, `<div class="meta">%s</div><div class="grid"><section class="panel"><h3>Bill to</h3><p><b>%s</b></p>`, he(pdfDataNote(x.CommonData)), he(firstNonBlank(x.CustomerName, "Customer not returned")))
 	for _, a := range x.CustomerAddress {
@@ -137,11 +180,11 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 		}
 	}
 	fmt.Fprintf(&b, `<tr class="grand"><td>Total amount</td><td>%s</td></tr></table>`, he(inr(x.TotalAmount)))
-	b.WriteString(bankHTML(bank))
+	b.WriteString(bankHTML(bank, PaymentQR{Amount: x.TotalAmount, Reference: "Invoice "+x.InvoiceNumber, Payee: firstNonBlank(x.Supplier.Name, x.FirmName, x.Company)}))
 	if x.Narration != "" {
 		fmt.Fprintf(&b, `<div class="narration"><h3>Narration</h3>%s</div>`, he(x.Narration))
 	}
-	return pdfDocument(firstNonBlank(x.FirmName, x.Company), "INVOICE DETAIL", "Read-only copy of data returned by TallyPrime", b.String())
+	return pdfDocument(firstNonBlank(x.FirmName, x.Company), "INVOICE DETAIL", "Read-only copy of data returned by TallyPrime", b.String(), x.Supplier)
 }
 func invoicePDF(x VoucherDetail, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(invoiceHTML(x, bank...))
@@ -149,6 +192,7 @@ func invoicePDF(x VoucherDetail, bank ...BankDetails) ([]byte, error) {
 
 type pdfTableDoc struct {
 	Title, Company, Subtitle string
+	Supplier                 CompanyProfile
 	Headers                  []string
 	Widths                   []float64
 	Rows                     [][]string
@@ -202,7 +246,7 @@ func tableHTML(d pdfTableDoc, bank ...BankDetails) string {
 		fmt.Fprintf(&b, `<table class="totals"><tr class="grand"><td>%s</td><td>%s</td></tr></table>`, he(d.TotalLabel), he(d.Total))
 	}
 	b.WriteString(bankHTML(bank))
-	return pdfDocument(d.Company, d.Title, d.Subtitle, b.String())
+	return pdfDocument(d.Company, d.Title, d.Subtitle, b.String(), d.Supplier)
 }
 func statementDoc(x LedgerStatementData) pdfTableDoc {
 	rows := [][]string{}
@@ -225,7 +269,7 @@ func statementDoc(x LedgerStatementData) pdfTableDoc {
 	if x.ClosingBalance != nil {
 		closing = balanceText(*x.ClosingBalance)
 	}
-	return pdfTableDoc{Title: "LEDGER STATEMENT", Company: x.Company, Subtitle: x.Ledger + " | " + displayDate(x.FromDate) + " to " + displayDate(x.ToDate) + " | " + pdfDataNote(x.CommonData), Headers: []string{"Date", "Voucher", "Type", "Debit (INR)", "Credit (INR)", "Balance"}, Widths: []float64{70, 90, 70, 80, 80, 121}, Rows: rows, TotalLabel: "Closing balance", Total: closing, Note: x.BalanceNote, Numeric: []bool{false, false, false, true, true, true}}
+	return pdfTableDoc{Title: "LEDGER STATEMENT", Company: x.Company, Supplier: x.Supplier, Subtitle: x.Ledger + " | " + displayDate(x.FromDate) + " to " + displayDate(x.ToDate) + " | " + pdfDataNote(x.CommonData), Headers: []string{"Date", "Voucher", "Type", "Debit (INR)", "Credit (INR)", "Balance"}, Widths: []float64{70, 90, 70, 80, 80, 121}, Rows: rows, TotalLabel: "Closing balance", Total: closing, Note: x.BalanceNote, Numeric: []bool{false, false, false, true, true, true}}
 }
 func ledgerStatementPDF(x LedgerStatementData, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(tableHTML(statementDoc(x), bank...))
@@ -239,7 +283,7 @@ func outstandingDoc(x LedgerOutstandingData) pdfTableDoc {
 	if x.SummaryOnly {
 		note = "Summary only: bill-wise breakup is unavailable. Total is the saved party ledger balance, not a newly verified bill-wise total."
 	}
-	return pdfTableDoc{Title: "OUTSTANDING BALANCE", Company: x.Company, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Bill number", "Bill date", "Due for", "Pending (INR)"}, Widths: []float64{155, 110, 90, 156}, Rows: rows, TotalLabel: "Net outstanding", Total: inr(x.Total) + " " + x.DrCr, Note: note, Numeric: []bool{false, false, false, true}}
+	return pdfTableDoc{Title: "OUTSTANDING BALANCE", Company: x.Company, Supplier: x.Supplier, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Bill number", "Bill date", "Due for", "Pending (INR)"}, Widths: []float64{155, 110, 90, 156}, Rows: rows, TotalLabel: "Net outstanding", Total: inr(x.Total) + " " + x.DrCr, Note: note, Numeric: []bool{false, false, false, true}}
 }
 func ledgerOutstandingPDF(x LedgerOutstandingData, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(tableHTML(outstandingDoc(x), bank...))
@@ -250,7 +294,7 @@ func groupDoc(x GroupBalanceData) pdfTableDoc {
 	for _, v := range x.Ledgers {
 		rows = append(rows, []string{v.Ledger, v.Parent, indianNumber(v.Balance), v.DrCr})
 	}
-	return pdfTableDoc{Title: "LEDGER GROUP DETAILS", Company: x.Company, Subtitle: x.Group + " | " + pdfDataNote(x.CommonData), Headers: []string{"Ledger", "Parent group", "Balance (INR)", "Dr/Cr"}, Widths: []float64{190, 140, 130, 51}, Rows: rows, TotalLabel: "Net balance", Total: inr(x.Total), Numeric: []bool{false, false, true, false}}
+	return pdfTableDoc{Title: "LEDGER GROUP DETAILS", Company: x.Company, Supplier: x.Supplier, Subtitle: x.Group + " | " + pdfDataNote(x.CommonData), Headers: []string{"Ledger", "Parent group", "Balance (INR)", "Dr/Cr"}, Widths: []float64{190, 140, 130, 51}, Rows: rows, TotalLabel: "Net balance", Total: inr(x.Total), Numeric: []bool{false, false, true, false}}
 }
 func groupBalancesPDF(x GroupBalanceData, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(tableHTML(groupDoc(x), bank...))
@@ -260,7 +304,7 @@ func customerDoc(x Customer360Data) pdfTableDoc {
 	for _, v := range x.LatestInvoices {
 		rows = append(rows, []string{displayDate(v.Date), v.Number, v.VoucherType, inr(v.Amount)})
 	}
-	return pdfTableDoc{Title: "CUSTOMER 360", Company: x.Company, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Date", "Invoice", "Type", "Amount"}, Widths: []float64{100, 150, 130, 131}, Rows: rows, TotalLabel: "Outstanding", Total: inr(x.Outstanding), Note: fmt.Sprintf("Known overdue %s | %d known pending bills. Bill coverage may be incomplete.", inr(x.Overdue), x.PendingBillCount), Numeric: []bool{false, false, false, true}}
+	return pdfTableDoc{Title: "CUSTOMER 360", Company: x.Company, Supplier: x.Supplier, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Date", "Invoice", "Type", "Amount"}, Widths: []float64{100, 150, 130, 131}, Rows: rows, TotalLabel: "Outstanding", Total: inr(x.Outstanding), Note: fmt.Sprintf("Known overdue %s | %d known pending bills. Bill coverage may be incomplete.", inr(x.Overdue), x.PendingBillCount), Numeric: []bool{false, false, false, true}}
 }
 func customer360PDF(x Customer360Data, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(tableHTML(customerDoc(x), bank...))
