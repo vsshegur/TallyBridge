@@ -552,7 +552,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	}
 	if reason, retry, p := s.tally.Pending(); p {
 		var old VoucherDetail
-		if at, ok := s.cache.Get("voucher-detail", c, mid, &old); ok {
+		if at, ok := s.cache.Get("voucher-detail", c, mid, &old); ok && old.TotalsVersion == 1 {
 			old.Live = false
 			old.Source = "saved"
 			old.Stale = true
@@ -567,7 +567,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	x, e := s.fetchVoucherDetail(c, mid, hint)
 	if e != nil {
 		var old VoucherDetail
-		if at, ok := s.cache.Get("voucher-detail", c, mid, &old); ok {
+		if at, ok := s.cache.Get("voucher-detail", c, mid, &old); ok && old.TotalsVersion == 1 {
 			old.Live = false
 			old.Source = "saved"
 			old.Stale = true
@@ -585,7 +585,7 @@ func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) 
 	c := r.URL.Query().Get("company")
 	mid := r.URL.Query().Get("masterId")
 	var x VoucherDetail
-	if _, ok := s.cache.Get("voucher-detail", c, mid, &x); !ok {
+	if _, ok := s.cache.Get("voucher-detail", c, mid, &x); !ok || x.TotalsVersion != 1 {
 		var e error
 		x, e = s.fetchVoucherDetail(c, mid, VoucherRow{})
 		if e != nil {
@@ -1474,7 +1474,7 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 	// the single Voucher object with FETCH *. This remains one voucher only and
 	// runs sequentially, never in parallel. Request-specific ERRORMSG responses do
 	// not trip the global safety cooldown.
-	needObject := err != nil || x.InvoiceNumber == "" || x.InvoiceDate == "" || x.DispatchedThrough == "" || x.LRNumber == "" || len(x.Items) == 0
+	needObject := err != nil || x.TotalsVersion != 1 || x.InvoiceNumber == "" || x.InvoiceDate == "" || x.DispatchedThrough == "" || x.LRNumber == "" || len(x.Items) == 0
 	if needObject {
 		b2, d2, _, e2 := s.tally.request("Invoice detail enrich", c, voucherDetailObjectXML(c, mid), 12*time.Second)
 		if e2 == nil && !hasXMLNode(b2, "VOUCHER") {
@@ -1512,8 +1512,8 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 	if x.CustomerName == "" {
 		x.CustomerName = hint.Party
 	}
-	if x.TotalAmount == 0 {
-		x.TotalAmount = abs(hint.Amount)
+	if x.TotalsVersion != 1 {
+		return VoucherDetail{}, errors.New("Tally did not return a verified invoice total; refresh with the company open in Tally before sharing")
 	}
 	x.CommonData = CommonData{Live: true, Source: "live", FetchedAt: time.Now(), DurationMS: d1}
 	x.ShareText = dispatchShareText(x)
@@ -1573,29 +1573,18 @@ func mergeVoucherDetail(a, b VoucherDetail) VoucherDetail {
 	if len(a.Items) == 0 {
 		a.Items = b.Items
 	}
-	if a.DiscountAmount == 0 {
+	if b.TotalsVersion == 1 && (a.TotalsVersion != 1 || len(b.Items) > 0) {
+		a.Items = b.Items
 		a.DiscountAmount = b.DiscountAmount
-	}
-	if a.TaxableAmount == 0 {
 		a.TaxableAmount = b.TaxableAmount
-	}
-	if a.CGST == 0 {
 		a.CGST = b.CGST
-	}
-	if a.SGST == 0 {
 		a.SGST = b.SGST
-	}
-	if a.IGST == 0 {
 		a.IGST = b.IGST
-	}
-	if a.Freight == 0 {
 		a.Freight = b.Freight
-	}
-	if a.RoundOff == 0 {
 		a.RoundOff = b.RoundOff
-	}
-	if a.TotalAmount == 0 {
 		a.TotalAmount = b.TotalAmount
+		a.OtherCharges = b.OtherCharges
+		a.TotalsVersion = b.TotalsVersion
 	}
 	if a.Narration == "" {
 		a.Narration = b.Narration

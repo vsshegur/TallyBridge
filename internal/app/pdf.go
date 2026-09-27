@@ -121,10 +121,17 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 		b.WriteString(`<tr><td colspan="6">No product rows returned by Tally.</td></tr>`)
 	}
 	b.WriteString(`</tbody></table><table class="totals">`)
+	if len(x.Items) > 0 {
+		subtotal := 0.0
+		for _, item := range x.Items {
+			subtotal += item.Amount
+		}
+		fmt.Fprintf(&b, "<tr><td>Items subtotal (net of item discounts)</td><td>%s</td></tr>", he(inr(subtotal)))
+	}
 	for _, r := range []struct {
 		label string
 		value float64
-	}{{"Discount", x.DiscountAmount}, {"Taxable amount", x.TaxableAmount}, {"CGST", x.CGST}, {"SGST", x.SGST}, {"IGST", x.IGST}, {"Freight / charges", x.Freight}, {"Round off", x.RoundOff}} {
+	}{{"Invoice discount (deducted)", -x.DiscountAmount}, {"Net items after discount", x.TaxableAmount}, {"CGST", x.CGST}, {"SGST", x.SGST}, {"IGST", x.IGST}, {"Freight / charges", x.Freight}, {"Round off", x.RoundOff}, {"Other ledger adjustments", x.OtherCharges}} {
 		if r.value != 0 {
 			fmt.Fprintf(&b, "<tr><td>%s</td><td>%s</td></tr>", he(r.label), he(inr(r.value)))
 		}

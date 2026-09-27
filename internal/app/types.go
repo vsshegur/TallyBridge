@@ -2,7 +2,7 @@ package app
 
 import "time"
 
-const Version = "2.0.7-design-preview"
+const Version = "2.0.8-design-preview"
 
 type Settings struct {
 	TallyURL    string `json:"tallyUrl"`
@@ -154,6 +154,8 @@ type VoucherDetail struct {
 	VehicleNumber     string        `json:"vehicleNumber,omitempty"`
 	EWayBillNumber    string        `json:"eWayBillNumber,omitempty"`
 	Items             []InvoiceItem `json:"items"`
+	TotalsVersion     int           `json:"totalsVersion,omitempty"`
+	OtherCharges      float64       `json:"otherCharges,omitempty"`
 	DiscountAmount    float64       `json:"discountAmount"`
 	TaxableAmount     float64       `json:"taxableAmount,omitempty"`
 	CGST              float64       `json:"cgst,omitempty"`

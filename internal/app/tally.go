@@ -275,7 +275,7 @@ func voucherListXML(company, vtype, from, to string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLiveVouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLiveVouchers" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><NATIVEMETHOD>Date</NATIVEMETHOD><NATIVEMETHOD>VoucherNumber</NATIVEMETHOD><NATIVEMETHOD>PartyLedgerName</NATIVEMETHOD><NATIVEMETHOD>VoucherTypeName</NATIVEMETHOD><NATIVEMETHOD>Amount</NATIVEMETHOD><NATIVEMETHOD>MasterID</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), from, to, escXML(vtype)))
 }
 func voucherDetailCollectionXML(company, masterID string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetail</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetail" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherMasterIDFilter</FILTER><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,AllInventoryEntries.*,AllLedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetail</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetail" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherMasterIDFilter</FILTER><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
 }
 func voucherDetailObjectXML(company, masterID string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Voucher</SUBTYPE><ID TYPE="Name">ID:'%s'</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVViewName>Invoice Voucher View</SVViewName></STATICVARIABLES><FETCHLIST><FETCH>*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, masterID, escXML(company)))
@@ -562,7 +562,9 @@ func parseVouchers(b []byte) []VoucherRow {
 			continue
 		}
 		seen[k] = true
-		out = append(out, VoucherRow{MasterID: mid, Date: date, Number: num, Party: firstDeep(n, "PARTYLEDGERNAME", "PARTYNAME", "BASICBUYERNAME"), Amount: abs(parseAmount(firstDeep(n, "AMOUNT"))), VoucherType: firstDeep(n, "VOUCHERTYPENAME")})
+		party := firstDeep(n, "PARTYLEDGERNAME", "PARTYNAME", "BASICBUYERNAME")
+		amount, _ := invoicePartyTotal(n, party)
+		out = append(out, VoucherRow{MasterID: mid, Date: date, Number: num, Party: party, Amount: abs(amount), VoucherType: firstDeep(n, "VOUCHERTYPENAME")})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Date == out[j].Date {
@@ -802,7 +804,7 @@ func parseVoucherDetail(b []byte, company, masterID string, hint VoucherRow) Vou
 	var inv []*xnode
 	nodesByName(r, "ALLINVENTORYENTRIES.LIST", &inv)
 	nodesByName(r, "INVENTORYENTRIES.LIST", &inv)
-	seenItem := map[string]bool{}
+
 	for _, n := range inv {
 		name := firstDeep(n, "STOCKITEMNAME", "ITEMNAME", "NAME")
 		if name == "" {
@@ -814,53 +816,10 @@ func parseVoucherDetail(b []byte, company, masterID string, hint VoucherRow) Vou
 		if amt == 0 {
 			amt = abs(parseAmount(firstDeep(n, "AMOUNT")))
 		}
-		key := name + "|" + qty + "|" + rate + fmt.Sprint(amt)
-		if seenItem[key] {
-			continue
-		}
-		seenItem[key] = true
-		x.Items = append(x.Items, InvoiceItem{Name: name, HSN: firstDeep(n, "HSN", "HSNCODE", "HSNSAC"), Quantity: qty, Rate: rate, Amount: amt, Discount: abs(parseAmount(firstDeep(n, "DISCOUNT", "DISCOUNTAMOUNT")))})
+		x.Items = append(x.Items, InvoiceItem{Name: name, HSN: firstDeep(n, "HSN", "HSNCODE", "HSNSAC"), Quantity: qty, Rate: rate, Amount: amt, Discount: abs(parseAmount(directChild(n, "DISCOUNTAMOUNT")))})
 	}
-	var led []*xnode
-	nodesByName(r, "ALLLEDGERENTRIES.LIST", &led)
-	nodesByName(r, "LEDGERENTRIES.LIST", &led)
-	maxAmt := abs(hint.Amount)
-	for _, n := range led {
-		name := strings.ToUpper(firstDeep(n, "LEDGERNAME"))
-		amt := parseAmount(directChild(n, "AMOUNT"))
-		aa := abs(amt)
-		if aa > maxAmt {
-			maxAmt = aa
-		}
-		switch {
-		case strings.Contains(name, "DISCOUNT"):
-			x.DiscountAmount += aa
-		case strings.Contains(name, "CGST"):
-			x.CGST += aa
-		case strings.Contains(name, "SGST"):
-			x.SGST += aa
-		case strings.Contains(name, "IGST"):
-			x.IGST += aa
-		case strings.Contains(name, "FREIGHT") || strings.Contains(name, "TRANSPORT") || strings.Contains(name, "CARTAGE"):
-			x.Freight += aa
-		case strings.Contains(name, "ROUND"):
-			x.RoundOff += amt
-		}
-	}
-	for _, it := range x.Items {
-		x.TaxableAmount += it.Amount
-		if it.Discount > 0 {
-			x.DiscountAmount += it.Discount
-		}
-	}
-	if maxAmt == 0 {
-		for _, v := range allDeep(r, "AMOUNT") {
-			if a := abs(parseAmount(v)); a > maxAmt {
-				maxAmt = a
-			}
-		}
-	}
-	x.TotalAmount = maxAmt
+
+	applyInvoiceAmounts(&x, r, hint)
 	x.ShareText = dispatchShareText(x)
 	return x
 }
