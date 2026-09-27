@@ -212,7 +212,7 @@ func (s *Server) handleNativeApproval(w http.ResponseWriter, r *http.Request) {
 func (s *Server) NativeHandler() http.Handler {
 	mobile := s.Handler()
 	allowed := map[string]bool{}
-	for _, p := range []string{"auth-check", "bootstrap", "status", "sync", "probe", "ledgers", "outstanding", "party-outstanding", "vouchers", "voucher-detail", "voucher-pdf", "ledger-details", "ledger-statement", "ledger-statement-pdf", "ledger-outstanding", "ledger-outstanding-pdf", "group-balances", "group-balances-pdf", "customer360", "customer360-pdf", "today-dispatch", "search-index", "ageing", "banks", "bank-details", "report"} {
+	for _, p := range []string{"proforma-masters", "proforma-preview", "proforma-pdf", "auth-check", "bootstrap", "status", "sync", "probe", "ledgers", "outstanding", "party-outstanding", "vouchers", "voucher-detail", "voucher-pdf", "ledger-details", "ledger-statement", "ledger-statement-pdf", "ledger-outstanding", "ledger-outstanding-pdf", "group-balances", "group-balances-pdf", "customer360", "customer360-pdf", "today-dispatch", "search-index", "ageing", "banks", "bank-details", "report"} {
 		allowed["/api/v1/mobile/"+p] = true
 	}
 	return securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +234,7 @@ func (s *Server) NativeHandler() http.Handler {
 			return
 		}
 		expected := "GET"
-		if r.URL.Path == "/api/v2/native/pair" || r.URL.Path == "/api/v1/mobile/sync" || r.URL.Path == "/api/v1/mobile/probe" {
+		if r.URL.Path == "/api/v2/native/pair" || r.URL.Path == "/api/v1/mobile/sync" || r.URL.Path == "/api/v1/mobile/probe" || r.URL.Path == "/api/v1/mobile/proforma-preview" || r.URL.Path == "/api/v1/mobile/proforma-pdf" {
 			expected = "POST"
 		}
 		if r.Method != expected {

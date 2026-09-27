@@ -74,6 +74,9 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("/api/v1/admin/report", s.localAdmin(s.handleAdminReport))
 	m.HandleFunc("/api/v1/admin/tailscale/check", s.localAdmin(s.handleTailscaleCheck))
 	m.HandleFunc("/api/v1/admin/tailscale/configure", s.localAdmin(s.handleTailscaleConfigure))
+	m.HandleFunc("/api/v1/mobile/proforma-masters", s.mobileAuth(s.handleProformaMasters))
+	m.HandleFunc("/api/v1/mobile/proforma-preview", s.mobileAuth(s.handleProforma))
+	m.HandleFunc("/api/v1/mobile/proforma-pdf", s.mobileAuth(s.handleProforma))
 	m.HandleFunc("/api/v1/mobile/auth-check", s.mobileAuth(s.handleAuthCheck))
 	m.HandleFunc("/api/v1/mobile/bootstrap", s.mobileAuth(s.handleBootstrap))
 	m.HandleFunc("/api/v1/mobile/status", s.mobileAuth(s.handleMobileStatus))
@@ -552,11 +555,12 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	}
 	if reason, retry, p := s.tally.Pending(); p {
 		var old VoucherDetail
-		if at, ok := s.cache.Get("voucher-detail", c, mid, &old); ok && old.TotalsVersion == 1 {
+		if at, ok := s.cache.Get("voucher-detail", c, mid, &old); ok && old.TotalsVersion == 2 {
 			old.Live = false
 			old.Source = "saved"
 			old.Stale = true
 			old.FetchedAt = at
+			old.ShareText = dispatchShareText(old) + s.companyBankText(c)
 			jsonOut(w, old)
 			return
 		}
@@ -567,25 +571,27 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	x, e := s.fetchVoucherDetail(c, mid, hint)
 	if e != nil {
 		var old VoucherDetail
-		if at, ok := s.cache.Get("voucher-detail", c, mid, &old); ok && old.TotalsVersion == 1 {
+		if at, ok := s.cache.Get("voucher-detail", c, mid, &old); ok && old.TotalsVersion == 2 {
 			old.Live = false
 			old.Source = "saved"
 			old.Stale = true
 			old.FetchedAt = at
 			old.LiveError = e.Error()
+			old.ShareText = dispatchShareText(old) + s.companyBankText(c)
 			jsonOut(w, old)
 			return
 		}
 		jsonErr(w, 503, e)
 		return
 	}
+	x.ShareText = dispatchShareText(x) + s.companyBankText(c)
 	jsonOut(w, x)
 }
 func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) {
 	c := r.URL.Query().Get("company")
 	mid := r.URL.Query().Get("masterId")
 	var x VoucherDetail
-	if _, ok := s.cache.Get("voucher-detail", c, mid, &x); !ok || x.TotalsVersion != 1 {
+	if _, ok := s.cache.Get("voucher-detail", c, mid, &x); !ok || x.TotalsVersion != 2 {
 		var e error
 		x, e = s.fetchVoucherDetail(c, mid, VoucherRow{})
 		if e != nil {
@@ -803,6 +809,7 @@ func (s *Server) handleLedgerOutstanding(w http.ResponseWriter, r *http.Request)
 	}
 	bank, _ := s.store.PDFBank(c)
 	x.ReminderText = paymentReminder(x, bank)
+	x.ShareText += bankText(bank)
 	jsonOut(w, x)
 }
 func (s *Server) handleLedgerOutstandingPDF(w http.ResponseWriter, r *http.Request) {
@@ -879,6 +886,7 @@ func (s *Server) handleGroupBalances(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, 503, e)
 		return
 	}
+	x.ShareText = groupBalanceShareText(nonzeroGroup(x)) + s.companyBankText(c)
 	jsonOut(w, x)
 }
 func (s *Server) handleGroupBalancesPDF(w http.ResponseWriter, r *http.Request) {
@@ -898,7 +906,8 @@ func (s *Server) handleGroupBalancesPDF(w http.ResponseWriter, r *http.Request) 
 	}
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="Group-%s.pdf"`, sanitizeFileName(g)))
-	data, pe := groupBalancesPDF(x)
+	banks, _ := s.optionalBank(c, "")
+	data, pe := groupBalancesPDF(x, banks...)
 	if pe != nil {
 		w.Header().Del("Content-Disposition")
 		jsonErr(w, 503, pe)
@@ -1474,7 +1483,7 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 	// the single Voucher object with FETCH *. This remains one voucher only and
 	// runs sequentially, never in parallel. Request-specific ERRORMSG responses do
 	// not trip the global safety cooldown.
-	needObject := err != nil || x.TotalsVersion != 1 || x.InvoiceNumber == "" || x.InvoiceDate == "" || x.DispatchedThrough == "" || x.LRNumber == "" || len(x.Items) == 0
+	needObject := err != nil || x.TotalsVersion != 2 || x.InvoiceNumber == "" || x.InvoiceDate == "" || x.DispatchedThrough == "" || x.LRNumber == "" || len(x.Items) == 0
 	if needObject {
 		b2, d2, _, e2 := s.tally.request("Invoice detail enrich", c, voucherDetailObjectXML(c, mid), 12*time.Second)
 		if e2 == nil && !hasXMLNode(b2, "VOUCHER") {
@@ -1512,7 +1521,7 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 	if x.CustomerName == "" {
 		x.CustomerName = hint.Party
 	}
-	if x.TotalsVersion != 1 {
+	if x.TotalsVersion != 2 {
 		return VoucherDetail{}, errors.New("Tally did not return a verified invoice total; refresh with the company open in Tally before sharing")
 	}
 	x.CommonData = CommonData{Live: true, Source: "live", FetchedAt: time.Now(), DurationMS: d1}
@@ -1573,7 +1582,7 @@ func mergeVoucherDetail(a, b VoucherDetail) VoucherDetail {
 	if len(a.Items) == 0 {
 		a.Items = b.Items
 	}
-	if b.TotalsVersion == 1 && (a.TotalsVersion != 1 || len(b.Items) > 0) {
+	if b.TotalsVersion == 2 && (a.TotalsVersion != 2 || len(b.Items) > 0) {
 		a.Items = b.Items
 		a.DiscountAmount = b.DiscountAmount
 		a.TaxableAmount = b.TaxableAmount

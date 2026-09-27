@@ -2,7 +2,7 @@ package app
 
 import "time"
 
-const Version = "2.0.8-design-preview"
+const Version = "2.0.9-design-preview"
 
 type Settings struct {
 	TallyURL    string `json:"tallyUrl"`
@@ -127,12 +127,13 @@ type VoucherData struct {
 }
 
 type InvoiceItem struct {
-	Name     string  `json:"name"`
-	HSN      string  `json:"hsn,omitempty"`
-	Quantity string  `json:"quantity"`
-	Rate     string  `json:"rate"`
-	Amount   float64 `json:"amount"`
-	Discount float64 `json:"discount,omitempty"`
+	Name        string  `json:"name"`
+	Description string  `json:"description,omitempty"`
+	HSN         string  `json:"hsn,omitempty"`
+	Quantity    string  `json:"quantity"`
+	Rate        string  `json:"rate"`
+	Amount      float64 `json:"amount"`
+	Discount    float64 `json:"discount,omitempty"`
 }
 
 type VoucherDetail struct {
@@ -250,6 +251,7 @@ type BankDetails struct {
 	IFSC          string `json:"ifsc,omitempty"`
 	Branch        string `json:"branch,omitempty"`
 	UPI           string `json:"upi,omitempty"`
+	Manual        bool   `json:"manual,omitempty"`
 }
 
 type BankListData struct {

@@ -323,7 +323,7 @@ func parseTree(b []byte) (*xnode, error) {
 		switch z := tok.(type) {
 		case xml.StartElement:
 			n := &xnode{Name: strings.ToUpper(z.Name.Local)}
-			if n.Name == "LEDGER" || n.Name == "COMPANY" {
+			if n.Name == "LEDGER" || n.Name == "COMPANY" || n.Name == "STOCKITEM" {
 				for _, a := range z.Attr {
 					if strings.EqualFold(a.Name.Local, "NAME") {
 						n.Children = append(n.Children, &xnode{Name: "NAME", Text: a.Value})
@@ -816,7 +816,7 @@ func parseVoucherDetail(b []byte, company, masterID string, hint VoucherRow) Vou
 		if amt == 0 {
 			amt = abs(parseAmount(firstDeep(n, "AMOUNT")))
 		}
-		x.Items = append(x.Items, InvoiceItem{Name: name, HSN: firstDeep(n, "HSN", "HSNCODE", "HSNSAC"), Quantity: qty, Rate: rate, Amount: amt, Discount: abs(parseAmount(directChild(n, "DISCOUNTAMOUNT")))})
+		x.Items = append(x.Items, InvoiceItem{Name: name, Description: strings.Join(allDeep(n, "BASICUSERDESCRIPTION"), "\n"), HSN: firstDeep(n, "HSN", "HSNCODE", "HSNSAC"), Quantity: qty, Rate: rate, Amount: amt, Discount: abs(parseAmount(directChild(n, "DISCOUNTAMOUNT")))})
 	}
 
 	applyInvoiceAmounts(&x, r, hint)
@@ -835,6 +835,9 @@ func dispatchShareText(x VoucherDetail) string {
 	} else {
 		for i, it := range x.Items {
 			fmt.Fprintf(&b, "%d. %s - Qty: %s - Rate: %s\n", i+1, dash(it.Name), dash(it.Quantity), dash(it.Rate))
+			if it.Description != "" {
+				fmt.Fprintf(&b, "   %s\n", it.Description)
+			}
 		}
 	}
 	if x.DiscountAmount != 0 {

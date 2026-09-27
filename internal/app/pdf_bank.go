@@ -107,6 +107,7 @@ func (s *Server) handlePDFBank(w http.ResponseWriter, r *http.Request) {
 		}
 		if q.Details != nil {
 			bank = *q.Details
+			bank.Manual = true
 			bank.Ledger = q.Ledger
 			bank.AccountNumber = strings.TrimSpace(bank.AccountNumber)
 			bank.UPI = strings.TrimSpace(bank.UPI)

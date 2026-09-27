@@ -45,7 +45,7 @@ func applyInvoiceAmounts(x *VoucherDetail, root *xnode, hint VoucherRow) {
 	if !verified {
 		return
 	}
-	x.TotalsVersion = 1
+	x.TotalsVersion = 2
 	x.TotalAmount = abs(total)
 	direction := 1.0
 	if total > 0 {

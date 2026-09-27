@@ -26,5 +26,9 @@ final class BridgeApi {
   byte[] data=Http.request(store.get("base")+path,"GET",null,headers(path,"GET","",true),32*1024*1024);
   if(data.length<5||!new String(data,0,5,StandardCharsets.US_ASCII).equals("%PDF-"))throw new Exception("The bridge did not return a valid PDF");return data;
  }
+ byte[] pdfPost(String path,String body)throws Exception{
+  byte[] data=Http.request(store.get("base")+path,"POST",body.getBytes(StandardCharsets.UTF_8),headers(path,"POST",body,true),32*1024*1024);
+  if(data.length<5||!new String(data,0,5,StandardCharsets.US_ASCII).equals("%PDF-"))throw new Exception("The bridge did not return a valid PDF");return data;
+ }
  static String path(String endpoint,String company,String...params){StringBuilder p=new StringBuilder("/api/v1/mobile/").append(endpoint).append("?company=").append(Http.enc(company));for(int i=0;i<params.length;i+=2)p.append('&').append(Http.enc(params[i])).append('=').append(Http.enc(params[i+1]));return p.toString();}
 }

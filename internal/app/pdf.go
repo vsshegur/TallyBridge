@@ -115,7 +115,7 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	}
 	b.WriteString(`<table class="items"><colgroup><col style="width:5%"><col style="width:33%"><col style="width:11%"><col style="width:14%"><col style="width:16%"><col style="width:21%"></colgroup><thead><tr><th>#</th><th>Product</th><th>HSN</th><th class="num">Quantity</th><th class="num">Rate</th><th class="num">Amount (INR)</th></tr></thead><tbody>`)
 	for i, it := range x.Items {
-		fmt.Fprintf(&b, `<tr><td>%d</td><td>%s</td><td>%s</td><td class="num">%s</td><td class="num">%s</td><td class="num">%s</td></tr>`, i+1, he(it.Name), he(it.HSN), he(it.Quantity), he(it.Rate), he(indianNumber(it.Amount)))
+		fmt.Fprintf(&b, `<tr><td>%d</td><td>%s</td><td>%s</td><td class="num">%s</td><td class="num">%s</td><td class="num">%s</td></tr>`, i+1, he(it.Name)+descriptionHTML(it.Description), he(it.HSN), he(it.Quantity), he(it.Rate), he(indianNumber(it.Amount)))
 	}
 	if len(x.Items) == 0 {
 		b.WriteString(`<tr><td colspan="6">No product rows returned by Tally.</td></tr>`)
@@ -252,7 +252,9 @@ func groupDoc(x GroupBalanceData) pdfTableDoc {
 	}
 	return pdfTableDoc{Title: "LEDGER GROUP DETAILS", Company: x.Company, Subtitle: x.Group + " | " + pdfDataNote(x.CommonData), Headers: []string{"Ledger", "Parent group", "Balance (INR)", "Dr/Cr"}, Widths: []float64{190, 140, 130, 51}, Rows: rows, TotalLabel: "Net balance", Total: inr(x.Total), Numeric: []bool{false, false, true, false}}
 }
-func groupBalancesPDF(x GroupBalanceData) ([]byte, error) { return renderPDF(tableHTML(groupDoc(x))) }
+func groupBalancesPDF(x GroupBalanceData, bank ...BankDetails) ([]byte, error) {
+	return renderPDF(tableHTML(groupDoc(x), bank...))
+}
 func customerDoc(x Customer360Data) pdfTableDoc {
 	rows := [][]string{}
 	for _, v := range x.LatestInvoices {
@@ -348,12 +350,13 @@ func printPDF(parent context.Context, browser, dir, inputURL string, index int) 
 	}
 	return data, err
 }
-func renderPDF(document string) ([]byte, error) {
+func renderPDF(document string) ([]byte, error) { return renderPDFMode(document, true) }
+func renderPDFMode(document string, keep bool) ([]byte, error) {
 	key := sha256.Sum256([]byte(document))
 	renderedPDFMu.Lock()
 	cached, ok := renderedPDFs[key]
 	renderedPDFMu.Unlock()
-	if ok {
+	if ok && keep {
 		return append([]byte(nil), cached...), nil
 	}
 
@@ -404,7 +407,7 @@ func renderPDF(document string) ([]byte, error) {
 		renderedPDFs = map[[32]byte][]byte{}
 		renderedPDFBytes = 0
 	}
-	if len(data) <= 24<<20 {
+	if keep && len(data) <= 24<<20 {
 		renderedPDFs[key] = append([]byte(nil), data...)
 		renderedPDFBytes += len(data)
 	}

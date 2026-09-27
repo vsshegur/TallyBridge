@@ -12,7 +12,7 @@ import (
 func TestInvoiceDiscountGSTUsesPartyTotalNotLargestAmount(t *testing.T) {
 	xml := []byte(`<VOUCHER><PARTYLEDGERNAME>Buyer</PARTYLEDGERNAME><VOUCHERNUMBER>INV-1</VOUCHERNUMBER><ALLINVENTORYENTRIES.LIST><STOCKITEMNAME>Towels</STOCKITEMNAME><AMOUNT>1000</AMOUNT></ALLINVENTORYENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><AMOUNT>1000</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Discount</LEDGERNAME><AMOUNT>-200</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>CGST</LEDGERNAME><AMOUNT>72</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>SGST</LEDGERNAME><AMOUNT>72</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Buyer</LEDGERNAME><AMOUNT>-944</AMOUNT><BILLALLOCATIONS.LIST><AMOUNT>-944</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST></VOUCHER>`)
 	x := parseVoucherDetail(xml, "Firm", "1", VoucherRow{Amount: 1000})
-	if x.TotalAmount != 944 || x.TaxableAmount != 800 || x.DiscountAmount != 200 || x.CGST != 72 || x.SGST != 72 || x.OtherCharges != 0 || x.TotalsVersion != 1 {
+	if x.TotalAmount != 944 || x.TaxableAmount != 800 || x.DiscountAmount != 200 || x.CGST != 72 || x.SGST != 72 || x.OtherCharges != 0 || x.TotalsVersion != 2 {
 		t.Fatalf("wrong invoice: %+v", x)
 	}
 	if !strings.Contains(x.ShareText, "Total Amount - ₹944.00") {
@@ -44,8 +44,8 @@ func TestInvoiceTotalNotGuessedFromInventoryOrHint(t *testing.T) {
 	}
 }
 func TestInvoiceObjectReplacesMonetarySnapshotTogether(t *testing.T) {
-	a := VoucherDetail{TotalsVersion: 1, TotalAmount: 1000, TaxableAmount: 1000, Items: []InvoiceItem{{Amount: 1000}}}
-	b := VoucherDetail{TotalsVersion: 1, TotalAmount: 944, TaxableAmount: 800, DiscountAmount: 200, CGST: 72, SGST: 72, Items: []InvoiceItem{{Amount: 1000}}}
+	a := VoucherDetail{TotalsVersion: 2, TotalAmount: 1000, TaxableAmount: 1000, Items: []InvoiceItem{{Amount: 1000}}}
+	b := VoucherDetail{TotalsVersion: 2, TotalAmount: 944, TaxableAmount: 800, DiscountAmount: 200, CGST: 72, SGST: 72, Items: []InvoiceItem{{Amount: 1000}}}
 	x := mergeVoucherDetail(a, b)
 	if x.TotalAmount != 944 || x.DiscountAmount != 200 || x.TaxableAmount != 800 {
 		t.Fatal(x)

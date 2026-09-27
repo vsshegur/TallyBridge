@@ -40,6 +40,17 @@ jobs:
           go test ./internal/app -run TestWritePDFSmoke -count=1 -v
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           if (!(Test-Path $env:TB_PDF_SMOKE)) { throw 'Fallback PDF was not created' }
+      - name: Verify proforma PDF layout
+        shell: pwsh
+        run: |
+          $env:TB_PROFORMA_FIXTURE = Join-Path $env:RUNNER_TEMP 'proforma-verification'
+          go test ./internal/app -run TestWriteProformaFixture -count=1 -v
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Proforma-PDF-Verification
+          path: ${{ runner.temp }}/proforma-verification/proforma.pdf
+          if-no-files-found: error
       - name: Build Windows installers
         shell: pwsh
         run: ./scripts/Build-Windows.ps1
@@ -105,9 +116,9 @@ jobs:
           adb install -r android/app/build/outputs/apk/debug/app-debug.apk
           adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           adb shell am instrument -w in.tallybridge.app.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/design-results.txt
-          grep -q 'OK (2 tests)' /tmp/design-results.txt
+          grep -q 'OK (3 tests)' /tmp/design-results.txt
           mkdir -p android/ui-screenshots
-          for screen in 01-unlock 02-overview 03-reports 04-connect 05-dark-overview 06-dark-reports 07-dark-connect 08-dark-appearance 09-outstanding 10-filters 11-sync; do
+          for screen in 01-unlock 02-overview 03-reports 04-connect 05-dark-overview 06-dark-reports 07-dark-connect 08-dark-appearance 09-outstanding 10-filters 11-sync 12-proforma 13-proforma-totals 14-proforma-review; do
             adb exec-out run-as in.tallybridge.app cat "files/ui/$screen.png" > "android/ui-screenshots/$screen.png"
             test -s "android/ui-screenshots/$screen.png"
           done
