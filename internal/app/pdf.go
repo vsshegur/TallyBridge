@@ -225,14 +225,14 @@ func ledgerStatementPDF(x LedgerStatementData, bank ...BankDetails) ([]byte, err
 }
 func outstandingDoc(x LedgerOutstandingData) pdfTableDoc {
 	rows := [][]string{}
-	for _, v := range x.Bills {
-		rows = append(rows, []string{v.BillNumber, displayDate(v.Date), displayDate(v.DueDate), fmt.Sprint(v.Ageing), indianNumber(v.PendingAmount) + " " + v.DrCr})
+	for _, v := range sortedBills(x.Bills) {
+		rows = append(rows, []string{v.BillNumber, displayDate(v.Date), invoiceDaysLabel(v.Date), indianNumber(v.PendingAmount) + " " + v.DrCr})
 	}
-	note := ""
+	note := x.FilterLabel
 	if x.SummaryOnly {
 		note = "Summary only: bill-wise breakup is unavailable. Total is the saved party ledger balance, not a newly verified bill-wise total."
 	}
-	return pdfTableDoc{Title: "OUTSTANDING BALANCE", Company: x.Company, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Bill number", "Bill date", "Due date", "Days", "Pending (INR)"}, Widths: []float64{130, 90, 90, 50, 151}, Rows: rows, TotalLabel: "Net outstanding", Total: inr(x.Total) + " " + x.DrCr, Note: note, Numeric: []bool{false, false, false, true, true}}
+	return pdfTableDoc{Title: "OUTSTANDING BALANCE", Company: x.Company, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Bill number", "Bill date", "Due for", "Pending (INR)"}, Widths: []float64{155, 110, 90, 156}, Rows: rows, TotalLabel: "Net outstanding", Total: inr(x.Total) + " " + x.DrCr, Note: note, Numeric: []bool{false, false, false, true}}
 }
 func ledgerOutstandingPDF(x LedgerOutstandingData, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(tableHTML(outstandingDoc(x), bank...))

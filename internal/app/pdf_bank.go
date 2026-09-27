@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -80,8 +81,9 @@ func (s *Server) handlePDFBank(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var q struct {
-		Company string `json:"company"`
-		Ledger  string `json:"ledger"`
+		Company string       `json:"company"`
+		Ledger  string       `json:"ledger"`
+		Details *BankDetails `json:"details,omitempty"`
 	}
 	if readJSON(r, &q) != nil || strings.TrimSpace(q.Company) == "" {
 		jsonErr(w, 400, errors.New("company required"))
@@ -103,20 +105,32 @@ func (s *Server) handlePDFBank(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, 400, errors.New("choose a bank ledger from this company's saved index"))
 			return
 		}
-		// Explicit desktop save/refresh reads the selected bank once. Sharing PDFs never does.
-		b, _, _, e := s.tally.request("Save PDF bank", q.Company, ledgerDetailXML(q.Company, q.Ledger), 0)
-		if e != nil {
-			jsonErr(w, 503, e)
-			return
+		if q.Details != nil {
+			bank = *q.Details
+			bank.Ledger = q.Ledger
+			bank.AccountNumber = strings.TrimSpace(bank.AccountNumber)
+			bank.UPI = strings.TrimSpace(bank.UPI)
+			bank.IFSC = strings.ToUpper(strings.TrimSpace(bank.IFSC))
+			if len(bank.AccountNumber) > 64 || len(bank.UPI) > 128 || len(bank.BankName) > 160 || len(bank.AccountHolder) > 160 || len(bank.Branch) > 160 || (bank.IFSC != "" && !regexp.MustCompile(`^[A-Z]{4}0[A-Z0-9]{6}$`).MatchString(bank.IFSC)) {
+				jsonErr(w, 400, errors.New("check bank details and the 11-character IFSC"))
+				return
+			}
+		} else {
+			// Explicit desktop save/refresh reads the selected bank once. Sharing PDFs never does.
+			b, _, _, e := s.tally.request("Save PDF bank", q.Company, bankLedgerXML(q.Company, q.Ledger), 0)
+			if e != nil {
+				jsonErr(w, 503, e)
+				return
+			}
+			details := parseLedgerDetails(b)
+			if details["NAME"] != "" && !strings.EqualFold(details["NAME"], q.Ledger) {
+				jsonErr(w, 503, errors.New("Tally returned a different bank ledger; previous default kept"))
+				return
+			}
+			bank = bankDetailsFromMap(q.Ledger, details)
 		}
-		details := parseLedgerDetails(b)
-		if details["NAME"] != "" && !strings.EqualFold(details["NAME"], q.Ledger) {
-			jsonErr(w, 503, errors.New("Tally returned a different bank ledger; previous default kept"))
-			return
-		}
-		bank = bankDetailsFromMap(q.Ledger, details)
 		if bank.AccountNumber == "" && bank.UPI == "" {
-			jsonErr(w, 422, errors.New("this ledger returned no account number or UPI; previous PDF bank kept"))
+			jsonErr(w, 422, errors.New("Tally did not export an account number or UPI. Enter and verify the bank details below to save them; previous bank kept"))
 			return
 		}
 	}

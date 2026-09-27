@@ -283,6 +283,11 @@ func voucherDetailObjectXML(company, masterID string) []byte {
 func ledgerDetailXML(company, ledger string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Ledger</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>Name</FETCH><FETCH>Parent</FETCH><FETCH>Address</FETCH><FETCH>LedgerPhone</FETCH><FETCH>Email</FETCH><FETCH>IncomeTaxNumber</FETCH><FETCH>PartyGSTIN</FETCH><FETCH>StateName</FETCH><FETCH>Pincode</FETCH><FETCH>ClosingBalance</FETCH><FETCH>BankName</FETCH><FETCH>BankAccountNumber</FETCH><FETCH>BankAccHolderName</FETCH><FETCH>IFSCCode</FETCH><FETCH>BranchName</FETCH><FETCH>UPIID</FETCH><FETCH>UPIId</FETCH><FETCH>BankDetails.*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(ledger), escXML(company)))
 }
+
+// Fetch the selected bank object completely: bank methods vary across Tally versions.
+func bankLedgerXML(company, ledger string) []byte {
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Ledger</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(ledger), escXML(company)))
+}
 func ledgerStatementXML(company, ledger, from, to string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLiveLedgerVouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLiveLedgerVouchers" ISMODIFY="No"><TYPE>Vouchers : Ledger</TYPE><CHILDOF>%s</CHILDOF><NATIVEMETHOD>Date</NATIVEMETHOD><NATIVEMETHOD>VoucherNumber</NATIVEMETHOD><NATIVEMETHOD>PartyLedgerName</NATIVEMETHOD><NATIVEMETHOD>VoucherTypeName</NATIVEMETHOD><NATIVEMETHOD>Amount</NATIVEMETHOD><FETCH>AllLedgerEntries.LedgerName,AllLedgerEntries.Amount</FETCH><NATIVEMETHOD>MasterID</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), from, to, escXML(ledger)))
 }
@@ -569,6 +574,14 @@ func parseLedgerDetails(b []byte) map[string]string {
 	if e != nil {
 		return nil
 	}
+	var ledgers []*xnode
+	nodesByName(r, "LEDGER", &ledgers)
+	if len(ledgers) > 1 {
+		return nil
+	}
+	if len(ledgers) == 1 {
+		r = ledgers[0]
+	}
 	fields := []string{"NAME", "PARENT", "PARTYGSTIN", "INCOMETAXNUMBER", "LEDGERPHONE", "EMAIL", "STATENAME", "PINCODE", "CLOSINGBALANCE", "BANKNAME", "BANKACCOUNTNUMBER", "BANKACCHOLDERNAME", "IFSCCODE", "BRANCHNAME", "UPIID"}
 	m := map[string]string{}
 	for _, f := range fields {
@@ -576,11 +589,26 @@ func parseLedgerDetails(b []byte) map[string]string {
 			m[f] = v
 		}
 	}
+	for canonical, tags := range map[string][]string{
+		"BANKACCOUNTNUMBER": {"BANKACNO", "BANKACCOUNTNO", "ACCOUNTNUMBER", "ACCOUNTNO", "ACNO"},
+		"IFSCCODE":          {"IFSC", "BANKIFSC", "BANKIFSCCODE"},
+		"BANKACCHOLDERNAME": {"ACCOUNTHOLDERNAME", "ACCOUNTHOLDER", "BANKACCHOLDER"},
+		"UPIID":             {"UPIADDRESS", "VPA", "VIRTUALPAYMENTADDRESS"},
+	} {
+		if m[canonical] == "" {
+			for _, tag := range tags {
+				if value := firstDeep(r, tag); value != "" {
+					m[canonical] = value
+					break
+				}
+			}
+		}
+	}
 	// Tally customisations and bank ledgers use slightly different tag names.
 	// Keep the response parser tolerant without ever making a second request.
 	aliases := map[string]func(string) bool{
 		"BANKNAME": func(n string) bool {
-			return strings.Contains(n, "BANK") && strings.Contains(n, "NAME") && !strings.Contains(n, "ACCOUNT")
+			return strings.Contains(n, "BANK") && strings.Contains(n, "NAME") && !strings.Contains(n, "ACCOUNT") && !strings.Contains(n, "HOLDER") && !strings.Contains(n, "BRANCH")
 		},
 		"BANKACCOUNTNUMBER": func(n string) bool {
 			return strings.Contains(n, "ACCOUNT") && (strings.Contains(n, "NUMBER") || strings.Contains(n, "NO"))
@@ -880,22 +908,24 @@ func ledgerStatementShareText(x LedgerStatementData) string {
 
 func ledgerOutstandingShareText(x LedgerOutstandingData) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Outstanding Balance\nCompany - %s\nLedger - %s\n", dash(x.Company), dash(x.Ledger))
+	fmt.Fprintf(&b, "*Outstanding Balance*\n%s\nCustomer: %s\n", dash(x.Company), dash(x.Ledger))
+	if x.FilterLabel != "" {
+		fmt.Fprintf(&b, "View: %s\n", x.FilterLabel)
+	}
 	if len(x.Bills) == 0 {
-		b.WriteString("\nBill-wise breakup unavailable. Summary from saved party balance.")
+		if x.SummaryOnly {
+			b.WriteString("\nBill-wise breakup unavailable. Summary from saved party balance.\n")
+		} else {
+			b.WriteString("\nNo pending bills in this view.\n")
+		}
 	} else {
-		b.WriteString("\nPending Bills\n")
-		for i, v := range x.Bills {
-			due := ""
-			if v.DueDate != "" {
-				due = " | Due: " + displayDate(v.DueDate)
-			}
-			fmt.Fprintf(&b, "%d. %s | %s%s | ₹%s %s\n", i+1, dash(v.BillNumber), displayDate(v.Date), due, indianNumber(v.PendingAmount), v.DrCr)
+		for i, v := range sortedBills(x.Bills) {
+			fmt.Fprintf(&b, "\n*%d. %s*\nInvoice date: %s\nDue for: %s\nPending: ₹%s %s\n", i+1, dash(v.BillNumber), displayDate(v.Date), invoiceDaysLabel(v.Date), indianNumber(v.PendingAmount), v.DrCr)
 		}
 	}
-	fmt.Fprintf(&b, "\nTotal Outstanding - ₹%s %s", indianNumber(x.Total), x.DrCr)
+	fmt.Fprintf(&b, "\n*Total Outstanding - ₹%s %s*", indianNumber(x.Total), x.DrCr)
 	if !x.FetchedAt.IsZero() {
-		fmt.Fprintf(&b, "\nLast updated - %s", x.FetchedAt.Local().Format("02 Jan 2006 15:04"))
+		fmt.Fprintf(&b, "\nLast updated: %s", x.FetchedAt.Local().Format("02 Jan 2006, 3:04 PM"))
 	}
 	return b.String()
 }

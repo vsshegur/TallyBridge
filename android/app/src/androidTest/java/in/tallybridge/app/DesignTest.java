@@ -51,6 +51,17 @@ public class DesignTest {
   capture("06-dark-reports");
   ui(()->{try{call("connectScreen");}catch(Exception e){throw new RuntimeException(e);}});
   capture("07-dark-connect");
+  ui(()->{try{
+   JSONObject report=new JSONObject("{\"fetchedAt\":\"2026-09-27T08:00:00Z\",\"total\":24500,\"drCr\":\"Dr\",\"bills\":[{\"id\":\"fixture1\",\"billNumber\":\"INV-2026-001\",\"date\":\"2026-06-01\",\"invoiceDays\":118,\"pendingAmount\":24500,\"drCr\":\"Dr\"}]}");
+   Method m=MainActivity.class.getDeclaredMethod("renderOutstanding",String.class,String.class,JSONObject.class);m.setAccessible(true);m.invoke(rule.getActivity(),"ABC Textiles & Trading Company","",report);
+  }catch(Exception e){throw new RuntimeException(e);}});
+  capture("09-outstanding");
+  ui(()->{try{
+   Method m=MainActivity.class.getDeclaredMethod("outstandingFilters",String.class,String.class,JSONObject.class);m.setAccessible(true);m.invoke(rule.getActivity(),"ABC Textiles","",new JSONObject());
+  }catch(Exception e){throw new RuntimeException(e);}});
+  capture("10-filters");
+  ui(()->{try{call("syncStatus");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("11-sync");
   ui(()->{try{field("tab","More");call("more");call("chooseAppearance");}catch(Exception e){throw new RuntimeException(e);}});
   capture("08-dark-appearance");
   ui(()->{try{

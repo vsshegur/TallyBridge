@@ -7,8 +7,8 @@ android {
         minSdk 28
         targetSdk 35
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-        versionCode 20004
-        versionName '2.0.4-recovery-preview'
+        versionCode 20006
+        versionName '2.0.6-reports-preview'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     signingConfigs {

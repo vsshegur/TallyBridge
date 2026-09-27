@@ -782,11 +782,27 @@ func (s *Server) handleLedgerOutstanding(w http.ResponseWriter, r *http.Request)
 		jsonErr(w, 400, errors.New("company and ledger required"))
 		return
 	}
-	x, e := s.getLedgerOutstanding(c, l)
+	var x LedgerOutstandingData
+	var e error
+	if r.URL.Query().Get("view") == "1" {
+		if _, ok := s.cache.Get("ledger-outstanding-display", c, l, &x); !ok {
+			jsonErr(w, 409, errors.New("refresh outstanding before filtering"))
+			return
+		}
+	} else {
+		x, e = s.getLedgerOutstanding(c, l)
+	}
 	if e != nil {
 		jsonErr(w, 503, e)
 		return
 	}
+	x, e = outstandingView(x, r.URL.Query())
+	if e != nil {
+		jsonErr(w, 409, e)
+		return
+	}
+	bank, _ := s.store.PDFBank(c)
+	x.ReminderText = paymentReminder(x, bank)
 	jsonOut(w, x)
 }
 func (s *Server) handleLedgerOutstandingPDF(w http.ResponseWriter, r *http.Request) {
@@ -803,6 +819,11 @@ func (s *Server) handleLedgerOutstandingPDF(w http.ResponseWriter, r *http.Reque
 			jsonErr(w, 503, e)
 			return
 		}
+	}
+	x, e = outstandingView(x, r.URL.Query())
+	if e != nil {
+		jsonErr(w, 409, e)
+		return
 	}
 	bank, be := s.optionalBank(c, r.URL.Query().Get("bank"))
 	if be != nil {

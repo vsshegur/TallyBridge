@@ -2,7 +2,7 @@ package app
 
 import "time"
 
-const Version = "2.0.5-design-preview"
+const Version = "2.0.6-design-preview"
 
 type Settings struct {
 	TallyURL    string `json:"tallyUrl"`
@@ -83,6 +83,8 @@ type OutstandingData struct {
 	Type    string             `json:"type"`
 }
 type BillRow struct {
+	ID             string  `json:"id"`
+	InvoiceDays    int     `json:"invoiceDays"`
 	SignedAmount   float64 `json:"signedAmount"`
 	DrCr           string  `json:"drCr,omitempty"`
 	Party          string  `json:"party,omitempty"`
@@ -182,7 +184,9 @@ type LedgerStatementData struct {
 }
 
 type LedgerOutstandingData struct {
-	DrCr string `json:"drCr,omitempty"`
+	FilterLabel  string `json:"filterLabel,omitempty"`
+	ReminderText string `json:"reminderText,omitempty"`
+	DrCr         string `json:"drCr,omitempty"`
 	CommonData
 	Company     string    `json:"company"`
 	Ledger      string    `json:"ledger"`
