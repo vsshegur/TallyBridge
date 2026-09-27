@@ -119,7 +119,8 @@ func bankHTML(banks []BankDetails, payments ...PaymentQR) string {
 	}
 	out.WriteString(`</div></section>`)
 	return out.String()
-}func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
+}
+func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, `<div class="meta">%s</div><div class="grid"><section class="panel"><h3>Bill to</h3><p><b>%s</b></p>`, he(pdfDataNote(x.CommonData)), he(firstNonBlank(x.CustomerName, "Customer not returned")))
 	for _, a := range x.CustomerAddress {
