@@ -185,3 +185,14 @@ func TestInvoiceDetailOpensFromDayWithoutMasterIDObject(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	if atomic.LoadInt32(&calls)!=1 || x.InvoiceNumber!="INV-22" || x.TotalAmount!=200 { t.Fatalf("calls=%d detail=%+v",calls,x) }
 }
+
+
+func TestVoucherPresentationHasBankAndSupplierVariants(t *testing.T) {
+	s, ts := testServerWithTally(t, func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, `<ENVELOPE/>`) })
+	defer ts.Close()
+	_ = s.cache.Put("company-profile-v1","Demo","",CompanyProfile{Name:"Demo",GSTIN:"27ABCDE1234F1Z5",Address:"Market Road",Phone:"9876543210"},time.Now())
+	_ = s.store.SavePDFBank("Demo",BankDetails{Ledger:"Bank",BankName:"Demo Bank",AccountNumber:"1234",IFSC:"DEMO0001234",UPI:"demo@upi"})
+	x := VoucherDetail{Company:"Demo",InvoiceNumber:"INV-1",InvoiceDate:"2026-09-27",CustomerName:"Buyer",TotalAmount:100}
+	s.applyVoucherPresentation("Demo",&x)
+	if x.Supplier.GSTIN=="" || x.Bank.UPI!="demo@upi" || x.ShareText=="" || !strings.Contains(x.ShareTextWithBank,"demo@upi") || strings.Contains(x.ShareText,"demo@upi") { t.Fatalf("%+v",x) }
+}

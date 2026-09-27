@@ -94,3 +94,13 @@ func TestVoucherDayLookupAvoidsTallyNumberFilter(t *testing.T) {
 	detail, ok := parseVoucherDayDetail(raw, "Demo Company", "43795", VoucherRow{Number:"INV-22",Date:"2026-09-27",Party:"ABC Buyer",VoucherType:"GST Sales",Amount:200})
 	if !ok || detail.InvoiceNumber!="INV-22" || detail.CustomerName!="ABC Buyer" || len(detail.Items)!=1 || detail.TotalAmount!=200 { t.Fatalf("ok=%v detail=%+v",ok,detail) }
 }
+
+
+func TestCompanyProfileParsesContactAndBuyerSelection(t *testing.T) {
+	d := supplierDetailsFromXML([]byte(`<COMPANY><MAILINGNAME>Demo Textiles</MAILINGNAME><ADDRESS>Market Road</ADDRESS><ADDRESS>Solapur</ADDRESS><PINCODE>413001</PINCODE><MOBILENUMBER>9876543210</MOBILENUMBER><EMAIL>accounts@example.com</EMAIL><GSTIN>27ABCDE1234F1Z5</GSTIN></COMPANY>`))
+	p := profileFromDetails("Fallback", d)
+	if p.Name!="Demo Textiles" || p.GSTIN!="27ABCDE1234F1Z5" || p.Phone!="9876543210" || p.Email!="accounts@example.com" || !strings.Contains(companyProfileAddress(p),"413001") { t.Fatalf("%+v",p) }
+	multi := []byte(`<ENVELOPE><LEDGER NAME="Wrong"><ADDRESS>Wrong City</ADDRESS></LEDGER><LEDGER NAME="ABC Buyer"><LEDGSTREGDETAILS.LIST><GSTIN>27AAAAA0000A1Z5</GSTIN></LEDGSTREGDETAILS.LIST><LEDMAILINGDETAILS.LIST><ADDRESS>Buyer Road</ADDRESS><ADDRESS>Solapur</ADDRESS><PINCODE>413001</PINCODE></LEDMAILINGDETAILS.LIST></LEDGER></ENVELOPE>`)
+	m := parseLedgerDetailsFor(multi,"ABC Buyer")
+	if m["PARTYGSTIN"]!="27AAAAA0000A1Z5" || !strings.Contains(m["ADDRESS"],"Buyer Road") || m["CITY"]!="Solapur" { t.Fatalf("%#v",m) }
+}
