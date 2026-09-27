@@ -567,7 +567,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 		jsonOut(w, map[string]any{"pending": true, "reason": reason, "retryAfterMs": retry.Milliseconds()})
 		return
 	}
-	hint := VoucherRow{MasterID: mid, Number: r.URL.Query().Get("number"), Date: normISODate(r.URL.Query().Get("date")), Party: r.URL.Query().Get("party"), Amount: parseAmount(r.URL.Query().Get("amount"))}
+	hint := VoucherRow{MasterID: mid, Number: r.URL.Query().Get("number"), Date: normISODate(r.URL.Query().Get("date")), Party: r.URL.Query().Get("party"), Amount: parseAmount(r.URL.Query().Get("amount")), VoucherType: r.URL.Query().Get("voucherType")}
 	x, e := s.fetchVoucherDetail(c, mid, hint)
 	if e != nil {
 		var old VoucherDetail
@@ -615,32 +615,40 @@ func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) 
 	_, _ = w.Write(pdf)
 }
 func (s *Server) handleLedgerDetails(w http.ResponseWriter, r *http.Request) {
-	c, l := r.URL.Query().Get("company"), r.URL.Query().Get("ledger")
+	c, l := strings.TrimSpace(r.URL.Query().Get("company")), strings.TrimSpace(r.URL.Query().Get("ledger"))
 	if c == "" || l == "" {
 		jsonErr(w, 400, errors.New("company and ledger required"))
 		return
 	}
-	b, d, _, e := s.tally.request("Ledger details", c, ledgerDetailXML(c, l), 0)
-	if e != nil {
+	details := map[string]string{}
+	var duration int64
+	var liveErr error
+	if b, d, _, e := s.tally.request("Ledger details", c, ledgerDetailXML(c, l), 0); e == nil {
+		duration = d
+		for k, v := range parseLedgerDetails(b) {
+			if strings.TrimSpace(v) != "" { details[k] = v }
+		}
+	} else { liveErr = e }
+	if details["PARTYGSTIN"] == "" || details["ADDRESS"] == "" || details["CITY"] == "" || details["STATENAME"] == "" {
+		if b, d, _, e := s.tally.request("Ledger details fallback", c, ledgerDetailCollectionXML(c, l), 0); e == nil {
+			if d > duration { duration = d }
+			for k, v := range parseLedgerDetails(b) {
+				if strings.TrimSpace(v) != "" && details[k] == "" { details[k] = v }
+			}
+			liveErr = nil
+		} else if liveErr == nil { liveErr = e }
+	}
+	if len(details) == 0 {
 		var old map[string]any
 		if at, ok := s.cache.Get("ledger-details", c, l, &old); ok {
-			old["live"] = false
-			old["source"] = "saved"
-			old["stale"] = true
-			old["fetchedAt"] = at
-			old["liveError"] = e.Error()
-			jsonOut(w, old)
-			return
+			old["live"] = false; old["source"] = "saved"; old["stale"] = true; old["fetchedAt"] = at
+			if liveErr != nil { old["liveError"] = liveErr.Error() }
+			jsonOut(w, old); return
 		}
-		jsonErr(w, 503, e)
+		if liveErr != nil { jsonErr(w, 503, liveErr) } else { jsonErr(w, 503, errors.New("Tally returned no recognized ledger details")) }
 		return
 	}
-	details := parseLedgerDetails(b)
-	if len(details) == 0 {
-		jsonErr(w, 503, errors.New("Tally returned no recognized ledger details"))
-		return
-	}
-	x := map[string]any{"live": true, "source": "live", "fetchedAt": time.Now(), "durationMs": d, "details": details}
+	x := map[string]any{"live": true, "source": "live", "fetchedAt": time.Now(), "durationMs": duration, "details": details}
 	_ = s.cache.Put("ledger-details", c, l, x, time.Now())
 	jsonOut(w, x)
 }
@@ -1465,6 +1473,9 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 	if supplied.Amount != 0 {
 		hint.Amount = supplied.Amount
 	}
+	if supplied.VoucherType != "" {
+		hint.VoucherType = supplied.VoucherType
+	}
 
 	// First use a compact Voucher collection. These methods are widely supported
 	// across TallyPrime versions and include the standard dispatch/LR fields.
@@ -1479,10 +1490,18 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 		return VoucherDetail{}, err
 	}
 
-	// If the compact response was rejected or omitted dispatch data, enrich from
-	// the single Voucher object with FETCH *. This remains one voucher only and
-	// runs sequentially, never in parallel. Request-specific ERRORMSG responses do
-	// not trip the global safety cooldown.
+	// Some Tally builds expose a register MasterID that cannot be reopened as a
+	// voucher object. Fall back to the exact register identity: voucher type,
+	// date and voucher number, still using a read-only collection.
+	if err != nil && hint.Number != "" && hint.Date != "" {
+		if qb := voucherDetailHintXML(c, hint); len(qb) > 0 {
+			if b0, d0, _, e0 := s.tally.request("Invoice detail by number", c, qb, 12*time.Second); e0 == nil && hasXMLNode(b0, "VOUCHER") {
+				x = parseVoucherDetail(b0, c, mid, hint)
+				err = nil
+				if d0 > d1 { d1 = d0 }
+			}
+		}
+	}
 	needObject := err != nil || x.TotalsVersion != 2 || x.InvoiceNumber == "" || x.InvoiceDate == "" || x.DispatchedThrough == "" || x.LRNumber == "" || len(x.Items) == 0
 	if needObject {
 		b2, d2, _, e2 := s.tally.request("Invoice detail enrich", c, voucherDetailObjectXML(c, mid), 12*time.Second)

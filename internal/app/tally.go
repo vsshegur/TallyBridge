@@ -284,8 +284,22 @@ func voucherDetailObjectXML(company, masterID string) []byte {
 	// object data without changing or writing anything in Tally.
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetailFull</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetailFull" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherFullMasterIDFilter</FILTER><FETCH>*</FETCH><FETCH>AllInventoryEntries.*</FETCH><FETCH>AllLedgerEntries.*</FETCH><FETCH>LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherFullMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
 }
+func voucherDetailHintXML(company string, hint VoucherRow) []byte {
+	date := strings.ReplaceAll(normISODate(hint.Date), "-", "")
+	if len(date) != 8 || strings.TrimSpace(hint.Number) == "" {
+		return nil
+	}
+	vtype := strings.TrimSpace(hint.VoucherType)
+	if vtype == "" { vtype = "Sales" }
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherByIdentity</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherByIdentity" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><FILTER>TBVoucherNumberFilter</FILTER><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherNumberFilter" ISMODIFY="No">$VoucherNumber = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), date, date, escXML(vtype), escXML(strings.TrimSpace(hint.Number))))
+}
+
 func ledgerDetailXML(company, ledger string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Ledger</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>Name</FETCH><FETCH>MailingName</FETCH><FETCH>Parent</FETCH><FETCH>Address</FETCH><FETCH>City</FETCH><FETCH>CountryName</FETCH><FETCH>StateName</FETCH><FETCH>LedStateName</FETCH><FETCH>Pincode</FETCH><FETCH>PartyGSTIN</FETCH><FETCH>GSTIN</FETCH><FETCH>GSTRegistrationNumber</FETCH><FETCH>LedMultiAddressList.*</FETCH><FETCH>LedGSTRegDetails.*</FETCH><FETCH>LedgerPhone</FETCH><FETCH>Email</FETCH><FETCH>IncomeTaxNumber</FETCH><FETCH>ClosingBalance</FETCH><FETCH>BankName</FETCH><FETCH>BankAccountNumber</FETCH><FETCH>BankAccHolderName</FETCH><FETCH>IFSCCode</FETCH><FETCH>BranchName</FETCH><FETCH>UPIID</FETCH><FETCH>UPIId</FETCH><FETCH>BankDetails.*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(ledger), escXML(company)))
+}
+
+func ledgerDetailCollectionXML(company, ledger string) []byte {
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLedgerDetailFallback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLedgerDetailFallback" ISMODIFY="No"><TYPE>Ledger</TYPE><FILTER>TBLedgerNameFilter</FILTER><FETCH>*</FETCH><FETCH>Address.*</FETCH><FETCH>LedMailingDetails.*</FETCH><FETCH>LedMultiAddressList.*</FETCH><FETCH>LedGSTRegDetails.*</FETCH><FETCH>GSTDetails.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBLedgerNameFilter" ISMODIFY="No">$Name = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), escXML(strings.TrimSpace(ledger))))
 }
 
 // Fetch the selected bank object completely: bank methods vary across Tally versions.
@@ -599,7 +613,7 @@ func parseLedgerDetails(b []byte) map[string]string {
 		}
 	}
 	if m["PARTYGSTIN"] == "" {
-		m["PARTYGSTIN"] = firstNonBlank(m["GSTIN"], m["GSTREGISTRATIONNUMBER"], firstDeep(r, "GSTREGNUMBER", "GSTREGISTRATIONNO"))
+		m["PARTYGSTIN"] = firstNonBlank(m["GSTIN"], m["GSTREGISTRATIONNUMBER"], firstDeep(r, "GSTREGNUMBER", "GSTREGISTRATIONNO"), firstDeepTagMatch(r, func(tag string) bool { return tag == "GSTIN" || strings.HasSuffix(tag, "GSTIN") }))
 	}
 	if m["STATENAME"] == "" {
 		m["STATENAME"] = firstNonBlank(m["LEDSTATENAME"], firstDeep(r, "PLACEOFSUPPLY", "STATE"))

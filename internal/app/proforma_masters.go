@@ -22,13 +22,41 @@ type StockItemsData struct {
 }
 
 func stockItemsXML(company string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBProformaStock</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBProformaStock"><TYPE>StockItem</TYPE><FETCH>Name,BaseUnits,Description,AdditionalName,GSTDetails.*,HSNDetails.*,GSTHSNCode</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBProformaStock</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBProformaStock" ISMODIFY="No"><TYPE>StockItem</TYPE><FETCH>Name,Parent,BaseUnits,Description,AdditionalName,GSTApplicable,GSTTypeOfSupply,GSTDetails.*,HSNDetails.*,GSTHSNCode,HSNCode,HSNMasterName</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
 }
 func companyDetailsXML(company string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Company</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>Name</FETCH><FETCH>MailingName</FETCH><FETCH>Address</FETCH><FETCH>City</FETCH><FETCH>StateName</FETCH><FETCH>CountryName</FETCH><FETCH>Pincode</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(company), escXML(company)))
 }
 func taxUnitsXML(company string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBProformaTaxUnits</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBProformaTaxUnits" ISMODIFY="No"><TYPE>Tax Unit</TYPE><FETCH>Name,GSTRegNumber,StateName,PinCode,AddressName,Address</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBProformaTaxUnits</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBProformaTaxUnits" ISMODIFY="No"><TYPE>Tax Unit</TYPE><FETCH>Name,GSTRegNumber,StateName,PinCode,AddressName,Address</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
+}
+func companyGSTXML(company string) []byte {
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>TBCompanyGSTReport</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><REPORT NAME="TBCompanyGSTReport"><FORM>TBCompanyGSTForm</FORM></REPORT><FORM NAME="TBCompanyGSTForm"><PART>TBCompanyGSTPart</PART></FORM><PART NAME="TBCompanyGSTPart"><LINE>TBCompanyGSTLine</LINE></PART><LINE NAME="TBCompanyGSTLine"><FIELDS>TBCompanyGSTIN</FIELDS></LINE><FIELD NAME="TBCompanyGSTIN"><SET>@@CMPGSTaxNumber</SET><XMLTAG>GSTIN</XMLTAG></FIELD></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
+}
+func hsnFromNode(n *xnode, asOf string) string {
+	var rows []*xnode
+	nodesByName(n, "HSNDETAILS.LIST", &rows)
+	var best *xnode
+	bestDate := ""
+	for _, row := range rows {
+		d := normISODate(firstDeep(row, "APPLICABLEFROM"))
+		if d == "" || d <= asOf {
+			if best == nil || d >= bestDate {
+				best, bestDate = row, d
+			}
+		}
+	}
+	if best != nil {
+		if v := firstDeep(best, "HSNCODE", "GSTHSNCODE"); v != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	if v := firstDeep(n, "GSTHSNCODE", "HSNCODE"); v != "" {
+		return strings.TrimSpace(v)
+	}
+	return firstDeepTagMatch(n, func(tag string) bool {
+		return strings.Contains(tag, "HSNCODE") && !strings.Contains(tag, "MASTER")
+	})
 }
 func supplierDetailsFromXML(raw []byte) map[string]string {
 	root, _ := parseTree(raw)
@@ -36,7 +64,7 @@ func supplierDetailsFromXML(raw []byte) map[string]string {
 		return map[string]string{}
 	}
 	details := map[string]string{}
-	if v := firstDeep(root, "GSTREGNUMBER", "GSTREGISTRATIONNUMBER", "GSTIN", "CMPGSTIN"); v != "" {
+	if v := firstNonBlank(firstDeep(root, "GSTREGNUMBER", "GSTREGISTRATIONNUMBER", "GSTIN", "CMPGSTIN"), firstDeepTagMatch(root, func(tag string) bool { return strings.Contains(tag, "GST") && strings.HasSuffix(tag, "IN") })); v != "" {
 		details["gstin"] = strings.ToUpper(strings.TrimSpace(v))
 	}
 	if a := allDeep(root, "ADDRESS"); len(a) > 0 {
@@ -77,7 +105,7 @@ func parseStockItems(raw []byte, asOf string) []StockItemMaster {
 	nodesByName(root, "STOCKITEM", &nodes)
 	out := []StockItemMaster{}
 	for _, n := range nodes {
-		x := StockItemMaster{Name: firstDeep(n, "NAME"), Unit: firstDeep(n, "BASEUNITS"), Description: firstDeep(n, "DESCRIPTION", "ADDITIONALNAME"), HSN: firstDeep(n, "GSTHSNCODE", "HSNCODE")}
+		x := StockItemMaster{Name: firstDeep(n, "NAME"), Unit: firstDeep(n, "BASEUNITS"), Description: firstDeep(n, "DESCRIPTION", "ADDITIONALNAME"), HSN: hsnFromNode(n, asOf)}
 		if x.Name == "" {
 			continue
 		}
@@ -180,6 +208,11 @@ func (s *Server) handleProformaMasters(w http.ResponseWriter, r *http.Request) {
 		// prefer that GSTIN while keeping the Company mailing address.
 		if raw, _, _, err := s.tally.request("Read proforma tax unit", c, taxUnitsXML(c), 0); err == nil {
 			mergeSupplierDetails(details, supplierDetailsFromXML(raw))
+		}
+		if details["gstin"] == "" {
+			if raw, _, _, err := s.tally.request("Read company GSTIN", c, companyGSTXML(c), 0); err == nil {
+				mergeSupplierDetails(details, supplierDetailsFromXML(raw))
+			}
 		}
 		if len(details) > 0 {
 			_ = s.cache.Put("proforma-company", c, "", details, time.Now())
