@@ -600,7 +600,14 @@ func parseVouchers(b []byte) []VoucherRow {
 	})
 	return out
 }
-func parseLedgerDetails(b []byte) map[string]string { return parseLedgerDetailsFor(b, "") }
+func parseLedgerDetails(b []byte) map[string]string {
+	r, e := parseTree(b)
+	if e != nil { return nil }
+	var ledgers []*xnode
+	nodesByName(r, "LEDGER", &ledgers)
+	if len(ledgers) > 1 { return nil }
+	return parseLedgerDetailsFor(b, "")
+}
 func parseLedgerDetailsFor(b []byte, wanted string) map[string]string {
 	r, e := parseTree(b)
 	if e != nil { return nil }

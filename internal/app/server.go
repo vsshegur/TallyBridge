@@ -639,14 +639,14 @@ func (s *Server) handleLedgerDetails(w http.ResponseWriter, r *http.Request) {
 	var liveErr error
 	if b, d, _, e := s.tally.request("Ledger details", c, ledgerDetailXML(c, l), 0); e == nil {
 		duration = d
-		for k, v := range parseLedgerDetails(b) {
+		for k, v := range parseLedgerDetailsFor(b, l) {
 			if strings.TrimSpace(v) != "" { details[k] = v }
 		}
 	} else { liveErr = e }
 	if details["PARTYGSTIN"] == "" || details["ADDRESS"] == "" || details["CITY"] == "" || details["STATENAME"] == "" {
 		if b, d, _, e := s.tally.request("Ledger details fallback", c, ledgerDetailCollectionXML(c, l), 0); e == nil {
 			if d > duration { duration = d }
-			for k, v := range parseLedgerDetails(b) {
+			for k, v := range parseLedgerDetailsFor(b, l) {
 				if strings.TrimSpace(v) != "" && details[k] == "" { details[k] = v }
 			}
 			liveErr = nil
