@@ -546,75 +546,76 @@ func (s *Server) handleMobileVouchers(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOut(w, v)
 }
+func voucherRequestHint(r *http.Request) (string, VoucherRow) {
+	mid := strings.TrimSpace(r.URL.Query().Get("masterId"))
+	return mid, VoucherRow{
+		MasterID: mid,
+		Number: strings.TrimSpace(r.URL.Query().Get("number")),
+		Date: normISODate(r.URL.Query().Get("date")),
+		Party: strings.TrimSpace(r.URL.Query().Get("party")),
+		Amount: parseAmount(r.URL.Query().Get("amount")),
+		VoucherType: strings.TrimSpace(r.URL.Query().Get("voucherType")),
+	}
+}
+func voucherCacheKey(mid string, hint VoucherRow) string {
+	if regexp.MustCompile(`^[0-9]+$`).MatchString(strings.TrimSpace(mid)) {
+		return "id:" + strings.TrimSpace(mid)
+	}
+	return "ref:" + strings.ToLower(strings.TrimSpace(hint.VoucherType)) + "|" + hint.Date + "|" + strings.TrimSpace(hint.Number)
+}
 func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Request) {
-	c := r.URL.Query().Get("company")
-	mid := r.URL.Query().Get("masterId")
-	if c == "" || mid == "" {
-		jsonErr(w, 400, errors.New("company and masterId required"))
+	c := strings.TrimSpace(r.URL.Query().Get("company"))
+	mid, hint := voucherRequestHint(r)
+	if c == "" || (mid == "" && (hint.Number == "" || hint.Date == "")) {
+		jsonErr(w, 400, errors.New("company plus voucher number/date or masterId required"))
 		return
 	}
+	key := voucherCacheKey(mid, hint)
 	if reason, retry, p := s.tally.Pending(); p {
 		var old VoucherDetail
-		if at, ok := s.cache.Get("voucher-detail", c, mid, &old); ok && old.TotalsVersion == 2 {
-			old.Live = false
-			old.Source = "saved"
-			old.Stale = true
-			old.FetchedAt = at
+		if at, ok := s.cache.Get("voucher-detail-v3", c, key, &old); ok && old.TotalsVersion == 2 {
+			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at
 			old.ShareText = dispatchShareText(old) + s.companyBankText(c)
-			jsonOut(w, old)
-			return
+			jsonOut(w, old); return
 		}
 		jsonOut(w, map[string]any{"pending": true, "reason": reason, "retryAfterMs": retry.Milliseconds()})
 		return
 	}
-	hint := VoucherRow{MasterID: mid, Number: r.URL.Query().Get("number"), Date: normISODate(r.URL.Query().Get("date")), Party: r.URL.Query().Get("party"), Amount: parseAmount(r.URL.Query().Get("amount")), VoucherType: r.URL.Query().Get("voucherType")}
 	x, e := s.fetchVoucherDetail(c, mid, hint)
 	if e != nil {
 		var old VoucherDetail
-		if at, ok := s.cache.Get("voucher-detail", c, mid, &old); ok && old.TotalsVersion == 2 {
-			old.Live = false
-			old.Source = "saved"
-			old.Stale = true
-			old.FetchedAt = at
-			old.LiveError = e.Error()
+		if at, ok := s.cache.Get("voucher-detail-v3", c, key, &old); ok && old.TotalsVersion == 2 {
+			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at; old.LiveError = e.Error()
 			old.ShareText = dispatchShareText(old) + s.companyBankText(c)
-			jsonOut(w, old)
-			return
+			jsonOut(w, old); return
 		}
-		jsonErr(w, 503, e)
-		return
+		jsonErr(w, 503, e); return
 	}
 	x.ShareText = dispatchShareText(x) + s.companyBankText(c)
 	jsonOut(w, x)
-}
-func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) {
-	c := r.URL.Query().Get("company")
-	mid := r.URL.Query().Get("masterId")
+}func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) {
+	c := strings.TrimSpace(r.URL.Query().Get("company"))
+	mid, hint := voucherRequestHint(r)
+	if c == "" || (mid == "" && (hint.Number == "" || hint.Date == "")) {
+		jsonErr(w, 400, errors.New("company plus voucher number/date or masterId required"))
+		return
+	}
+	key := voucherCacheKey(mid, hint)
 	var x VoucherDetail
-	if _, ok := s.cache.Get("voucher-detail", c, mid, &x); !ok || x.TotalsVersion != 2 {
+	if _, ok := s.cache.Get("voucher-detail-v3", c, key, &x); !ok || x.TotalsVersion != 2 {
 		var e error
-		x, e = s.fetchVoucherDetail(c, mid, VoucherRow{})
-		if e != nil {
-			jsonErr(w, 503, e)
-			return
-		}
+		x, e = s.fetchVoucherDetail(c, mid, hint)
+		if e != nil { jsonErr(w, 503, e); return }
 	}
 	bank, e := s.optionalBank(c, r.URL.Query().Get("bank"))
-	if e != nil {
-		jsonErr(w, 503, e)
-		return
-	}
-	pdf, pe := invoicePDF(x, bank...)
-	if pe != nil {
-		jsonErr(w, 503, pe)
-		return
-	}
+	if e != nil { jsonErr(w, 503, e); return }
+	data, pe := invoicePDF(x, bank...)
+	if pe != nil { jsonErr(w, 503, pe); return }
 	name := sanitizeFileName(firstNonBlank(x.InvoiceNumber, "Invoice"))
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="Invoice-%s.pdf"`, name))
-	_, _ = w.Write(pdf)
-}
-func (s *Server) handleLedgerDetails(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write(data)
+}func (s *Server) handleLedgerDetails(w http.ResponseWriter, r *http.Request) {
 	c, l := strings.TrimSpace(r.URL.Query().Get("company")), strings.TrimSpace(r.URL.Query().Get("ledger"))
 	if c == "" || l == "" {
 		jsonErr(w, 400, errors.New("company and ledger required"))
@@ -1062,7 +1063,7 @@ func (s *Server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
 			out = append(out, SearchResult{Kind: "bill", Title: firstNonBlank(b.BillNumber, po.Party), Subtitle: po.Party + " • pending " + indianNumber(b.PendingAmount), Party: po.Party, Ledger: po.Party, Number: b.BillNumber, Date: b.Date, Amount: b.PendingAmount})
 		}
 	}
-	for _, d := range s.cache.Matching("voucher-detail", c) {
+	for _, d := range s.cache.Matching("voucher-detail-v3", c) {
 		var v VoucherDetail
 		if json.Unmarshal(d.Data, &v) != nil {
 			continue
@@ -1456,100 +1457,73 @@ func (s *Server) getVouchers(c, typ, period string, refresh bool) (VoucherData, 
 	return x, osErrNotExist
 }
 func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (VoucherDetail, error) {
-	if c == "" || !regexp.MustCompile(`^[0-9]+$`).MatchString(mid) {
-		return VoucherDetail{}, errors.New("company and numeric voucher ID required")
+	c, mid = strings.TrimSpace(c), strings.TrimSpace(mid)
+	isNumericID := regexp.MustCompile(`^[0-9]+$`).MatchString(mid)
+	if c == "" || (!isNumericID && (strings.TrimSpace(supplied.Number) == "" || normISODate(supplied.Date) == "")) {
+		return VoucherDetail{}, errors.New("company plus voucher number/date or numeric voucher ID required")
 	}
-
-	hint, _ := s.cache.VoucherHint(c, mid)
-	if supplied.Number != "" {
-		hint.Number = supplied.Number
+	hint := supplied
+	if isNumericID {
+		if cached, ok := s.cache.VoucherHint(c, mid); ok {
+			if hint.Number == "" { hint.Number = cached.Number }
+			if hint.Date == "" { hint.Date = cached.Date }
+			if hint.Party == "" { hint.Party = cached.Party }
+			if hint.Amount == 0 { hint.Amount = cached.Amount }
+			if hint.VoucherType == "" { hint.VoucherType = cached.VoucherType }
+		}
 	}
-	if supplied.Date != "" {
-		hint.Date = supplied.Date
-	}
-	if supplied.Party != "" {
-		hint.Party = supplied.Party
-	}
-	if supplied.Amount != 0 {
-		hint.Amount = supplied.Amount
-	}
-	if supplied.VoucherType != "" {
-		hint.VoucherType = supplied.VoucherType
-	}
-
-	// First use a compact Voucher collection. These methods are widely supported
-	// across TallyPrime versions and include the standard dispatch/LR fields.
-	b, d1, _, err := s.tally.request("Invoice detail", c, voucherDetailCollectionXML(c, mid), 12*time.Second)
+	hint.Date = normISODate(hint.Date)
 	var x VoucherDetail
-	if err == nil && !hasXMLNode(b, "VOUCHER") {
-		err = fmt.Errorf("%w: no voucher returned", ErrTallyRequest)
-	}
-	if err == nil {
-		x = parseVoucherDetail(b, c, mid, hint)
-	} else if !errors.Is(err, ErrTallyRequest) {
-		return VoucherDetail{}, err
-	}
+	var lastErr error
+	var duration int64
 
-	// Some Tally builds expose a register MasterID that cannot be reopened as a
-	// voucher object. Fall back to the exact register identity: voucher type,
-	// date and voucher number, still using a read-only collection.
-	if err != nil && hint.Number != "" && hint.Date != "" {
+	// Open from the exact register identity first. This avoids Tally builds where
+	// the register MasterID cannot be reopened as a Voucher object.
+	if hint.Number != "" && hint.Date != "" {
 		if qb := voucherDetailHintXML(c, hint); len(qb) > 0 {
-			if b0, d0, _, e0 := s.tally.request("Invoice detail by number", c, qb, 12*time.Second); e0 == nil && hasXMLNode(b0, "VOUCHER") {
-				x = parseVoucherDetail(b0, c, mid, hint)
-				err = nil
-				if d0 > d1 { d1 = d0 }
+			b, d, _, e := s.tally.request("Invoice detail by number", c, qb, 12*time.Second)
+			if e == nil && hasXMLNode(b, "VOUCHER") {
+				x = parseVoucherDetail(b, c, mid, hint)
+				duration = d
+			} else if e != nil {
+				lastErr = e
+			} else {
+				lastErr = fmt.Errorf("%w: no voucher returned for invoice number/date", ErrTallyRequest)
 			}
 		}
 	}
-	needObject := err != nil || x.TotalsVersion != 2 || x.InvoiceNumber == "" || x.InvoiceDate == "" || x.DispatchedThrough == "" || x.LRNumber == "" || len(x.Items) == 0
-	if needObject {
-		b2, d2, _, e2 := s.tally.request("Invoice detail enrich", c, voucherDetailObjectXML(c, mid), 12*time.Second)
-		if e2 == nil && !hasXMLNode(b2, "VOUCHER") {
-			e2 = errors.New("Tally returned no recognized voucher")
-		}
-		if e2 == nil {
-			y := parseVoucherDetail(b2, c, mid, hint)
-			x = mergeVoucherDetail(x, y)
-			if d2 > d1 {
-				d1 = d2
-			}
-		} else if err != nil { // both strategies failed
-			return VoucherDetail{}, e2
-		}
+	needMore := x.TotalsVersion != 2 || x.InvoiceNumber == "" || len(x.Items) == 0
+	if needMore && isNumericID {
+		b, d, _, e := s.tally.request("Invoice detail by master id", c, voucherDetailCollectionXML(c, mid), 12*time.Second)
+		if e == nil && hasXMLNode(b, "VOUCHER") {
+			x = mergeVoucherDetail(x, parseVoucherDetail(b, c, mid, hint))
+			if d > duration { duration = d }
+		} else if e != nil { lastErr = e }
 	}
-
-	// Identity values shown in Sales Register are authoritative hints for the
-	// selected row and guarantee share/PDF output even when Tally nests them in a
-	// different XML level.
-	if x.Company == "" {
-		x.Company = c
+	needMore = x.TotalsVersion != 2 || x.InvoiceNumber == "" || len(x.Items) == 0
+	if needMore && isNumericID {
+		b, d, _, e := s.tally.request("Invoice detail enrich", c, voucherDetailObjectXML(c, mid), 12*time.Second)
+		if e == nil && hasXMLNode(b, "VOUCHER") {
+			x = mergeVoucherDetail(x, parseVoucherDetail(b, c, mid, hint))
+			if d > duration { duration = d }
+		} else if e != nil { lastErr = e }
 	}
-	if x.FirmName == "" {
-		x.FirmName = c
-	}
-	if x.MasterID == "" {
-		x.MasterID = mid
-	}
-	if x.InvoiceNumber == "" {
-		x.InvoiceNumber = hint.Number
-	}
-	if x.InvoiceDate == "" {
-		x.InvoiceDate = hint.Date
-	}
-	if x.CustomerName == "" {
-		x.CustomerName = hint.Party
-	}
+	if x.Company == "" { x.Company = c }
+	if x.FirmName == "" { x.FirmName = c }
+	if x.MasterID == "" { x.MasterID = mid }
+	if x.InvoiceNumber == "" { x.InvoiceNumber = hint.Number }
+	if x.InvoiceDate == "" { x.InvoiceDate = hint.Date }
+	if x.CustomerName == "" { x.CustomerName = hint.Party }
+	if x.VoucherType == "" { x.VoucherType = hint.VoucherType }
 	if x.TotalsVersion != 2 {
-		return VoucherDetail{}, errors.New("Tally did not return a verified invoice total; refresh with the company open in Tally before sharing")
+		if lastErr != nil { return VoucherDetail{}, lastErr }
+		return VoucherDetail{}, errors.New("Tally did not return a verified invoice total for this register row")
 	}
-	x.CommonData = CommonData{Live: true, Source: "live", FetchedAt: time.Now(), DurationMS: d1}
+	x.CommonData = CommonData{Live: true, Source: "live", FetchedAt: time.Now(), DurationMS: duration}
 	x.ShareText = dispatchShareText(x)
-	_ = s.cache.Put("voucher-detail", c, mid, x, x.FetchedAt)
+	_ = s.cache.Put("voucher-detail-v3", c, voucherCacheKey(mid, hint), x, x.FetchedAt)
 	return x, nil
-}
-
-func mergeVoucherDetail(a, b VoucherDetail) VoucherDetail {
+}func mergeVoucherDetail(a, b VoucherDetail) VoucherDetail {
 	if a.Company == "" {
 		a.Company = b.Company
 	}
