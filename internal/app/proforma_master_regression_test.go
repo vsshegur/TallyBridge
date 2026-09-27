@@ -74,3 +74,23 @@ func TestComputedBuyerAndHSNFields(t *testing.T) {
 	items := parseStockItems([]byte(`<ENVELOPE><STOCKITEM NAME="Towel"><BASEUNITS>pcs</BASEUNITS><TBHSN>63026000</TBHSN></STOCKITEM></ENVELOPE>`), "2026-09-27")
 	if len(items)!=1 || items[0].HSN!="63026000" { t.Fatal(items) }
 }
+
+
+func TestBuyerFallbackUsesValidXMLAndModernAggregates(t *testing.T) {
+	obj := string(ledgerDetailXML("Demo Company", "ABC Buyer"))
+	for _, want := range []string{"<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>","<FETCH>*</FETCH>","<FETCH>LedMailingDetails.*</FETCH>","<FETCH>LedGSTRegDetails.*</FETCH>"} {
+		if !strings.Contains(obj, want) { t.Fatalf("ledger object missing %s", want) }
+	}
+	fallback := string(ledgerDetailCollectionXML("Demo Company", "ABC Buyer"))
+	if strings.Contains(fallback, "<SVEXPORTFORMAT>$SysName:XML</SVEXPORTFORMAT>") || !strings.Contains(fallback, "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>") { t.Fatal(fallback) }
+	m := parseLedgerDetails([]byte(`<LEDGER><LEDGSTREGDETAILS.LIST><GSTIN>27ABCDE1234F1Z5</GSTIN><STATE>Maharashtra</STATE></LEDGSTREGDETAILS.LIST><LEDMAILINGDETAILS.LIST><ADDRESS>Market Yard</ADDRESS><ADDRESS>Solapur</ADDRESS><PINCODE>413001</PINCODE></LEDMAILINGDETAILS.LIST></LEDGER>`))
+	if m["PARTYGSTIN"]!="27ABCDE1234F1Z5" || m["CITY"]!="Solapur" || m["PINCODE"]!="413001" || !strings.Contains(m["ADDRESS"],"Market Yard") { t.Fatalf("%#v",m) }
+}
+
+func TestVoucherDayLookupAvoidsTallyNumberFilter(t *testing.T) {
+	x := string(voucherDayXML("Demo Company", "2026-09-27"))
+	if strings.Contains(x, "TBVoucherNumberFilter") || strings.Contains(x, "<CHILDOF>") || !strings.Contains(x, "<TYPE>Voucher</TYPE>") || !strings.Contains(x, "20260927") { t.Fatal(x) }
+	raw := []byte(`<ENVELOPE><VOUCHER><MASTERID>1</MASTERID><DATE>20260927</DATE><VOUCHERNUMBER>OTHER</VOUCHERNUMBER><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME><PARTYLEDGERNAME>X</PARTYLEDGERNAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>X</LEDGERNAME><ISPARTYLEDGER>Yes</ISPARTYLEDGER><AMOUNT>-50</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER><VOUCHER><MASTERID>43795</MASTERID><DATE>20260927</DATE><VOUCHERNUMBER>INV-22</VOUCHERNUMBER><VOUCHERTYPENAME>GST Sales</VOUCHERTYPENAME><PARTYLEDGERNAME>ABC Buyer</PARTYLEDGERNAME><ALLINVENTORYENTRIES.LIST><STOCKITEMNAME>Towel</STOCKITEMNAME><BILLEDQTY>2 pcs</BILLEDQTY><RATE>100/pcs</RATE><AMOUNT>-200</AMOUNT></ALLINVENTORYENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>ABC Buyer</LEDGERNAME><ISPARTYLEDGER>Yes</ISPARTYLEDGER><AMOUNT>-200</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></ENVELOPE>`)
+	detail, ok := parseVoucherDayDetail(raw, "Demo Company", "43795", VoucherRow{Number:"INV-22",Date:"2026-09-27",Party:"ABC Buyer",VoucherType:"GST Sales",Amount:200})
+	if !ok || detail.InvoiceNumber!="INV-22" || detail.CustomerName!="ABC Buyer" || len(detail.Items)!=1 || detail.TotalAmount!=200 { t.Fatalf("ok=%v detail=%+v",ok,detail) }
+}

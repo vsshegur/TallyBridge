@@ -1479,18 +1479,21 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 	var lastErr error
 	var duration int64
 
-	// Open from the exact register identity first. This avoids Tally builds where
-	// the register MasterID cannot be reopened as a Voucher object.
+	// Read the selected day and choose the exact register row in Go. This avoids
+	// Tally-side VoucherNumber filters and VoucherType ChildOf behaviour, both of
+	// which vary with custom voucher types/numbering in real companies.
 	if hint.Number != "" && hint.Date != "" {
-		if qb := voucherDetailHintXML(c, hint); len(qb) > 0 {
-			b, d, _, e := s.tally.request("Invoice detail by number", c, qb, 12*time.Second)
-			if e == nil && hasXMLNode(b, "VOUCHER") {
-				x = parseVoucherDetail(b, c, mid, hint)
-				duration = d
-			} else if e != nil {
-				lastErr = e
+		if qb := voucherDayXML(c, hint.Date); len(qb) > 0 {
+			b, d, _, e := s.tally.request("Invoice detail by day", c, qb, 12*time.Second)
+			if e == nil {
+				if selected, ok := parseVoucherDayDetail(b, c, mid, hint); ok {
+					x = selected
+					duration = d
+				} else {
+					lastErr = fmt.Errorf("%w: invoice %s not found in %s day data", ErrTallyRequest, hint.Number, hint.Date)
+				}
 			} else {
-				lastErr = fmt.Errorf("%w: no voucher returned for invoice number/date", ErrTallyRequest)
+				lastErr = e
 			}
 		}
 	}

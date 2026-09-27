@@ -294,12 +294,20 @@ func voucherDetailHintXML(company string, hint VoucherRow) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherByIdentity</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherByIdentity" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><FILTER>TBVoucherNumberFilter</FILTER><FETCH>*</FETCH><FETCH>AllInventoryEntries.*</FETCH><FETCH>AllLedgerEntries.*</FETCH><FETCH>LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherNumberFilter" ISMODIFY="No">$VoucherNumber = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), date, date, escXML(vtype), escXML(strings.TrimSpace(hint.Number))))
 }
 
-func ledgerDetailXML(company, ledger string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Ledger</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>Name</FETCH><FETCH>MailingName</FETCH><FETCH>Parent</FETCH><FETCH>Address</FETCH><FETCH>City</FETCH><FETCH>CountryName</FETCH><FETCH>StateName</FETCH><FETCH>LedStateName</FETCH><FETCH>Pincode</FETCH><FETCH>PartyGSTIN</FETCH><FETCH>GSTIN</FETCH><FETCH>GSTRegistrationNumber</FETCH><FETCH>LedMultiAddressList.*</FETCH><FETCH>LedGSTRegDetails.*</FETCH><FETCH>LedgerPhone</FETCH><FETCH>Email</FETCH><FETCH>IncomeTaxNumber</FETCH><FETCH>ClosingBalance</FETCH><FETCH>BankName</FETCH><FETCH>BankAccountNumber</FETCH><FETCH>BankAccHolderName</FETCH><FETCH>IFSCCode</FETCH><FETCH>BranchName</FETCH><FETCH>UPIID</FETCH><FETCH>UPIId</FETCH><FETCH>BankDetails.*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(ledger), escXML(company)))
+func voucherDayXML(company, date string) []byte {
+	d := strings.ReplaceAll(normISODate(date), "-", "")
+	if len(d) != 8 { return nil }
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDay</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDay" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), d, d))
 }
 
+func ledgerDetailXML(company, ledger string) []byte {
+	// Fetch the complete single Ledger plus the modern mailing/GST aggregates.
+	// TallyPrime 3+ moved several party fields into LedMailingDetails and
+	// LedGSTRegDetails, while older companies may still expose top-level methods.
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Ledger</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>*</FETCH><FETCH>Address.*</FETCH><FETCH>LedMailingDetails.*</FETCH><FETCH>LedGSTRegDetails.*</FETCH><FETCH>LedMultiAddressList.*</FETCH><FETCH>GSTDetails.*</FETCH><FETCH>BankDetails.*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(ledger), escXML(company)))
+}
 func ledgerDetailCollectionXML(company, ledger string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLedgerDetailFallback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLedgerDetailFallback" ISMODIFY="No"><TYPE>Ledger</TYPE><FILTER>TBLedgerNameFilter</FILTER><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>MailingName</NATIVEMETHOD><NATIVEMETHOD>Address</NATIVEMETHOD><NATIVEMETHOD>City</NATIVEMETHOD><NATIVEMETHOD>Pincode</NATIVEMETHOD><NATIVEMETHOD>LedStateName</NATIVEMETHOD><NATIVEMETHOD>PartyGSTIN</NATIVEMETHOD><FETCH>Address.*,LedMailingDetails.*,LedMultiAddressList.*,LedGSTRegDetails.*,GSTDetails.*</FETCH><METHOD>TBGSTIN:$PartyGSTIN</METHOD><METHOD>TBSTATE:$LedStateName</METHOD><METHOD>TBCITY:$City</METHOD><METHOD>TBPINCODE:$Pincode</METHOD></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBLedgerNameFilter" ISMODIFY="No">$Name = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), escXML(strings.TrimSpace(ledger))))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLedgerDetailFallback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLedgerDetailFallback" ISMODIFY="No"><TYPE>Ledger</TYPE><FILTER>TBLedgerNameFilter</FILTER><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>MailingName</NATIVEMETHOD><NATIVEMETHOD>Address</NATIVEMETHOD><NATIVEMETHOD>City</NATIVEMETHOD><NATIVEMETHOD>Pincode</NATIVEMETHOD><NATIVEMETHOD>LedStateName</NATIVEMETHOD><NATIVEMETHOD>PartyGSTIN</NATIVEMETHOD><FETCH>Address.*,LedMailingDetails.*,LedMultiAddressList.*,LedGSTRegDetails.*,GSTDetails.*</FETCH><METHOD>TBGSTIN:$PartyGSTIN</METHOD><METHOD>TBSTATE:$LedStateName</METHOD><METHOD>TBCITY:$City</METHOD><METHOD>TBPINCODE:$Pincode</METHOD></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBLedgerNameFilter" ISMODIFY="No">$Name = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), escXML(strings.TrimSpace(ledger))))
 }
 
 // Fetch the selected bank object completely: bank methods vary across Tally versions.
@@ -619,7 +627,7 @@ func parseLedgerDetails(b []byte) map[string]string {
 		m["STATENAME"] = firstNonBlank(firstDeep(r, "TBSTATE"), m["LEDSTATENAME"], firstDeep(r, "PLACEOFSUPPLY", "STATE"))
 	}
 	if m["CITY"] == "" {
-		m["CITY"] = firstNonBlank(firstDeep(r, "TBCITY"), firstDeep(r, "LEDGERCITY", "MAILINGCITY", "DISTRICT"))
+		m["CITY"] = firstNonBlank(firstDeep(r, "TBCITY"), firstDeep(r, "LEDGERCITY", "MAILINGCITY", "CITYNAME", "DISTRICT", "DISTRICTNAME", "PLACE"))
 	}
 	if m["PINCODE"] == "" {
 		m["PINCODE"] = firstNonBlank(firstDeep(r, "TBPINCODE"), firstDeep(r, "LEDGERPINCODE", "MAILINGPINCODE"))
@@ -661,7 +669,26 @@ func parseLedgerDetails(b []byte) map[string]string {
 		}
 	}
 	if a := allDeep(r, "ADDRESS"); len(a) > 0 {
-		m["ADDRESS"] = strings.Join(a, ", ")
+		clean := make([]string, 0, len(a))
+		seen := map[string]bool{}
+		for _, line := range a {
+			line = strings.TrimSpace(line)
+			key := strings.ToLower(line)
+			if line != "" && !seen[key] {
+				seen[key] = true
+				clean = append(clean, line)
+			}
+		}
+		m["ADDRESS"] = strings.Join(clean, ", ")
+		// TallyPrime's modern LedMailingDetails schema has Address/State/Country/PIN
+		// but no separate City method. Many ledgers therefore store city as the
+		// final address line. Use it only when there are at least two address lines.
+		if m["CITY"] == "" && len(clean) >= 2 {
+			candidate := strings.TrimSpace(clean[len(clean)-1])
+			if len(candidate) <= 80 && candidate != m["STATENAME"] && candidate != m["COUNTRYNAME"] && candidate != m["PINCODE"] {
+				m["CITY"] = candidate
+			}
+		}
 	}
 	return m
 }
@@ -783,6 +810,9 @@ func parseGenericRows(b []byte) []map[string]string {
 }
 func parseVoucherDetail(b []byte, company, masterID string, hint VoucherRow) VoucherDetail {
 	r, _ := parseTree(b)
+	return parseVoucherDetailNode(r, company, masterID, hint)
+}
+func parseVoucherDetailNode(r *xnode, company, masterID string, hint VoucherRow) VoucherDetail {
 	x := VoucherDetail{Company: company, FirmName: company, MasterID: masterID, Items: []InvoiceItem{}, CustomerAddress: []string{}}
 	if r == nil {
 		return x
@@ -853,6 +883,37 @@ func parseVoucherDetail(b []byte, company, masterID string, hint VoucherRow) Vou
 	x.ShareText = dispatchShareText(x)
 	return x
 }
+func parseVoucherDayDetail(b []byte, company, masterID string, hint VoucherRow) (VoucherDetail, bool) {
+	root, err := parseTree(b)
+	if err != nil || root == nil { return VoucherDetail{}, false }
+	var vouchers []*xnode
+	nodesByName(root, "VOUCHER", &vouchers)
+	if len(vouchers) == 0 { return VoucherDetail{}, false }
+	wantNum := strings.TrimSpace(hint.Number)
+	wantDate := normISODate(hint.Date)
+	wantType := strings.TrimSpace(hint.VoucherType)
+	wantParty := strings.TrimSpace(hint.Party)
+	bestScore := -1
+	var best *xnode
+	for _, v := range vouchers {
+		num := strings.TrimSpace(firstDeep(v, "VOUCHERNUMBER", "REFERENCE"))
+		date := normISODate(firstDeep(v, "DATE", "VOUCHERDATE"))
+		if wantNum != "" && !strings.EqualFold(num, wantNum) { continue }
+		if wantDate != "" && date != "" && date != wantDate { continue }
+		score := 100
+		if masterID != "" && firstDeep(v, "MASTERID") == masterID { score += 100 }
+		if wantType != "" && strings.EqualFold(strings.TrimSpace(firstDeep(v, "VOUCHERTYPENAME")), wantType) { score += 30 }
+		party := strings.TrimSpace(firstDeep(v, "PARTYLEDGERNAME", "PARTYNAME", "BASICBUYERNAME"))
+		if wantParty != "" && strings.EqualFold(party, wantParty) { score += 20 }
+		if hint.Amount != 0 {
+			if total, ok := invoicePartyTotal(v, firstNonBlank(party, wantParty)); ok && abs(abs(total)-abs(hint.Amount)) < 0.02 { score += 10 }
+		}
+		if score > bestScore { bestScore, best = score, v }
+	}
+	if best == nil { return VoucherDetail{}, false }
+	return parseVoucherDetailNode(best, company, masterID, hint), true
+}
+
 func dispatchShareText(x VoucherDetail) string {
 	customer := strings.TrimSpace(x.CustomerName)
 	if x.CustomerCity != "" {
