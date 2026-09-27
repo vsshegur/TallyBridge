@@ -25,6 +25,20 @@ func profileFromDetails(company string, d map[string]string) CompanyProfile {
 	if p.StateCode == "" && len(p.GSTIN) >= 2 { p.StateCode = p.GSTIN[:2] }
 	return p
 }
+func (s *Server) savedCompanyProfile(company string) CompanyProfile {
+	company = strings.TrimSpace(company)
+	var p CompanyProfile
+	if _, ok := s.cache.Get("company-profile-v1", company, "", &p); ok {
+		if p.Name == "" { p.Name = company }
+		return p
+	}
+	var legacy map[string]string
+	if _, ok := s.cache.Get("proforma-company", company, "", &legacy); ok {
+		p = profileFromDetails(company, legacy)
+	}
+	if p.Name == "" { p.Name = company }
+	return p
+}
 func (s *Server) companyProfile(company string, refresh bool) (CompanyProfile, error) {
 	company = strings.TrimSpace(company)
 	if company == "" { return CompanyProfile{}, errors.New("company required") }

@@ -226,7 +226,7 @@ func (s *Server) handleProforma(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	profile, _ := s.companyProfile(p.Company, false)
+	profile := s.savedCompanyProfile(p.Company)
 	if profile.GSTIN != "" { p.SupplierGST = profile.GSTIN }
 	if address := companyProfileAddress(profile); address != "" { p.SupplierAddress = address }
 	if profile.StateCode != "" { p.SupplierState = profile.StateCode }
