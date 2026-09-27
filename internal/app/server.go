@@ -593,7 +593,8 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	}
 	x.ShareText = dispatchShareText(x) + s.companyBankText(c)
 	jsonOut(w, x)
-}func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) {
+}
+func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) {
 	c := strings.TrimSpace(r.URL.Query().Get("company"))
 	mid, hint := voucherRequestHint(r)
 	if c == "" || (mid == "" && (hint.Number == "" || hint.Date == "")) {
@@ -615,7 +616,8 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="Invoice-%s.pdf"`, name))
 	_, _ = w.Write(data)
-}func (s *Server) handleLedgerDetails(w http.ResponseWriter, r *http.Request) {
+}
+func (s *Server) handleLedgerDetails(w http.ResponseWriter, r *http.Request) {
 	c, l := strings.TrimSpace(r.URL.Query().Get("company")), strings.TrimSpace(r.URL.Query().Get("ledger"))
 	if c == "" || l == "" {
 		jsonErr(w, 400, errors.New("company and ledger required"))
@@ -1523,7 +1525,8 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 	x.ShareText = dispatchShareText(x)
 	_ = s.cache.Put("voucher-detail-v3", c, voucherCacheKey(mid, hint), x, x.FetchedAt)
 	return x, nil
-}func mergeVoucherDetail(a, b VoucherDetail) VoucherDetail {
+}
+func mergeVoucherDetail(a, b VoucherDetail) VoucherDetail {
 	if a.Company == "" {
 		a.Company = b.Company
 	}
