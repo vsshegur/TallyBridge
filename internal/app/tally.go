@@ -523,6 +523,9 @@ func parseGroupBalances(b []byte) []GroupLedgerRow {
 		}
 		seen[strings.ToLower(name)] = true
 		bal := parseAmount(firstDeep(n, "CLOSINGBALANCE", "AMOUNT"))
+		if abs(bal) < 0.005 {
+			continue
+		}
 		drcr := ""
 		if bal < 0 {
 			drcr = "Dr"
@@ -590,7 +593,7 @@ func parseLedgerDetails(b []byte) map[string]string {
 		}
 	}
 	for canonical, tags := range map[string][]string{
-		"BANKACCOUNTNUMBER": {"BANKACNO", "BANKACCOUNTNO", "ACCOUNTNUMBER", "ACCOUNTNO", "ACNO"},
+		"BANKACCOUNTNUMBER": {"BANKACNO", "BANKACCOUNTNO", "BANKACCOUNTNUM", "ACCOUNTNUMBER", "ACCOUNTNO", "ACNO"},
 		"IFSCCODE":          {"IFSC", "BANKIFSC", "BANKIFSCCODE"},
 		"BANKACCHOLDERNAME": {"ACCOUNTHOLDERNAME", "ACCOUNTHOLDER", "BANKACCHOLDER"},
 		"UPIID":             {"UPIADDRESS", "VPA", "VIRTUALPAYMENTADDRESS"},
@@ -697,7 +700,7 @@ func parsePartyBills(b []byte, party string) []BillRow {
 		if amt == 0 {
 			return false
 		}
-		date := normISODate(firstDeep(n, "BILLDATE", "DSPBILLDATE", "DATE"))
+		date := normISODate(firstDeep(n, "BILLDATE", "DSPBILLDATE", "INVOICEDATE", "VOUCHERDATE", "DATE"))
 		due := normISODate(firstDeep(n, "DUEDATE", "DSPDUEDATE", "BILLDUE"))
 		age := 0
 		if dt := parseISOOrZero(firstNonBlank(due, date)); !dt.IsZero() && time.Now().After(dt) {
@@ -999,24 +1002,15 @@ func parseAmount(s string) float64 {
 	return v
 }
 func normISODate(s string) string {
-	s = strings.TrimSpace(s)
-	digits := regexp.MustCompile(`[^0-9]`).ReplaceAllString(s, "")
-	if len(digits) >= 8 {
-		digits = digits[:8]
-		if y, _ := strconv.Atoi(digits[:4]); y >= 1900 && y <= 2200 {
-			return digits[:4] + "-" + digits[4:6] + "-" + digits[6:8]
-		} // DDMMYYYY
-		if y, _ := strconv.Atoi(digits[4:]); y >= 1900 && y <= 2200 {
-			return digits[4:] + "-" + digits[2:4] + "-" + digits[:2]
-		}
-	}
-	for _, layout := range []string{"2-Jan-2006", "02-Jan-2006", "2/1/2006", "02/01/2006", "2006-01-02"} {
+	s = strings.TrimSpace(strings.ReplaceAll(s, "\u00a0", " "))
+	for _, layout := range []string{"2006-01-02", "20060102", "2-Jan-2006", "2-Jan-06", "2-Jan-2006", "2-January-2006", "2-January-06", "2 Jan 2006", "2 Jan 06", "2 January 2006", "2/1/2006", "2/1/06", "2-1-2006", "2-1-06", "2.1.2006", "2006/1/2", "02012006", time.RFC3339, "2006-01-02 15:04:05"} {
 		if t, e := time.Parse(layout, s); e == nil {
 			return t.Format("2006-01-02")
 		}
 	}
-	return s
+	return ""
 }
+
 func displayDate(s string) string {
 	if t, e := time.Parse("2006-01-02", s); e == nil {
 		return t.Format("02-01-2006")

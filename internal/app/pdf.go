@@ -238,6 +238,7 @@ func ledgerOutstandingPDF(x LedgerOutstandingData, bank ...BankDetails) ([]byte,
 	return renderPDF(tableHTML(outstandingDoc(x), bank...))
 }
 func groupDoc(x GroupBalanceData) pdfTableDoc {
+	x = nonzeroGroup(x)
 	rows := [][]string{}
 	for _, v := range x.Ledgers {
 		rows = append(rows, []string{v.Ledger, v.Parent, indianNumber(v.Balance), v.DrCr})

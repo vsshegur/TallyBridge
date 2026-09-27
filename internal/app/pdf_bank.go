@@ -127,6 +127,26 @@ func (s *Server) handlePDFBank(w http.ResponseWriter, r *http.Request) {
 				jsonErr(w, 503, errors.New("Tally returned a different bank ledger; previous default kept"))
 				return
 			}
+			if details["BANKACCOUNTNUMBER"] == "" || details["IFSCCODE"] == "" {
+				extra, _, _, fetchErr := s.tally.request("Read bank account methods", q.Company, bankMethodsXML(q.Company, q.Ledger), 0)
+				if fetchErr == nil {
+					fallback := parseLedgerDetails(extra)
+					if strings.EqualFold(strings.TrimSpace(fallback["NAME"]), strings.TrimSpace(q.Ledger)) {
+						if details == nil {
+							details = map[string]string{}
+						}
+						// Never combine an IFSC from a different account with the first result.
+						sameAccount := details["BANKACCOUNTNUMBER"] == "" || fallback["BANKACCOUNTNUMBER"] == "" || details["BANKACCOUNTNUMBER"] == fallback["BANKACCOUNTNUMBER"]
+						if sameAccount {
+							for key, value := range fallback {
+								if details[key] == "" {
+									details[key] = value
+								}
+							}
+						}
+					}
+				}
+			}
 			bank = bankDetailsFromMap(q.Ledger, details)
 		}
 		if bank.AccountNumber == "" && bank.UPI == "" {

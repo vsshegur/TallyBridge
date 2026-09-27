@@ -850,7 +850,7 @@ func (s *Server) getGroupBalances(c, g string) (GroupBalanceData, error) {
 			old.Stale = true
 			old.FetchedAt = at
 			old.LiveError = e.Error()
-			return old, nil
+			return nonzeroGroup(old), nil
 		}
 		return GroupBalanceData{}, e
 	}

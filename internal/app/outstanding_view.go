@@ -12,7 +12,7 @@ import (
 )
 
 func invoiceDays(date string) int {
-	d, e := time.Parse("2006-01-02", date)
+	d, e := time.Parse("2006-01-02", normISODate(date))
 	if e != nil {
 		return -1
 	}
@@ -33,6 +33,9 @@ func invoiceDaysLabel(date string) string {
 }
 func sortedBills(bills []BillRow) []BillRow {
 	out := append([]BillRow(nil), bills...)
+	for i := range out {
+		out[i].Date = normISODate(out[i].Date)
+	}
 	sort.SliceStable(out, func(i, j int) bool {
 		a, b := out[i].Date, out[j].Date
 		if a == "" {
