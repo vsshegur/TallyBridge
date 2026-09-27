@@ -50,6 +50,7 @@ type Proforma struct {
 	CGST            float64        `json:"cgst"`
 	SGST            float64        `json:"sgst"`
 	IGST            float64        `json:"igst"`
+	RoundOff        float64        `json:"roundOff"`
 	Total           float64        `json:"total"`
 	ShareText       string         `json:"shareText"`
 	Bank            BankDetails    `json:"bank"`
@@ -168,7 +169,10 @@ func calculateProforma(p Proforma) (Proforma, error) {
 	p.CGST = currencyFromCents(cgst)
 	p.SGST = currencyFromCents(sgst)
 	p.IGST = currencyFromCents(igst)
-	p.Total = currencyFromCents(taxable + cgst + sgst + igst)
+	beforeRound := taxable + cgst + sgst + igst
+	rounded := ((beforeRound + 50) / 100) * 100
+	p.RoundOff = currencyFromCents(rounded - beforeRound)
+	p.Total = currencyFromCents(rounded)
 	p.ShareText = proformaText(p)
 	return p, nil
 }
@@ -196,6 +200,7 @@ func proformaText(p Proforma) string {
 			fmt.Fprintf(&b, "\n%s: ₹%s", f.label, indianNumber(f.value))
 		}
 	}
+	fmt.Fprintf(&b, "\nRound off: ₹%s", indianNumber(p.RoundOff))
 	fmt.Fprintf(&b, "\n*Total: ₹%s*", indianNumber(p.Total))
 	if p.Notes != "" {
 		b.WriteString("\n\n" + p.Notes)
@@ -263,8 +268,8 @@ func proformaHTML(p Proforma) string {
 	for _, f := range []struct {
 		label string
 		value float64
-	}{{"Items subtotal", p.Gross}, {"Discount (deducted)", -p.Discount}, {"Taxable amount", p.Taxable}, {"CGST", p.CGST}, {"SGST", p.SGST}, {"IGST", p.IGST}} {
-		if f.value != 0 {
+	}{{"Items subtotal", p.Gross}, {"Discount (deducted)", -p.Discount}, {"Taxable amount", p.Taxable}, {"CGST", p.CGST}, {"SGST", p.SGST}, {"IGST", p.IGST}, {"Round off", p.RoundOff}} {
+		if f.value != 0 || f.label == "Round off" {
 			fmt.Fprintf(&b, "<tr><td>%s</td><td>%s</td></tr>", he(f.label), he(inr(f.value)))
 		}
 	}

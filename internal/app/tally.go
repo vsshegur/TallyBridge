@@ -278,10 +278,14 @@ func voucherDetailCollectionXML(company, masterID string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetail</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetail" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherMasterIDFilter</FILTER><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
 }
 func voucherDetailObjectXML(company, masterID string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Voucher</SUBTYPE><ID TYPE="Name">ID:'%s'</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVViewName>Invoice Voucher View</SVViewName></STATICVARIABLES><FETCHLIST><FETCH>*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, masterID, escXML(company)))
+	// Do not use the fragile Voucher object identifier form (ID:'123'). Some
+	// TallyPrime builds reject a valid register MasterID as "Could not find
+	// Voucher:ID:'123'". A one-voucher filtered collection returns the same
+	// object data without changing or writing anything in Tally.
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetailFull</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetailFull" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherFullMasterIDFilter</FILTER><FETCH>*</FETCH><FETCH>AllInventoryEntries.*</FETCH><FETCH>AllLedgerEntries.*</FETCH><FETCH>LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherFullMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
 }
 func ledgerDetailXML(company, ledger string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Ledger</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>Name</FETCH><FETCH>Parent</FETCH><FETCH>Address</FETCH><FETCH>LedgerPhone</FETCH><FETCH>Email</FETCH><FETCH>IncomeTaxNumber</FETCH><FETCH>PartyGSTIN</FETCH><FETCH>StateName</FETCH><FETCH>Pincode</FETCH><FETCH>ClosingBalance</FETCH><FETCH>BankName</FETCH><FETCH>BankAccountNumber</FETCH><FETCH>BankAccHolderName</FETCH><FETCH>IFSCCode</FETCH><FETCH>BranchName</FETCH><FETCH>UPIID</FETCH><FETCH>UPIId</FETCH><FETCH>BankDetails.*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(ledger), escXML(company)))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Ledger</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>Name</FETCH><FETCH>MailingName</FETCH><FETCH>Parent</FETCH><FETCH>Address</FETCH><FETCH>City</FETCH><FETCH>CountryName</FETCH><FETCH>StateName</FETCH><FETCH>LedStateName</FETCH><FETCH>Pincode</FETCH><FETCH>PartyGSTIN</FETCH><FETCH>GSTIN</FETCH><FETCH>GSTRegistrationNumber</FETCH><FETCH>LedMultiAddressList.*</FETCH><FETCH>LedGSTRegDetails.*</FETCH><FETCH>LedgerPhone</FETCH><FETCH>Email</FETCH><FETCH>IncomeTaxNumber</FETCH><FETCH>ClosingBalance</FETCH><FETCH>BankName</FETCH><FETCH>BankAccountNumber</FETCH><FETCH>BankAccHolderName</FETCH><FETCH>IFSCCode</FETCH><FETCH>BranchName</FETCH><FETCH>UPIID</FETCH><FETCH>UPIId</FETCH><FETCH>BankDetails.*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(ledger), escXML(company)))
 }
 
 // Fetch the selected bank object completely: bank methods vary across Tally versions.
@@ -587,12 +591,24 @@ func parseLedgerDetails(b []byte) map[string]string {
 	if len(ledgers) == 1 {
 		r = ledgers[0]
 	}
-	fields := []string{"NAME", "PARENT", "PARTYGSTIN", "INCOMETAXNUMBER", "LEDGERPHONE", "EMAIL", "STATENAME", "PINCODE", "CLOSINGBALANCE", "BANKNAME", "BANKACCOUNTNUMBER", "BANKACCHOLDERNAME", "IFSCCODE", "BRANCHNAME", "UPIID"}
+	fields := []string{"NAME", "MAILINGNAME", "PARENT", "PARTYGSTIN", "GSTIN", "GSTREGISTRATIONNUMBER", "INCOMETAXNUMBER", "LEDGERPHONE", "EMAIL", "CITY", "COUNTRYNAME", "STATENAME", "LEDSTATENAME", "PINCODE", "CLOSINGBALANCE", "BANKNAME", "BANKACCOUNTNUMBER", "BANKACCHOLDERNAME", "IFSCCODE", "BRANCHNAME", "UPIID"}
 	m := map[string]string{}
 	for _, f := range fields {
 		if v := firstDeep(r, f); v != "" {
 			m[f] = v
 		}
+	}
+	if m["PARTYGSTIN"] == "" {
+		m["PARTYGSTIN"] = firstNonBlank(m["GSTIN"], m["GSTREGISTRATIONNUMBER"], firstDeep(r, "GSTREGNUMBER", "GSTREGISTRATIONNO"))
+	}
+	if m["STATENAME"] == "" {
+		m["STATENAME"] = firstNonBlank(m["LEDSTATENAME"], firstDeep(r, "PLACEOFSUPPLY", "STATE"))
+	}
+	if m["CITY"] == "" {
+		m["CITY"] = firstDeep(r, "LEDGERCITY", "MAILINGCITY", "DISTRICT")
+	}
+	if m["PINCODE"] == "" {
+		m["PINCODE"] = firstDeep(r, "LEDGERPINCODE", "MAILINGPINCODE")
 	}
 	for canonical, tags := range map[string][]string{
 		"BANKACCOUNTNUMBER": {"BANKACNO", "BANKACCOUNTNO", "BANKACCOUNTNUM", "ACCOUNTNUMBER", "ACCOUNTNO", "ACNO"},

@@ -46,7 +46,7 @@ func TestProformaValidationAndRounding(t *testing.T) {
 	p.Items[0].Discount = "0"
 	p.Items[0].GST = "5"
 	p, e := calculateProforma(p)
-	if e != nil || p.Gross != 1.01 || p.CGST != 0.03 || p.SGST != 0.03 || p.Total != 1.07 {
+	if e != nil || p.Gross != 1.01 || p.CGST != 0.03 || p.SGST != 0.03 || p.RoundOff != -0.07 || p.Total != 1 {
 		t.Fatal(p, e)
 	}
 }

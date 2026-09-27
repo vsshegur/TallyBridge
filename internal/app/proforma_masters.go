@@ -25,8 +25,49 @@ func stockItemsXML(company string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBProformaStock</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBProformaStock"><TYPE>StockItem</TYPE><FETCH>Name,BaseUnits,Description,AdditionalName,GSTDetails.*,HSNDetails.*,GSTHSNCode</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
 }
 func companyDetailsXML(company string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Company</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>Name</FETCH><FETCH>Address</FETCH><FETCH>StateName</FETCH><FETCH>GSTIN</FETCH><FETCH>GSTRegistrationNumber</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(company), escXML(company)))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Company</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>Name</FETCH><FETCH>MailingName</FETCH><FETCH>Address</FETCH><FETCH>City</FETCH><FETCH>StateName</FETCH><FETCH>CountryName</FETCH><FETCH>Pincode</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(company), escXML(company)))
 }
+func taxUnitsXML(company string) []byte {
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBProformaTaxUnits</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBProformaTaxUnits" ISMODIFY="No"><TYPE>Tax Unit</TYPE><FETCH>Name,GSTRegNumber,StateName,PinCode,AddressName,Address</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
+}
+func supplierDetailsFromXML(raw []byte) map[string]string {
+	root, _ := parseTree(raw)
+	if root == nil {
+		return map[string]string{}
+	}
+	details := map[string]string{}
+	if v := firstDeep(root, "GSTREGNUMBER", "GSTREGISTRATIONNUMBER", "GSTIN", "CMPGSTIN"); v != "" {
+		details["gstin"] = strings.ToUpper(strings.TrimSpace(v))
+	}
+	if a := allDeep(root, "ADDRESS"); len(a) > 0 {
+		details["address"] = strings.Join(a, ", ")
+	}
+	for key, tags := range map[string][]string{
+		"city": {"CITY"},
+		"state": {"STATENAME"},
+		"country": {"COUNTRYNAME"},
+		"pincode": {"PINCODE"},
+	} {
+		if v := firstDeep(root, tags...); v != "" {
+			details[key] = v
+		}
+	}
+	if len(details["gstin"]) >= 2 {
+		details["stateCode"] = details["gstin"][:2]
+	}
+	return details
+}
+func mergeSupplierDetails(dst, src map[string]string) {
+	for k, v := range src {
+		if strings.TrimSpace(v) == "" {
+			continue
+		}
+		if k == "gstin" || dst[k] == "" {
+			dst[k] = v
+		}
+	}
+}
+
 func parseStockItems(raw []byte, asOf string) []StockItemMaster {
 	root, e := parseTree(raw)
 	if e != nil {
@@ -130,13 +171,18 @@ func (s *Server) handleProformaMasters(w http.ResponseWriter, r *http.Request) {
 	details := map[string]string{}
 	_, hasCompany := s.cache.Get("proforma-company", c, "", &details)
 	if !hasCompany || r.URL.Query().Get("refresh") == "1" {
-		raw, _, _, err := s.tally.request("Read proforma company", c, companyDetailsXML(c), 0)
-		if err == nil {
-			root, _ := parseTree(raw)
-			if root != nil {
-				details = map[string]string{"gstin": firstDeep(root, "GSTIN", "GSTREGISTRATIONNUMBER"), "address": strings.Join(allDeep(root, "ADDRESS"), ", "), "state": firstDeep(root, "STATENAME")}
-				_ = s.cache.Put("proforma-company", c, "", details, time.Now())
-			}
+		details = map[string]string{}
+		if raw, _, _, err := s.tally.request("Read proforma company", c, companyDetailsXML(c), 0); err == nil {
+			mergeSupplierDetails(details, supplierDetailsFromXML(raw))
+		}
+		// GST registration belongs to Tally's Tax Unit in current releases, not
+		// reliably to the Company object. Read the company's Tax Unit(s) and
+		// prefer that GSTIN while keeping the Company mailing address.
+		if raw, _, _, err := s.tally.request("Read proforma tax unit", c, taxUnitsXML(c), 0); err == nil {
+			mergeSupplierDetails(details, supplierDetailsFromXML(raw))
+		}
+		if len(details) > 0 {
+			_ = s.cache.Put("proforma-company", c, "", details, time.Now())
 		}
 	}
 	bank, _ := s.store.PDFBank(c)
