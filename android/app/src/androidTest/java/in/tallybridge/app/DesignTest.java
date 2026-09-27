@@ -33,7 +33,7 @@ public class DesignTest {
   ui(()->{try{
    field("company","Vijayalaxmi Textiles • Solapur");
    JSONObject summary=new JSONObject().put("receivable",12345678.50).put("payable",245800.00).put("sales",1834500.75).put("rFetchedAt","2026-09-26T04:00:00Z").put("pFetchedAt","2026-09-26T04:00:00Z").put("sFetchedAt","2026-09-26T04:00:00Z");
-   field("boot",new JSONObject().put("tallyOnline",true).put("summaries",new JSONObject().put("Vijayalaxmi Textiles • Solapur",summary)));
+   field("boot",new JSONObject().put("tallyOnline",true).put("autoSync",new JSONObject().put("lastOk","2026-09-27T08:00:00Z")).put("lastSuccess","2026-09-27T08:00:00Z").put("summaries",new JSONObject().put("Vijayalaxmi Textiles • Solapur",summary)));
    call("renderHome");
   }catch(Exception e){throw new RuntimeException(e);}});
   capture("02-overview");

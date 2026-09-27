@@ -115,7 +115,7 @@ public final class MainActivity extends Activity {
  private void selectInitialCompany(){JSONArray cs=array(boot,"companies");boolean found=false;for(int i=0;i<cs.length();i++)if(cs.optJSONObject(i)!=null&&company.equals(cs.optJSONObject(i).optString("name")))found=true;if(!found)company=cs.length()>0?cs.optJSONObject(0).optString("name"):"";store.put("company",company);}
  private void chooseCompany(){JSONArray cs=array(boot,"companies");String[] names=new String[cs.length()];for(int i=0;i<cs.length();i++)names[i]=cs.optJSONObject(i).optString("name");if(names.length==0){toast("Open a company in Tally and use Refresh");return;}new AlertDialog.Builder(this).setTitle("Choose company").setItems(names,(d,i)->{company=names[i];store.put("company",company);cache.clear();cacheAt.clear();rootTab("Home");}).show();}
  private void updateStatus(){if(statusView==null)return;JSONObject sync=object(boot,"autoSync");String state=sync.optBoolean("running")?"Syncing • "+sync.optString("step"):!sync.optString("lastError").isEmpty()?"Sync needs attention • tap for details":boot.optBoolean("tallyOnline")?"Connected • tap for sync status":"Tally unavailable • retrying";statusView.setText(state);statusView.setOnClickListener(v->open(this::syncStatus));statusView.setContentDescription(state);}
- private void syncStatus(){List<Row> data=new ArrayList<>();JSONObject sync=object(boot,"autoSync");data.add(heading(sync.optBoolean("running")?"Updating your accounts":boot.optBoolean("tallyOnline")?"PC connected":"Waiting for Tally",sync.optBoolean("running")?sync.optString("company")+" • "+sync.optString("step"):"Automatic updates every 3 minutes; failed cycles retry after cooldown."));data.add(row("Last complete sync",time(sync.optString("lastOK")),"",null));data.add(row("Last successful Tally read",time(boot.optString("lastSuccess")),"",null));if(!sync.optString("lastError").isEmpty())data.add(heading("What needs attention",sync.optString("lastError")));data.add(row("Sync now","Request a fresh background update","",this::syncNow));data.add(row("Test connection","Check the company is open in Tally","",this::probe));local("Sync status",this::syncStatus,data,false);syncScreenActive=true;}
+ private void syncStatus(){List<Row> data=new ArrayList<>();JSONObject sync=object(boot,"autoSync");data.add(heading(sync.optBoolean("running")?"Updating your accounts":boot.optBoolean("tallyOnline")?"PC connected":"Waiting for Tally",sync.optBoolean("running")?sync.optString("company")+" • "+sync.optString("step"):"Automatic updates every 3 minutes; failed cycles retry after cooldown."));data.add(row("Last complete sync",time(sync.optString("lastOk")),"",null));data.add(row("Last successful Tally read",time(boot.optString("lastSuccess")),"",null));if(!sync.optString("lastError").isEmpty())data.add(heading("What needs attention",sync.optString("lastError")));data.add(row("Sync now","Request a fresh background update","",this::syncNow));data.add(row("Test connection","Check the company is open in Tally","",this::probe));local("Sync status",this::syncStatus,data,false);syncScreenActive=true;}
  private void rootTab(String name){history.clear();tab=name;switch(name){case "Home":home();break;case "Ledgers":ledgers(false);break;case "Due":outstanding("receivable");break;case "Reports":reports();break;default:more();}}
  private void open(Runnable next){if(current!=null)history.push(current);next.run();}
  private void goBack(){generation++;if(!history.isEmpty())history.pop().run();else rootTab("Home");}
@@ -155,7 +155,7 @@ public final class MainActivity extends Activity {
  private void renderHome(){
   int scrollY=body!=null&&body.getChildCount()>0&&body.getChildAt(0) instanceof ScrollView?body.getChildAt(0).getScrollY():0;
   base("Overview",true);LinearLayout page=formPanel();page.setPadding(dp(20),dp(4),dp(20),dp(24));JSONObject sm=object(object(boot,"summaries"),company),sync=object(boot,"autoSync");
-  TextView lead=text("Your business at a glance",19,NAVY);lead.setTypeface(null,Typeface.BOLD);page.addView(lead);page.addView(text("Your balances, reports and customer follow-ups",13,MUTED));gap(page,12);quick(page,"refresh",sync.optBoolean("running")?"Sync in progress":!sync.optString("lastError").isEmpty()?"Sync needs attention":"Connection & sync",sync.optBoolean("running")?sync.optString("step"):time(sync.optString("lastOK")),()->open(this::syncStatus));gap(page,6);
+  TextView lead=text("Your business at a glance",19,NAVY);lead.setTypeface(null,Typeface.BOLD);page.addView(lead);page.addView(text("Your balances, reports and customer follow-ups",13,MUTED));gap(page,12);quick(page,"refresh",sync.optBoolean("running")?"Sync in progress":!sync.optString("lastError").isEmpty()?"Sync needs attention":"Connection & sync",sync.optBoolean("running")?sync.optString("step"):time(sync.optString("lastOk")),()->open(this::syncStatus));gap(page,6);
   metric(page,"Receivable",amountOrMissing(sm,"receivable"),time(sm.optString("rFetchedAt")),"receive",true,()->open(()->outstanding("receivable")));
   metric(page,"Payable",amountOrMissing(sm,"payable"),time(sm.optString("pFetchedAt")),"pay",false,()->open(()->outstanding("payable")));
   metric(page,"Sales this month",amountOrMissing(sm,"sales"),time(sm.optString("sFetchedAt")),"Reports",false,()->open(()->register("sales")));
@@ -183,15 +183,27 @@ public final class MainActivity extends Activity {
  private void renderOutstanding(String name,String filters,JSONObject x){
   List<Row> data=new ArrayList<>();data.add(heading(name,(x.optString("filterLabel").isEmpty()?"All pending bills":x.optString("filterLabel"))+" • Oldest first\n"+time(x.optString("fetchedAt"))));
   if(x.optBoolean("summaryOnly"))data.add(heading("Balance only","Bill details are unavailable. Filters and reminders need a bill-wise report."));
-  data.add(row("Search & filters","Invoice number, amount, date or days pending","",()->open(()->outstandingFilters(name,filters,x))));
-  JSONArray bills=array(x,"bills");if(bills.length()>0)data.add(row("Select bills","Choose invoices for sharing or a reminder","",()->selectOutstanding(name,filters,x)));
-  if(!filters.isEmpty())data.add(row("Show all bills","Clear filters and selection","",()->ledgerOutstanding(name)));
+  data.add(row("Total outstanding",x.optString("filterLabel").isEmpty()?"All bills":"Only bills in this view",money(x.optDouble("total"))+" "+x.optString("drCr"),null));
+  JSONArray bills=array(x,"bills");
+  if(!x.optBoolean("summaryOnly"))data.add(row("Filter or select bills","Invoice date, amount and days pending","",()->{
+   List<String> options=new ArrayList<>();List<Runnable> actions=new ArrayList<>();options.add("Search & filters");actions.add(()->open(()->outstandingFilters(name,filters,x)));
+   if(bills.length()>0){options.add("Select bills");actions.add(()->selectOutstanding(name,filters,x));}
+   if(!filters.isEmpty()){options.add("Show all bills");actions.add(()->ledgerOutstanding(name));}
+   new AlertDialog.Builder(this).setTitle("Choose bills").setItems(options.toArray(new String[0]),(d,i)->actions.get(i).run()).setNegativeButton("Cancel",null).show();
+  }));
   String snapshot=filters.contains("at=")?filters:filters+"&at="+Http.enc(x.optString("fetchedAt"));
-  shareRows(data,x.optString("shareText"),path("ledger-outstanding-pdf","ledger",name)+snapshot,"Outstanding-"+name);
-  if(!x.optString("reminderText").isEmpty())data.add(row("Payment reminder","Review the message and saved bank details","",()->reviewMessage("Payment reminder",x.optString("reminderText"))));
+  String pdfPath=path("ledger-outstanding-pdf","ledger",name)+snapshot;
+  data.add(row("Share or remind","Review details, PDF or payment reminder","",()->{
+   List<String> options=new ArrayList<>();List<Runnable> actions=new ArrayList<>();
+   options.add("Share details only");actions.add(()->reviewMessage("Review details",x.optString("shareText")));
+   options.add("Preview / share PDF");actions.add(()->fetchPDF(pdfPath,"Outstanding-"+name,x.optString("shareText"),0));
+   options.add("Save PDF");actions.add(()->fetchPDF(pdfPath,"Outstanding-"+name,"",2));
+   if(!x.optString("reminderText").isEmpty()){options.add("Payment reminder");actions.add(()->reviewMessage("Payment reminder",x.optString("reminderText")));}
+   new AlertDialog.Builder(this).setTitle("Share outstanding").setItems(options.toArray(new String[0]),(d,i)->actions.get(i).run()).setNegativeButton("Cancel",null).show();
+  }));
   data.add(heading(bills.length()+" pending bills","Invoice date • Days since invoice"));
   for(int i=0;i<bills.length();i++){JSONObject bill=bills.optJSONObject(i);if(bill==null)continue;int days=bill.optInt("invoiceDays",-1);data.add(row(bill.optString("billNumber"),bill.optString("date")+"\n"+(days<0?"Invoice date unavailable":"Due for "+days+" days"),money(bill.optDouble("pendingAmount"))+" "+bill.optString("drCr"),null));}
-  data.add(row("Total outstanding",x.optString("filterLabel").isEmpty()?"All bills":"Only bills in this view",money(x.optDouble("total"))+" "+x.optString("drCr"),null));
+
   rows("Outstanding",data,false);
  }
  private Map<String,String> outstandingParams(String filters){Map<String,String> p=new LinkedHashMap<>();Uri u=Uri.parse("https://local.invalid/?"+filters);for(String k:new String[]{"search","from","to","min","max","minDays","maxDays","at","bills"}){String value=u.getQueryParameter(k);if(value!=null&&!value.isEmpty())p.put(k,value);}return p;}
