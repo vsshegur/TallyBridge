@@ -291,7 +291,7 @@ func voucherDetailHintXML(company string, hint VoucherRow) []byte {
 	}
 	vtype := strings.TrimSpace(hint.VoucherType)
 	if vtype == "" { vtype = "Sales" }
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherByIdentity</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherByIdentity" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><FILTER>TBVoucherNumberFilter</FILTER><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherNumberFilter" ISMODIFY="No">$VoucherNumber = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), date, date, escXML(vtype), escXML(strings.TrimSpace(hint.Number))))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherByIdentity</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherByIdentity" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><FILTER>TBVoucherNumberFilter</FILTER><FETCH>*</FETCH><FETCH>AllInventoryEntries.*</FETCH><FETCH>AllLedgerEntries.*</FETCH><FETCH>LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherNumberFilter" ISMODIFY="No">$VoucherNumber = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), date, date, escXML(vtype), escXML(strings.TrimSpace(hint.Number))))
 }
 
 func ledgerDetailXML(company, ledger string) []byte {
@@ -299,7 +299,7 @@ func ledgerDetailXML(company, ledger string) []byte {
 }
 
 func ledgerDetailCollectionXML(company, ledger string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLedgerDetailFallback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLedgerDetailFallback" ISMODIFY="No"><TYPE>Ledger</TYPE><FILTER>TBLedgerNameFilter</FILTER><FETCH>*</FETCH><FETCH>Address.*</FETCH><FETCH>LedMailingDetails.*</FETCH><FETCH>LedMultiAddressList.*</FETCH><FETCH>LedGSTRegDetails.*</FETCH><FETCH>GSTDetails.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBLedgerNameFilter" ISMODIFY="No">$Name = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), escXML(strings.TrimSpace(ledger))))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLedgerDetailFallback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLedgerDetailFallback" ISMODIFY="No"><TYPE>Ledger</TYPE><FILTER>TBLedgerNameFilter</FILTER><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>MailingName</NATIVEMETHOD><NATIVEMETHOD>Address</NATIVEMETHOD><NATIVEMETHOD>City</NATIVEMETHOD><NATIVEMETHOD>Pincode</NATIVEMETHOD><NATIVEMETHOD>LedStateName</NATIVEMETHOD><NATIVEMETHOD>PartyGSTIN</NATIVEMETHOD><FETCH>Address.*,LedMailingDetails.*,LedMultiAddressList.*,LedGSTRegDetails.*,GSTDetails.*</FETCH><METHOD>TBGSTIN:$PartyGSTIN</METHOD><METHOD>TBSTATE:$LedStateName</METHOD><METHOD>TBCITY:$City</METHOD><METHOD>TBPINCODE:$Pincode</METHOD></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBLedgerNameFilter" ISMODIFY="No">$Name = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), escXML(strings.TrimSpace(ledger))))
 }
 
 // Fetch the selected bank object completely: bank methods vary across Tally versions.
@@ -613,16 +613,16 @@ func parseLedgerDetails(b []byte) map[string]string {
 		}
 	}
 	if m["PARTYGSTIN"] == "" {
-		m["PARTYGSTIN"] = firstNonBlank(m["GSTIN"], m["GSTREGISTRATIONNUMBER"], firstDeep(r, "GSTREGNUMBER", "GSTREGISTRATIONNO"), firstDeepTagMatch(r, func(tag string) bool { return tag == "GSTIN" || strings.HasSuffix(tag, "GSTIN") }))
+		m["PARTYGSTIN"] = firstNonBlank(firstDeep(r, "TBGSTIN"), m["GSTIN"], m["GSTREGISTRATIONNUMBER"], firstDeep(r, "GSTREGNUMBER", "GSTREGISTRATIONNO"), firstDeepTagMatch(r, func(tag string) bool { return tag == "GSTIN" || strings.HasSuffix(tag, "GSTIN") }))
 	}
 	if m["STATENAME"] == "" {
-		m["STATENAME"] = firstNonBlank(m["LEDSTATENAME"], firstDeep(r, "PLACEOFSUPPLY", "STATE"))
+		m["STATENAME"] = firstNonBlank(firstDeep(r, "TBSTATE"), m["LEDSTATENAME"], firstDeep(r, "PLACEOFSUPPLY", "STATE"))
 	}
 	if m["CITY"] == "" {
-		m["CITY"] = firstDeep(r, "LEDGERCITY", "MAILINGCITY", "DISTRICT")
+		m["CITY"] = firstNonBlank(firstDeep(r, "TBCITY"), firstDeep(r, "LEDGERCITY", "MAILINGCITY", "DISTRICT"))
 	}
 	if m["PINCODE"] == "" {
-		m["PINCODE"] = firstDeep(r, "LEDGERPINCODE", "MAILINGPINCODE")
+		m["PINCODE"] = firstNonBlank(firstDeep(r, "TBPINCODE"), firstDeep(r, "LEDGERPINCODE", "MAILINGPINCODE"))
 	}
 	for canonical, tags := range map[string][]string{
 		"BANKACCOUNTNUMBER": {"BANKACNO", "BANKACCOUNTNO", "BANKACCOUNTNUM", "ACCOUNTNUMBER", "ACCOUNTNO", "ACNO"},

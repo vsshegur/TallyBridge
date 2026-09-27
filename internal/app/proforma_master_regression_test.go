@@ -56,3 +56,21 @@ func TestModernNestedBuyerAndHSNParsing(t *testing.T) {
 	var nodes []*xnode; nodesByName(root, "STOCKITEM", &nodes)
 	if len(nodes)!=1 || hsnFromNode(nodes[0], "2026-09-27")!="63026000" { t.Fatal("HSN details not parsed") }
 }
+
+
+func TestAuthoritativeTallyMasterMethods(t *testing.T) {
+	company := string(companyGSTXML("Demo Company"))
+	if !strings.Contains(company, "$GSTRegNumber:TaxUnit:($ExciseUnitName:Company:##SVCurrentCompany)") || !strings.Contains(company, "$$SysName:XML") { t.Fatal(company) }
+	stock := string(stockItemsXML("Demo Company"))
+	if !strings.Contains(stock, "<METHOD>TBHSN:$GSTItemHSNCodeEx</METHOD>") || !strings.Contains(stock, "<NATIVEMETHOD>Name</NATIVEMETHOD>") { t.Fatal(stock) }
+	ledger := string(ledgerDetailCollectionXML("Demo Company", "Buyer"))
+	for _, want := range []string{"<METHOD>TBGSTIN:$PartyGSTIN</METHOD>","<METHOD>TBSTATE:$LedStateName</METHOD>","<METHOD>TBCITY:$City</METHOD>"} {
+		if !strings.Contains(ledger, want) { t.Fatalf("missing %s", want) }
+	}
+}
+func TestComputedBuyerAndHSNFields(t *testing.T) {
+	buyer := parseLedgerDetails([]byte(`<LEDGER><TBGSTIN>27ABCDE1234F1Z5</TBGSTIN><TBSTATE>Maharashtra</TBSTATE><TBCITY>Solapur</TBCITY><TBPINCODE>413001</TBPINCODE><ADDRESS>Market Road</ADDRESS></LEDGER>`))
+	if buyer["PARTYGSTIN"]!="27ABCDE1234F1Z5" || buyer["STATENAME"]!="Maharashtra" || buyer["CITY"]!="Solapur" || buyer["PINCODE"]!="413001" { t.Fatal(buyer) }
+	items := parseStockItems([]byte(`<ENVELOPE><STOCKITEM NAME="Towel"><BASEUNITS>pcs</BASEUNITS><TBHSN>63026000</TBHSN></STOCKITEM></ENVELOPE>`), "2026-09-27")
+	if len(items)!=1 || items[0].HSN!="63026000" { t.Fatal(items) }
+}

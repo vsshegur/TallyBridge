@@ -22,7 +22,7 @@ type StockItemsData struct {
 }
 
 func stockItemsXML(company string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBProformaStock</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBProformaStock" ISMODIFY="No"><TYPE>StockItem</TYPE><FETCH>Name,Parent,BaseUnits,Description,AdditionalName,GSTApplicable,GSTTypeOfSupply,GSTDetails.*,HSNDetails.*,GSTHSNCode,HSNCode,HSNMasterName</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBProformaStock</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBProformaStock" ISMODIFY="No"><TYPE>StockItem</TYPE><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>Parent</NATIVEMETHOD><NATIVEMETHOD>BaseUnits</NATIVEMETHOD><NATIVEMETHOD>Description</NATIVEMETHOD><NATIVEMETHOD>AdditionalName</NATIVEMETHOD><NATIVEMETHOD>GSTHSNCode</NATIVEMETHOD><NATIVEMETHOD>HSNCode</NATIVEMETHOD><FETCH>GSTDetails.*,HSNDetails.*</FETCH><METHOD>TBHSN:$GSTItemHSNCodeEx</METHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
 }
 func companyDetailsXML(company string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Company</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>Name</FETCH><FETCH>MailingName</FETCH><FETCH>Address</FETCH><FETCH>City</FETCH><FETCH>StateName</FETCH><FETCH>CountryName</FETCH><FETCH>Pincode</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(company), escXML(company)))
@@ -31,7 +31,7 @@ func taxUnitsXML(company string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBProformaTaxUnits</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBProformaTaxUnits" ISMODIFY="No"><TYPE>Tax Unit</TYPE><FETCH>Name,GSTRegNumber,StateName,PinCode,AddressName,Address</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
 }
 func companyGSTXML(company string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>TBCompanyGSTReport</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><REPORT NAME="TBCompanyGSTReport"><FORM>TBCompanyGSTForm</FORM></REPORT><FORM NAME="TBCompanyGSTForm"><PART>TBCompanyGSTPart</PART></FORM><PART NAME="TBCompanyGSTPart"><LINE>TBCompanyGSTLine</LINE></PART><LINE NAME="TBCompanyGSTLine"><FIELDS>TBCompanyGSTIN</FIELDS></LINE><FIELD NAME="TBCompanyGSTIN"><SET>@@CMPGSTaxNumber</SET><XMLTAG>GSTIN</XMLTAG></FIELD></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>TBCompanyGSTReport</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><REPORT NAME="TBCompanyGSTReport"><FORM>TBCompanyGSTForm</FORM></REPORT><FORM NAME="TBCompanyGSTForm"><PART>TBCompanyGSTPart</PART></FORM><PART NAME="TBCompanyGSTPart"><LINE>TBCompanyGSTLine</LINE></PART><LINE NAME="TBCompanyGSTLine"><FIELDS>TBCompanyGSTIN</FIELDS></LINE><FIELD NAME="TBCompanyGSTIN"><SET>$GSTRegNumber:TaxUnit:($ExciseUnitName:Company:##SVCurrentCompany)</SET><XMLTAG>GSTIN</XMLTAG></FIELD></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company)))
 }
 func hsnFromNode(n *xnode, asOf string) string {
 	var rows []*xnode
@@ -105,7 +105,7 @@ func parseStockItems(raw []byte, asOf string) []StockItemMaster {
 	nodesByName(root, "STOCKITEM", &nodes)
 	out := []StockItemMaster{}
 	for _, n := range nodes {
-		x := StockItemMaster{Name: firstDeep(n, "NAME"), Unit: firstDeep(n, "BASEUNITS"), Description: firstDeep(n, "DESCRIPTION", "ADDITIONALNAME"), HSN: hsnFromNode(n, asOf)}
+		x := StockItemMaster{Name: firstDeep(n, "NAME"), Unit: firstDeep(n, "BASEUNITS"), Description: firstDeep(n, "DESCRIPTION", "ADDITIONALNAME"), HSN: firstNonBlank(firstDeep(n, "TBHSN"), hsnFromNode(n, asOf))}
 		if x.Name == "" {
 			continue
 		}
@@ -181,7 +181,7 @@ func (s *Server) handleProformaMasters(w http.ResponseWriter, r *http.Request) {
 	}
 	var stocks StockItemsData
 	at, ok := s.cache.Get("stock-items", c, "", &stocks)
-	if !ok || r.URL.Query().Get("refresh") == "1" || time.Since(at) > 5*time.Minute {
+	if !ok || r.URL.Query().Get("refresh") == "1" || time.Since(at) >= 0 {
 		raw, ms, _, err := s.tally.request("Read proforma stock masters", c, stockItemsXML(c), 0)
 		if err != nil {
 			if !ok {
@@ -198,7 +198,7 @@ func (s *Server) handleProformaMasters(w http.ResponseWriter, r *http.Request) {
 	}
 	details := map[string]string{}
 	_, hasCompany := s.cache.Get("proforma-company", c, "", &details)
-	if !hasCompany || r.URL.Query().Get("refresh") == "1" {
+	if !hasCompany || r.URL.Query().Get("refresh") == "1" || hasCompany {
 		details = map[string]string{}
 		if raw, _, _, err := s.tally.request("Read proforma company", c, companyDetailsXML(c), 0); err == nil {
 			mergeSupplierDetails(details, supplierDetailsFromXML(raw))
