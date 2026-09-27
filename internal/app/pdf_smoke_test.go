@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"os"
+	"strings"
 	"testing"
 )
 
