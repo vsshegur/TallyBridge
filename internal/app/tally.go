@@ -304,7 +304,7 @@ func ledgerDetailXML(company, ledger string) []byte {
 	// Fetch the complete single Ledger plus the modern mailing/GST aggregates.
 	// TallyPrime 3+ moved several party fields into LedMailingDetails and
 	// LedGSTRegDetails, while older companies may still expose top-level methods.
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Ledger</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>*</FETCH><FETCH>Address.*</FETCH><FETCH>LedMailingDetails.*</FETCH><FETCH>LedGSTRegDetails.*</FETCH><FETCH>LedMultiAddressList.*</FETCH><FETCH>GSTDetails.*</FETCH><FETCH>BankDetails.*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(ledger), escXML(company)))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE><SUBTYPE>Ledger</SUBTYPE><ID TYPE="Name">%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><FETCHLIST><FETCH>*</FETCH><FETCH>City</FETCH><FETCH>Pincode</FETCH><FETCH>LedStateName</FETCH><FETCH>PartyGSTIN</FETCH><FETCH>Address.*</FETCH><FETCH>LedMailingDetails.*</FETCH><FETCH>LedGSTRegDetails.*</FETCH><FETCH>LedMultiAddressList.*</FETCH><FETCH>GSTDetails.*</FETCH><FETCH>BankDetails.*</FETCH></FETCHLIST></DESC></BODY></ENVELOPE>`, escXML(ledger), escXML(company)))
 }
 func ledgerDetailCollectionXML(company, ledger string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLedgerDetailFallback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLedgerDetailFallback" ISMODIFY="No"><TYPE>Ledger</TYPE><FILTER>TBLedgerNameFilter</FILTER><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>MailingName</NATIVEMETHOD><NATIVEMETHOD>Address</NATIVEMETHOD><NATIVEMETHOD>City</NATIVEMETHOD><NATIVEMETHOD>Pincode</NATIVEMETHOD><NATIVEMETHOD>LedStateName</NATIVEMETHOD><NATIVEMETHOD>PartyGSTIN</NATIVEMETHOD><FETCH>Address.*,LedMailingDetails.*,LedMultiAddressList.*,LedGSTRegDetails.*,GSTDetails.*</FETCH><METHOD>TBGSTIN:$PartyGSTIN</METHOD><METHOD>TBSTATE:$LedStateName</METHOD><METHOD>TBCITY:$City</METHOD><METHOD>TBPINCODE:$Pincode</METHOD></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBLedgerNameFilter" ISMODIFY="No">$Name = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), escXML(strings.TrimSpace(ledger))))
@@ -898,10 +898,12 @@ func parseVoucherDayDetail(b []byte, company, masterID string, hint VoucherRow) 
 	for _, v := range vouchers {
 		num := strings.TrimSpace(firstDeep(v, "VOUCHERNUMBER", "REFERENCE"))
 		date := normISODate(firstDeep(v, "DATE", "VOUCHERDATE"))
-		if wantNum != "" && !strings.EqualFold(num, wantNum) { continue }
+		vMID := strings.TrimSpace(firstDeep(v, "MASTERID"))
+		idMatch := masterID != "" && vMID == masterID
+		if wantNum != "" && !strings.EqualFold(num, wantNum) && !idMatch { continue }
 		if wantDate != "" && date != "" && date != wantDate { continue }
 		score := 100
-		if masterID != "" && firstDeep(v, "MASTERID") == masterID { score += 100 }
+		if idMatch { score += 100 }
 		if wantType != "" && strings.EqualFold(strings.TrimSpace(firstDeep(v, "VOUCHERTYPENAME")), wantType) { score += 30 }
 		party := strings.TrimSpace(firstDeep(v, "PARTYLEDGERNAME", "PARTYNAME", "BASICBUYERNAME"))
 		if wantParty != "" && strings.EqualFold(party, wantParty) { score += 20 }

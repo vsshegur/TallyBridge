@@ -11,7 +11,7 @@ func TestProformaSupplierUsesTaxUnitAndBuyerDetails(t *testing.T) {
 		t.Fatal(tax)
 	}
 	ledger := string(ledgerDetailXML("Vijayalaxmi Textiles", "ABC Buyer"))
-	for _, want := range []string{"<FETCH>City</FETCH>", "<FETCH>PartyGSTIN</FETCH>", "<FETCH>LedMultiAddressList.*</FETCH>", "<FETCH>LedGSTRegDetails.*</FETCH>"} {
+	for _, want := range []string{"<FETCH>City</FETCH>", "<FETCH>PartyGSTIN</FETCH>", "<FETCH>LedMailingDetails.*</FETCH>", "<FETCH>LedMultiAddressList.*</FETCH>", "<FETCH>LedGSTRegDetails.*</FETCH>"} {
 		if !strings.Contains(ledger, want) {
 			t.Fatalf("buyer detail query missing %s", want)
 		}
