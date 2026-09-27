@@ -872,11 +872,7 @@ func parseVoucherDetailNode(r *xnode, company, masterID string, hint VoucherRow)
 	x.EWayBillNumber = firstDeep(r, "EWAYBILLNO", "EWAYBILLNUMBER")
 	x.Narration = firstDeep(r, "NARRATION")
 	x.CustomerAddress = allDeep(r, "ADDRESS")
-	var inv []*xnode
-	nodesByName(r, "ALLINVENTORYENTRIES.LIST", &inv)
-	nodesByName(r, "INVENTORYENTRIES.LIST", &inv)
-
-	for _, n := range inv {
+	for _, n := range invoiceInventoryRows(r) {
 		name := firstDeep(n, "STOCKITEMNAME", "ITEMNAME", "NAME")
 		if name == "" {
 			continue
@@ -946,6 +942,15 @@ func dispatchShareText(x VoucherDetail) string {
 	}
 	if x.DiscountAmount != 0 {
 		fmt.Fprintf(&b, "\nDiscount Amount - ₹%s", indianNumber(x.DiscountAmount))
+	}
+	if x.CGST != 0 {
+		fmt.Fprintf(&b, "\nCGST Amount - ₹%s", indianNumber(abs(x.CGST)))
+	}
+	if x.SGST != 0 {
+		fmt.Fprintf(&b, "\nSGST Amount - ₹%s", indianNumber(abs(x.SGST)))
+	}
+	if x.IGST != 0 {
+		fmt.Fprintf(&b, "\nIGST Amount - ₹%s", indianNumber(abs(x.IGST)))
 	}
 	fmt.Fprintf(&b, "\nTotal Amount - ₹%s", indianNumber(x.TotalAmount))
 	return b.String()

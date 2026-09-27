@@ -11,13 +11,43 @@ func voucherNode(root *xnode) *xnode {
 	return root
 }
 func invoiceLedgers(root *xnode) []*xnode {
-	var rows []*xnode
-	for _, n := range voucherNode(root).Children {
-		if n.Name == "ALLLEDGERENTRIES.LIST" || n.Name == "LEDGERENTRIES.LIST" {
-			rows = append(rows, n)
+	v := voucherNode(root)
+	all := make([]*xnode, 0)
+	legacy := make([]*xnode, 0)
+	for _, n := range v.Children {
+		switch n.Name {
+		case "ALLLEDGERENTRIES.LIST":
+			all = append(all, n)
+		case "LEDGERENTRIES.LIST":
+			legacy = append(legacy, n)
 		}
 	}
-	return rows
+	// Tally can return both aliases for the same ledger rows when both are
+	// requested. Never sum both representations or the invoice total/taxes can
+	// be doubled. ALLLEDGERENTRIES is the canonical modern form.
+	if len(all) > 0 {
+		return all
+	}
+	return legacy
+}
+func invoiceInventoryRows(root *xnode) []*xnode {
+	v := voucherNode(root)
+	all := make([]*xnode, 0)
+	legacy := make([]*xnode, 0)
+	for _, n := range v.Children {
+		switch n.Name {
+		case "ALLINVENTORYENTRIES.LIST":
+			all = append(all, n)
+		case "INVENTORYENTRIES.LIST":
+			legacy = append(legacy, n)
+		}
+	}
+	// Same rule as ledger rows: these are alternate representations, not two
+	// independent sets of stock lines.
+	if len(all) > 0 {
+		return all
+	}
+	return legacy
 }
 func invoicePartyTotal(root *xnode, party string) (float64, bool) {
 	sum := 0.0

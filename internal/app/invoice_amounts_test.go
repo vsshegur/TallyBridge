@@ -63,3 +63,35 @@ func TestOldInvoiceCacheCannotBeSharedAsPDF(t *testing.T) {
 		t.Fatalf("old monetary cache accepted: %d %s", w.Code, w.Body.String())
 	}
 }
+
+
+func TestInvoiceDoesNotDoubleAliasLedgerAndInventoryRepresentations(t *testing.T) {
+	xml := []byte(`<VOUCHER>
+<PARTYLEDGERNAME>Buyer</PARTYLEDGERNAME><VOUCHERNUMBER>INV-DUP</VOUCHERNUMBER>
+<ALLINVENTORYENTRIES.LIST><STOCKITEMNAME>Towel</STOCKITEMNAME><RATE>1000/pcs</RATE><BILLEDQTY>1 pcs</BILLEDQTY><AMOUNT>1000</AMOUNT></ALLINVENTORYENTRIES.LIST>
+<INVENTORYENTRIES.LIST><STOCKITEMNAME>Towel</STOCKITEMNAME><RATE>1000/pcs</RATE><BILLEDQTY>1 pcs</BILLEDQTY><AMOUNT>1000</AMOUNT></INVENTORYENTRIES.LIST>
+<ALLLEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><AMOUNT>1000</AMOUNT></ALLLEDGERENTRIES.LIST>
+<ALLLEDGERENTRIES.LIST><LEDGERNAME>CGST</LEDGERNAME><AMOUNT>90</AMOUNT></ALLLEDGERENTRIES.LIST>
+<ALLLEDGERENTRIES.LIST><LEDGERNAME>SGST</LEDGERNAME><AMOUNT>90</AMOUNT></ALLLEDGERENTRIES.LIST>
+<ALLLEDGERENTRIES.LIST><LEDGERNAME>Buyer</LEDGERNAME><ISPARTYLEDGER>Yes</ISPARTYLEDGER><AMOUNT>-1180</AMOUNT></ALLLEDGERENTRIES.LIST>
+<LEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><AMOUNT>1000</AMOUNT></LEDGERENTRIES.LIST>
+<LEDGERENTRIES.LIST><LEDGERNAME>CGST</LEDGERNAME><AMOUNT>90</AMOUNT></LEDGERENTRIES.LIST>
+<LEDGERENTRIES.LIST><LEDGERNAME>SGST</LEDGERNAME><AMOUNT>90</AMOUNT></LEDGERENTRIES.LIST>
+<LEDGERENTRIES.LIST><LEDGERNAME>Buyer</LEDGERNAME><ISPARTYLEDGER>Yes</ISPARTYLEDGER><AMOUNT>-1180</AMOUNT></LEDGERENTRIES.LIST>
+</VOUCHER>`)
+	x := parseVoucherDetail(xml, "Firm", "1", VoucherRow{Amount: 1180})
+	if x.TotalAmount != 1180 || x.CGST != 90 || x.SGST != 90 || x.IGST != 0 || x.TaxableAmount != 1000 || x.OtherCharges != 0 || len(x.Items) != 1 {
+		t.Fatalf("duplicate aliases changed invoice: %+v", x)
+	}
+	if !strings.Contains(x.ShareText, "CGST Amount - ₹90.00") || !strings.Contains(x.ShareText, "SGST Amount - ₹90.00") || strings.Contains(x.ShareText, "IGST Amount") {
+		t.Fatal(x.ShareText)
+	}
+}
+
+func TestInvoiceDetailsShareShowsIGSTWhenApplicable(t *testing.T) {
+	x := VoucherDetail{FirmName:"Firm",CustomerName:"Buyer",InvoiceNumber:"INV-IGST",InvoiceDate:"2026-09-27",IGST:180,TotalAmount:1180}
+	text := dispatchShareText(x)
+	if !strings.Contains(text, "IGST Amount - ₹180.00") || strings.Contains(text, "CGST Amount") || strings.Contains(text, "SGST Amount") {
+		t.Fatal(text)
+	}
+}
