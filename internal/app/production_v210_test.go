@@ -122,7 +122,9 @@ func TestDiagnosticsIncludesBuyerAndInvoiceContextWithoutRawXML(t *testing.T) {
 	_ = s.cache.Put("ledger-details","Demo","Buyer",map[string]any{"details":map[string]string{"PARTYGSTIN":"27AAAAA0000A1Z5","ADDRESS":"Buyer Road","CITY":"Solapur"}},time.Now())
 	x:=VoucherDetail{Company:"Demo",MasterID:"10",InvoiceNumber:"INV-10",InvoiceDate:"2026-09-28",VoucherType:"Sales",CustomerName:"Buyer",TotalAmount:1180,RegisterAmount:1180,AmountVerified:true,TaxableAmount:1000,CGST:90,SGST:90}
 	_ = s.cache.Put("voucher-detail-v6","Demo","id:10",x,time.Now())
-	req:=httptest.NewRequest(http.MethodGet,"/api/v1/mobile/diagnostics?company=Demo&ledger=Buyer&number=INV-10&date=2026-09-28&masterId=10&voucherType=Sales",nil)
+	s.setDiagnosticLedgerContext("Demo","Buyer")
+	s.setDiagnosticInvoiceContext("Demo",x)
+	req:=httptest.NewRequest(http.MethodGet,"/api/v1/admin/diagnostics?company=Demo",nil)
 	d:=s.diagnostics("Demo",req)
 	if d.Buyer["PARTYGSTIN"]=="" || d.Invoice["masterId"]!="10" || d.Invoice["verified"]!=true { t.Fatalf("missing context buyer=%v invoice=%v",d.Buyer,d.Invoice) }
 	raw,_:=json.Marshal(d)
