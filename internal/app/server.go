@@ -613,7 +613,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	key := voucherCacheKey(mid, hint)
 	if reason, retry, p := s.tally.Pending(); p {
 		var old VoucherDetail
-		if at, ok := s.cache.Get("voucher-detail-v5", c, key, &old); ok && old.TotalsVersion == 2 {
+		if at, ok := s.cache.Get("voucher-detail-v6", c, key, &old); ok && old.TotalsVersion == 2 {
 			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at
 			s.applyVoucherPresentation(c, &old)
 			jsonOut(w, old); return
@@ -624,7 +624,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	x, e := s.fetchVoucherDetail(c, mid, hint)
 	if e != nil {
 		var old VoucherDetail
-		if at, ok := s.cache.Get("voucher-detail-v5", c, key, &old); ok && old.TotalsVersion == 2 {
+		if at, ok := s.cache.Get("voucher-detail-v6", c, key, &old); ok && old.TotalsVersion == 2 {
 			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at; old.LiveError = e.Error()
 			s.applyVoucherPresentation(c, &old)
 			jsonOut(w, old); return
@@ -643,7 +643,7 @@ func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) 
 	}
 	key := voucherCacheKey(mid, hint)
 	var x VoucherDetail
-	if _, ok := s.cache.Get("voucher-detail-v5", c, key, &x); !ok || x.TotalsVersion != 2 {
+	if _, ok := s.cache.Get("voucher-detail-v6", c, key, &x); !ok || x.TotalsVersion != 2 {
 		var e error
 		x, e = s.fetchVoucherDetail(c, mid, hint)
 		if e != nil { jsonErr(w, 503, e); return }
@@ -1121,7 +1121,7 @@ func (s *Server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
 			out = append(out, SearchResult{Kind: "bill", Title: firstNonBlank(b.BillNumber, po.Party), Subtitle: po.Party + " • pending " + indianNumber(b.PendingAmount), Party: po.Party, Ledger: po.Party, Number: b.BillNumber, Date: b.Date, Amount: b.PendingAmount})
 		}
 	}
-	for _, d := range s.cache.Matching("voucher-detail-v5", c) {
+	for _, d := range s.cache.Matching("voucher-detail-v6", c) {
 		var v VoucherDetail
 		if json.Unmarshal(d.Data, &v) != nil {
 			continue
@@ -1586,7 +1586,7 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 	s.verifyInvoiceAmount(&x, hint)
 	x.CommonData = CommonData{Live: true, Source: "live", FetchedAt: time.Now(), DurationMS: duration, PDFTemplate: validPDFTemplate(s.store.Settings().PDFTemplate)}
 	x.ShareText = dispatchShareText(x)
-	_ = s.cache.Put("voucher-detail-v5", c, voucherCacheKey(mid, hint), x, x.FetchedAt)
+	_ = s.cache.Put("voucher-detail-v6", c, voucherCacheKey(mid, hint), x, x.FetchedAt)
 	return x, nil
 }
 func mergeVoucherDetail(a, b VoucherDetail) VoucherDetail {
