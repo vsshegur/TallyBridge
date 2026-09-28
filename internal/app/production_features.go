@@ -140,9 +140,9 @@ func (s *Server) diagnostics(company string, r *http.Request) DiagnosticReport {
 	if r != nil {
 		ledger := strings.TrimSpace(r.URL.Query().Get("ledger"))
 		if ledger != "" {
-			var saved map[string]any
-			if _, ok := s.cache.Get("ledger-details", company, ledger, &saved); ok {
-				if m, ok := saved["details"].(map[string]string); ok { d.Buyer=m }
+			var saved struct { Details map[string]string `json:"details"` }
+			if _, ok := s.cache.Get("ledger-details", company, ledger, &saved); ok && len(saved.Details) > 0 {
+				d.Buyer = saved.Details
 			}
 		}
 		number := strings.TrimSpace(r.URL.Query().Get("number"))
@@ -150,9 +150,12 @@ func (s *Server) diagnostics(company string, r *http.Request) DiagnosticReport {
 		if number!="" && date!="" {
 			key := voucherCacheKey(strings.TrimSpace(r.URL.Query().Get("masterId")), VoucherRow{Number:number,Date:date,VoucherType:r.URL.Query().Get("voucherType")})
 			var x VoucherDetail
-			if _, ok := s.cache.Get("voucher-detail-v5", company, key, &x); ok {
+			if _, ok := s.cache.Get("voucher-detail-v6", company, key, &x); ok {
 				d.Invoice = map[string]any{
-					"number":x.InvoiceNumber,"date":x.InvoiceDate,"total":x.TotalAmount,
+					"number":x.InvoiceNumber,"date":x.InvoiceDate,"masterId":x.MasterID,
+					"voucherType":x.VoucherType,"party":x.CustomerName,
+					"total":x.TotalAmount,"taxable":x.TaxableAmount,"discount":x.DiscountAmount,
+					"freight":x.Freight,"cgst":x.CGST,"sgst":x.SGST,"igst":x.IGST,"roundOff":x.RoundOff,
 					"registerAmount":x.RegisterAmount,"delta":x.AmountDelta,
 					"verified":x.AmountVerified,"note":x.VerificationNote,"source":x.Source,
 				}
@@ -169,6 +172,8 @@ func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOut(w, s.diagnostics(c,r))
 }
+const invoiceVerificationTolerance = 0.01
+
 func (s *Server) verifyInvoiceAmount(x *VoucherDetail, hint VoucherRow) {
 	if x == nil { return }
 	if hint.Amount == 0 {
@@ -178,11 +183,11 @@ func (s *Server) verifyInvoiceAmount(x *VoucherDetail, hint VoucherRow) {
 	}
 	x.RegisterAmount = math.Abs(hint.Amount)
 	x.AmountDelta = math.Abs(math.Abs(x.TotalAmount)-x.RegisterAmount)
-	x.AmountVerified = x.AmountDelta <= 0.02
+	x.AmountVerified = x.AmountDelta <= invoiceVerificationTolerance+0.0000001
 	if x.AmountVerified {
-		x.VerificationNote = "Invoice total matches the register amount."
+		x.VerificationNote = "Invoice total matches the register amount within ₹0.01."
 	} else {
-		x.VerificationNote = fmt.Sprintf("Amount mismatch: register %.2f vs detail %.2f.", x.RegisterAmount, math.Abs(x.TotalAmount))
+		x.VerificationNote = fmt.Sprintf("Amount mismatch detected. Register: ₹%.2f • Invoice detail: ₹%.2f • Difference: ₹%.2f.", x.RegisterAmount, math.Abs(x.TotalAmount), x.AmountDelta)
 	}
 }
 func validPDFTemplate(v string) string {
