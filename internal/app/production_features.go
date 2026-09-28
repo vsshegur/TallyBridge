@@ -101,6 +101,9 @@ func (s *Server) companyHealth(company string, refresh bool) CompanyHealth {
 	add(&items,"bank","Bank account",bank.AccountNumber,"Save/verify the payment bank in Windows → Payments.",true)
 	add(&items,"ifsc","IFSC",bank.IFSC,"Enter the bank IFSC in Windows → Payments.",bank.AccountNumber!="")
 	add(&items,"upi","UPI ID",bank.UPI,"Add a UPI ID to enable payment QR codes.",false)
+	qrValue := ""
+	if strings.TrimSpace(bank.UPI)!="" { qrValue = "UPI payment QR enabled" }
+	add(&items,"qr","QR ready",qrValue,"Add a UPI ID to enable customer payment QR codes.",false)
 	okCount, reqCount, reqOK := 0,0,true
 	issues := []string{}
 	for _, it := range items {
