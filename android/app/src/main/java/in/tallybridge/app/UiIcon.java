@@ -18,6 +18,11 @@ final class UiIcon extends View {
  case "Ledgers":c.drawRoundRect(4,3,20,21,2,2,paint);line(c,8,3,8,21);line(c,12,8,16,8);line(c,12,12,16,12);break;
  case "Due":c.drawCircle(12,12,9,paint);line(c,12,7,12,12,16,14);break;
  case "Reports":line(c,4,3,4,21,21,21);line(c,8,17,8,12);line(c,13,17,13,8);line(c,18,17,18,5);break;
+ case "Proforma":c.drawRoundRect(5,3,19,21,2,2,paint);line(c,8,8,16,8);line(c,8,12,16,12);line(c,8,16,13,16);break;
+ case "Payments":c.drawRoundRect(3,6,21,18,2,2,paint);line(c,3,10,21,10);c.drawCircle(17,14,1.2f,paint);break;
+ case "health":c.drawCircle(12,12,9,paint);line(c,8,12,11,15,17,8);break;
+ case "diag":line(c,4,18,8,14,11,16,16,8,20,10);line(c,4,21,20,21);break;
+ case "qr":c.drawRect(4,4,10,10,paint);c.drawRect(14,4,20,10,paint);c.drawRect(4,14,10,20,paint);line(c,14,14,17,14,17,17,20,17,20,20,14,20);break;
  case "More":c.drawCircle(5,12,1,paint);c.drawCircle(12,12,1,paint);c.drawCircle(19,12,1,paint);break;
  case "back":line(c,14,5,7,12,14,19);break;
  case "next":line(c,9,5,16,12,9,19);break;
