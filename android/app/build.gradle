@@ -1,4 +1,5 @@
 plugins { id 'com.android.application' }
+def releaseSigningEnabled = System.getenv('TB_KEYSTORE') != null && !System.getenv('TB_KEYSTORE').isEmpty()
 android {
     namespace 'in.tallybridge.app'
     compileSdk 35
@@ -12,16 +13,24 @@ android {
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     signingConfigs {
-        release {
-            if (System.getenv('TB_KEYSTORE')) {
+        if (releaseSigningEnabled) {
+            release {
                 storeFile file(System.getenv('TB_KEYSTORE'))
                 storePassword System.getenv('TB_STORE_PASSWORD')
                 keyAlias System.getenv('TB_KEY_ALIAS')
                 keyPassword System.getenv('TB_KEY_PASSWORD')
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
             }
         }
     }
-    buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (releaseSigningEnabled) signingConfig signingConfigs.release
+        }
+    }
 }
 
 dependencies {
