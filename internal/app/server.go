@@ -238,7 +238,12 @@ func (s *Server) handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 		devs[i].Key = ""
 	}
 	cc, at := s.cache.Companies()
-	jsonOut(w, map[string]any{"live": s.stateSnapshot(), "settings": cfg, "devices": devs, "logs": s.tally.Logs(), "cache": s.cache.Stats(), "cachedCompanies": cc, "cachedCompaniesAt": at, "autoSync": s.autoSyncSnapshot()})
+	st := s.stateSnapshot()
+	companies := st.Companies
+	if len(companies)==0 { companies=cc }
+	health := map[string]CompanyHealth{}
+	for _, c := range companies { health[c.Name]=s.companyHealth(c.Name,false) }
+	jsonOut(w, map[string]any{"version":Version,"live": st, "settings": cfg, "devices": devs, "logs": s.tally.Logs(), "cache": s.cache.Stats(), "cachedCompanies": cc, "cachedCompaniesAt": at, "autoSync": s.autoSyncSnapshot(), "health":health})
 }
 func (s *Server) handleAdminProbe(w http.ResponseWriter, r *http.Request) {
 	st, e := s.probeLive()
