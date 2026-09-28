@@ -2,6 +2,6 @@
 
 package main
 
-func runSystemTray(adminURL, iconPath string) error {
+func runSystemTray(adminURL, diagnosticsURL, iconPath string, status func() string) error {
 	select {}
 }

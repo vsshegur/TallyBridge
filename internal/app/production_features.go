@@ -311,3 +311,22 @@ func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 	ctx,cancel:=context.WithTimeout(r.Context(),5*time.Second); defer cancel()
 	jsonOut(w,checkLatestRelease(ctx))
 }
+
+func (s *Server) TrayStatus() string {
+	st:=s.stateSnapshot()
+	sync:=s.autoSyncSnapshot()
+	if sync.Running {
+		step:=strings.TrimSpace(sync.Step)
+		if step=="" { step="syncing" }
+		return "TallyBridge • Syncing: "+step
+	}
+	if st.TallyOnline {
+		n:=len(st.Companies)
+		if n==0 { return "TallyBridge • Tally connected" }
+		return fmt.Sprintf("TallyBridge • Tally connected • %d company",n)+map[bool]string{true:"",false:"ies"}[n==1]
+	}
+	if !st.LastSuccess.IsZero() {
+		return "TallyBridge • Tally unavailable • saved data ready"
+	}
+	return "TallyBridge • Waiting for Tally"
+}

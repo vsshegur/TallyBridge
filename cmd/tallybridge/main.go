@@ -71,7 +71,7 @@ func main() {
 	// bridge process and both local listeners.
 	exe, _ := os.Executable()
 	iconPath := filepath.Join(filepath.Dir(exe), "TallyBridge.ico")
-	if err := runSystemTray(adminURL, iconPath); err != nil {
+	if err := runSystemTray(adminURL, adminURL+"#diag", iconPath, srv.TrayStatus); err != nil {
 		// A tray failure must not kill a working read-only bridge. Keep serving
 		// so the desktop shortcut and phone can still reach it.
 		select {}

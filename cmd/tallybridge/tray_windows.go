@@ -4,6 +4,9 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
 	"runtime"
 	"sync"
 	"syscall"
@@ -19,6 +22,7 @@ const (
 	trayCallback    = wmUser + 41
 
 	nimAdd    = 0x00000000
+	nimModify = 0x00000001
 	nimDelete = 0x00000002
 	nifMessage = 0x00000001
 	nifIcon    = 0x00000002
@@ -29,12 +33,15 @@ const (
 	lrDefaultSize  = 0x0040
 
 	mfString    = 0x0000
+	mfGrayed    = 0x0001
 	mfSeparator = 0x0800
 	tpmRightBtn = 0x0002
 	tpmReturnCmd = 0x0100
 
-	cmdOpen = 1001
-	cmdExit = 1002
+	cmdOpen        = 1001
+	cmdDiagnostics = 1002
+	cmdRestart     = 1003
+	cmdExit        = 1004
 )
 
 type point struct {
@@ -105,6 +112,8 @@ var (
 	procShellNotifyIcon     = shell32.NewProc("Shell_NotifyIconW")
 
 	trayAdminURL string
+	trayDiagnosticsURL string
+	trayStatus func() string
 	trayNID      notifyIconData
 	trayTaskbarCreated uint32
 	trayExitOnce sync.Once
@@ -135,17 +144,45 @@ func openTrayAdmin() {
 		go app.OpenDesktop(trayAdminURL)
 	}
 }
+func currentTrayStatus() string {
+	if trayStatus == nil { return "TallyBridge • read-only Tally companion" }
+	s:=trayStatus()
+	if len(s)>120 { s=s[:120] }
+	return s
+}
+func refreshTrayTip() {
+	fillUTF16(trayNID.Tip[:], currentTrayStatus())
+	_,_,_=procShellNotifyIcon.Call(nimModify,uintptr(unsafe.Pointer(&trayNID)))
+}
+func closeTray(hwnd uintptr) {
+	trayExitOnce.Do(func() {
+		removeTrayIcon()
+		procDestroyWindow.Call(hwnd)
+		procPostQuitMessage.Call(0)
+	})
+}
+func restartBridge(hwnd uintptr) {
+	exe,err:=os.Executable()
+	if err!=nil { return }
+	command:=fmt.Sprintf(`ping 127.0.0.1 -n 3 >nul & start "" "%s" --background`,exe)
+	cmd:=exec.Command("cmd.exe","/C",command)
+	cmd.SysProcAttr=&syscall.SysProcAttr{CreationFlags:0x08000000,HideWindow:true}
+	_ = cmd.Start()
+	closeTray(hwnd)
+}
 func showTrayMenu(hwnd uintptr) {
+	refreshTrayTip()
 	menu, _, _ := procCreatePopupMenu.Call()
-	if menu == 0 {
-		return
-	}
+	if menu == 0 { return }
 	defer procDestroyMenu.Call(menu)
-
+	status:=currentTrayStatus()
+	procAppendMenu.Call(menu, mfString|mfGrayed, 0, uintptr(unsafe.Pointer(utf16Ptr(status))))
+	procAppendMenu.Call(menu, mfSeparator, 0, 0)
 	procAppendMenu.Call(menu, mfString, cmdOpen, uintptr(unsafe.Pointer(utf16Ptr("Open TallyBridge"))))
+	procAppendMenu.Call(menu, mfString, cmdDiagnostics, uintptr(unsafe.Pointer(utf16Ptr("Open Diagnostics"))))
+	procAppendMenu.Call(menu, mfString, cmdRestart, uintptr(unsafe.Pointer(utf16Ptr("Restart Bridge"))))
 	procAppendMenu.Call(menu, mfSeparator, 0, 0)
 	procAppendMenu.Call(menu, mfString, cmdExit, uintptr(unsafe.Pointer(utf16Ptr("Exit TallyBridge"))))
-
 	var p point
 	procGetCursorPos.Call(uintptr(unsafe.Pointer(&p)))
 	procSetForegroundWindow.Call(hwnd)
@@ -153,12 +190,12 @@ func showTrayMenu(hwnd uintptr) {
 	switch cmd {
 	case cmdOpen:
 		openTrayAdmin()
+	case cmdDiagnostics:
+		if trayDiagnosticsURL!="" { go app.OpenDesktop(trayDiagnosticsURL) }
+	case cmdRestart:
+		restartBridge(hwnd)
 	case cmdExit:
-		trayExitOnce.Do(func() {
-			removeTrayIcon()
-			procDestroyWindow.Call(hwnd)
-			procPostQuitMessage.Call(0)
-		})
+		closeTray(hwnd)
 	}
 }
 func trayWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
@@ -185,11 +222,13 @@ func trayWndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 	return r
 }
 
-func runSystemTray(adminURL, iconPath string) error {
+func runSystemTray(adminURL, diagnosticsURL, iconPath string, status func() string) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
 	trayAdminURL = adminURL
+	trayDiagnosticsURL = diagnosticsURL
+	trayStatus = status
 	trayExitOnce = sync.Once{}
 
 	instance, _, _ := procGetModuleHandle.Call(0)
@@ -229,7 +268,7 @@ func runSystemTray(adminURL, iconPath string) error {
 		HIcon:           hIcon,
 	}
 	trayNID.CbSize = uint32(unsafe.Sizeof(trayNID))
-	fillUTF16(trayNID.Tip[:], "TallyBridge - read-only Tally companion")
+	fillUTF16(trayNID.Tip[:], currentTrayStatus())
 	if !addTrayIcon() {
 		procDestroyWindow.Call(hwnd)
 		return errors.New("could not add TallyBridge system tray icon")
