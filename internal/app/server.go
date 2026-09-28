@@ -754,6 +754,7 @@ func (s *Server) handleLedgerStatementPDF(w http.ResponseWriter, r *http.Request
 	}
 	profile, _ := s.companyProfile(c, false)
 	x.Supplier = profile
+	x.PDFTemplate = validPDFTemplate(s.store.Settings().PDFTemplate)
 	bank, be := s.optionalBank(c, r.URL.Query().Get("bank"))
 	if be != nil {
 		jsonErr(w, 503, be)
@@ -884,6 +885,7 @@ func (s *Server) handleLedgerOutstandingPDF(w http.ResponseWriter, r *http.Reque
 	}
 	profile, _ := s.companyProfile(c, false)
 	x.Supplier = profile
+	x.PDFTemplate = validPDFTemplate(s.store.Settings().PDFTemplate)
 	bank, be := s.optionalBank(c, r.URL.Query().Get("bank"))
 	if be != nil {
 		jsonErr(w, 503, be)
@@ -958,6 +960,7 @@ func (s *Server) handleGroupBalancesPDF(w http.ResponseWriter, r *http.Request) 
 	}
 	profile, _ := s.companyProfile(c, false)
 	x.Supplier = profile
+	x.PDFTemplate = validPDFTemplate(s.store.Settings().PDFTemplate)
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="Group-%s.pdf"`, sanitizeFileName(g)))
 	banks, _ := s.optionalBank(c, "")
@@ -1311,6 +1314,7 @@ func (s *Server) handleCustomer360PDF(w http.ResponseWriter, r *http.Request) {
 	}
 	profile, _ := s.companyProfile(c, false)
 	x.Supplier = profile
+	x.PDFTemplate = validPDFTemplate(s.store.Settings().PDFTemplate)
 	bank, e := s.optionalBank(c, r.URL.Query().Get("bank"))
 	if e != nil {
 		jsonErr(w, 503, e)

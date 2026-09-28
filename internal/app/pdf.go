@@ -188,12 +188,13 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	return pdfDocument(firstNonBlank(x.FirmName, x.Company), "INVOICE DETAIL", "Read-only copy of data returned by TallyPrime", b.String(), x.Supplier)
 }
 func invoicePDF(x VoucherDetail, bank ...BankDetails) ([]byte, error) {
-	return renderPDF(invoiceHTML(x, bank...))
+	return renderPDF(applyPDFTemplate(invoiceHTML(x, bank...), x.PDFTemplate))
 }
 
 type pdfTableDoc struct {
 	Title, Company, Subtitle string
 	Supplier                 CompanyProfile
+	Template                 string
 	Headers                  []string
 	Widths                   []float64
 	Rows                     [][]string
@@ -247,7 +248,7 @@ func tableHTML(d pdfTableDoc, bank ...BankDetails) string {
 		fmt.Fprintf(&b, `<table class="totals"><tr class="grand"><td>%s</td><td>%s</td></tr></table>`, he(d.TotalLabel), he(d.Total))
 	}
 	b.WriteString(bankHTML(bank))
-	return pdfDocument(d.Company, d.Title, d.Subtitle, b.String(), d.Supplier)
+	return applyPDFTemplate(pdfDocument(d.Company, d.Title, d.Subtitle, b.String(), d.Supplier), d.Template)
 }
 func statementDoc(x LedgerStatementData) pdfTableDoc {
 	rows := [][]string{}
@@ -270,7 +271,7 @@ func statementDoc(x LedgerStatementData) pdfTableDoc {
 	if x.ClosingBalance != nil {
 		closing = balanceText(*x.ClosingBalance)
 	}
-	return pdfTableDoc{Title: "LEDGER STATEMENT", Company: x.Company, Supplier: x.Supplier, Subtitle: x.Ledger + " | " + displayDate(x.FromDate) + " to " + displayDate(x.ToDate) + " | " + pdfDataNote(x.CommonData), Headers: []string{"Date", "Voucher", "Type", "Debit (INR)", "Credit (INR)", "Balance"}, Widths: []float64{70, 90, 70, 80, 80, 121}, Rows: rows, TotalLabel: "Closing balance", Total: closing, Note: x.BalanceNote, Numeric: []bool{false, false, false, true, true, true}}
+	return pdfTableDoc{Title: "LEDGER STATEMENT", Company: x.Company, Supplier: x.Supplier, Template: x.PDFTemplate, Subtitle: x.Ledger + " | " + displayDate(x.FromDate) + " to " + displayDate(x.ToDate) + " | " + pdfDataNote(x.CommonData), Headers: []string{"Date", "Voucher", "Type", "Debit (INR)", "Credit (INR)", "Balance"}, Widths: []float64{70, 90, 70, 80, 80, 121}, Rows: rows, TotalLabel: "Closing balance", Total: closing, Note: x.BalanceNote, Numeric: []bool{false, false, false, true, true, true}}
 }
 func ledgerStatementPDF(x LedgerStatementData, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(tableHTML(statementDoc(x), bank...))
@@ -284,7 +285,7 @@ func outstandingDoc(x LedgerOutstandingData) pdfTableDoc {
 	if x.SummaryOnly {
 		note = "Summary only: bill-wise breakup is unavailable. Total is the saved party ledger balance, not a newly verified bill-wise total."
 	}
-	return pdfTableDoc{Title: "OUTSTANDING BALANCE", Company: x.Company, Supplier: x.Supplier, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Bill number", "Bill date", "Due for", "Pending (INR)"}, Widths: []float64{155, 110, 90, 156}, Rows: rows, TotalLabel: "Net outstanding", Total: inr(x.Total) + " " + x.DrCr, Note: note, Numeric: []bool{false, false, false, true}}
+	return pdfTableDoc{Title: "OUTSTANDING BALANCE", Company: x.Company, Supplier: x.Supplier, Template: x.PDFTemplate, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Bill number", "Bill date", "Due for", "Pending (INR)"}, Widths: []float64{155, 110, 90, 156}, Rows: rows, TotalLabel: "Net outstanding", Total: inr(x.Total) + " " + x.DrCr, Note: note, Numeric: []bool{false, false, false, true}}
 }
 func ledgerOutstandingPDF(x LedgerOutstandingData, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(tableHTML(outstandingDoc(x), bank...))
@@ -295,7 +296,7 @@ func groupDoc(x GroupBalanceData) pdfTableDoc {
 	for _, v := range x.Ledgers {
 		rows = append(rows, []string{v.Ledger, v.Parent, indianNumber(v.Balance), v.DrCr})
 	}
-	return pdfTableDoc{Title: "LEDGER GROUP DETAILS", Company: x.Company, Supplier: x.Supplier, Subtitle: x.Group + " | " + pdfDataNote(x.CommonData), Headers: []string{"Ledger", "Parent group", "Balance (INR)", "Dr/Cr"}, Widths: []float64{190, 140, 130, 51}, Rows: rows, TotalLabel: "Net balance", Total: inr(x.Total), Numeric: []bool{false, false, true, false}}
+	return pdfTableDoc{Title: "LEDGER GROUP DETAILS", Company: x.Company, Supplier: x.Supplier, Template: x.PDFTemplate, Subtitle: x.Group + " | " + pdfDataNote(x.CommonData), Headers: []string{"Ledger", "Parent group", "Balance (INR)", "Dr/Cr"}, Widths: []float64{190, 140, 130, 51}, Rows: rows, TotalLabel: "Net balance", Total: inr(x.Total), Numeric: []bool{false, false, true, false}}
 }
 func groupBalancesPDF(x GroupBalanceData, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(tableHTML(groupDoc(x), bank...))
@@ -305,7 +306,7 @@ func customerDoc(x Customer360Data) pdfTableDoc {
 	for _, v := range x.LatestInvoices {
 		rows = append(rows, []string{displayDate(v.Date), v.Number, v.VoucherType, inr(v.Amount)})
 	}
-	return pdfTableDoc{Title: "CUSTOMER 360", Company: x.Company, Supplier: x.Supplier, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Date", "Invoice", "Type", "Amount"}, Widths: []float64{100, 150, 130, 131}, Rows: rows, TotalLabel: "Outstanding", Total: inr(x.Outstanding), Note: fmt.Sprintf("Known overdue %s | %d known pending bills. Bill coverage may be incomplete.", inr(x.Overdue), x.PendingBillCount), Numeric: []bool{false, false, false, true}}
+	return pdfTableDoc{Title: "CUSTOMER 360", Company: x.Company, Supplier: x.Supplier, Template: x.PDFTemplate, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Date", "Invoice", "Type", "Amount"}, Widths: []float64{100, 150, 130, 131}, Rows: rows, TotalLabel: "Outstanding", Total: inr(x.Outstanding), Note: fmt.Sprintf("Known overdue %s | %d known pending bills. Bill coverage may be incomplete.", inr(x.Overdue), x.PendingBillCount), Numeric: []bool{false, false, false, true}}
 }
 func customer360PDF(x Customer360Data, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(tableHTML(customerDoc(x), bank...))
