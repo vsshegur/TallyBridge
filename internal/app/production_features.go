@@ -307,9 +307,36 @@ func checkLatestRelease(ctx context.Context) UpdateInfo {
 	info.Available=newerVersion(info.Latest,Version)
 	return info
 }
+func (s *Server) updateSnapshot() UpdateInfo {
+	s.updateMu.Lock()
+	defer s.updateMu.Unlock()
+	return s.updateInfo
+}
+func (s *Server) storeUpdateInfo(x UpdateInfo) {
+	s.updateMu.Lock()
+	s.updateInfo=x
+	s.updateChecking=false
+	s.updateMu.Unlock()
+}
+func (s *Server) maybeCheckUpdates() {
+	s.updateMu.Lock()
+	if s.updateChecking || (!s.updateInfo.CheckedAt.IsZero() && time.Since(s.updateInfo.CheckedAt) < 6*time.Hour) {
+		s.updateMu.Unlock()
+		return
+	}
+	s.updateChecking=true
+	s.updateMu.Unlock()
+	go func(){
+		ctx,cancel:=context.WithTimeout(context.Background(),5*time.Second)
+		defer cancel()
+		s.storeUpdateInfo(checkLatestRelease(ctx))
+	}()
+}
 func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 	ctx,cancel:=context.WithTimeout(r.Context(),5*time.Second); defer cancel()
-	jsonOut(w,checkLatestRelease(ctx))
+	x:=checkLatestRelease(ctx)
+	s.storeUpdateInfo(x)
+	jsonOut(w,x)
 }
 
 func (s *Server) TrayStatus() string {

@@ -33,6 +33,9 @@ type Server struct {
 	tailscaleOnline bool
 	tailscaleStatus string
 	phoneURL        string
+	updateMu        sync.Mutex
+	updateInfo      UpdateInfo
+	updateChecking  bool
 }
 
 func NewServer(base string) (*Server, error) {
@@ -243,7 +246,8 @@ func (s *Server) handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 	if len(companies)==0 { companies=cc }
 	health := map[string]CompanyHealth{}
 	for _, c := range companies { health[c.Name]=s.companyHealth(c.Name,false) }
-	jsonOut(w, map[string]any{"version":Version,"live": st, "settings": cfg, "devices": devs, "logs": s.tally.Logs(), "cache": s.cache.Stats(), "cachedCompanies": cc, "cachedCompaniesAt": at, "autoSync": s.autoSyncSnapshot(), "health":health})
+	if cfg.AutoUpdate { s.maybeCheckUpdates() }
+	jsonOut(w, map[string]any{"version":Version,"live": st, "settings": cfg, "devices": devs, "logs": s.tally.Logs(), "cache": s.cache.Stats(), "cachedCompanies": cc, "cachedCompaniesAt": at, "autoSync": s.autoSyncSnapshot(), "health":health, "update":s.updateSnapshot()})
 }
 func (s *Server) handleAdminProbe(w http.ResponseWriter, r *http.Request) {
 	st, e := s.probeLive()
@@ -479,7 +483,8 @@ func (s *Server) bootstrapPayload() map[string]any {
 	health := map[string]CompanyHealth{}
 	for _, c := range cs { health[c.Name] = s.companyHealth(c.Name, false) }
 	cfg := s.store.Settings()
-	return map[string]any{"bridgeOnline": true, "tallyOnline": st.TallyOnline, "companies": cs, "lastSuccess": st.LastSuccess, "cacheLatestAt": s.cache.Stats().LatestAt, "summaries": s.summaries(cs), "autoSync": s.autoSyncSnapshot(), "version": Version, "pdfBanks": s.store.PDFBankNames(), "health": health, "pdfTemplate": validPDFTemplate(cfg.PDFTemplate), "autoUpdate": cfg.AutoUpdate}
+	if cfg.AutoUpdate { s.maybeCheckUpdates() }
+	return map[string]any{"bridgeOnline": true, "tallyOnline": st.TallyOnline, "companies": cs, "lastSuccess": st.LastSuccess, "cacheLatestAt": s.cache.Stats().LatestAt, "summaries": s.summaries(cs), "autoSync": s.autoSyncSnapshot(), "version": Version, "pdfBanks": s.store.PDFBankNames(), "health": health, "pdfTemplate": validPDFTemplate(cfg.PDFTemplate), "autoUpdate": cfg.AutoUpdate, "update": s.updateSnapshot()}
 }
 func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 	s.ensureAutoSync()
