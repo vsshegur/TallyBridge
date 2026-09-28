@@ -65,10 +65,11 @@ public class DesignTest {
   capture("11-sync");
   ui(()->{try{field("tab","More");call("more");call("chooseAppearance");}catch(Exception e){throw new RuntimeException(e);}});
   capture("08-dark-appearance");
-  InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("input keyevent 4").close();
+  InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
   InstrumentationRegistry.getInstrumentation().waitForIdleSync();
   ui(()->{try{
-   field("company","Vijayalaxmi Textiles • Solapur");
+   rule.getActivity().getSharedPreferences("appearance",0).edit().putString("mode","Light").commit();call("applyAppearance");
+   field("tab","Payments");field("company","Vijayalaxmi Textiles • Solapur");
    JSONObject bank=new JSONObject().put("bankName","State Bank").put("accountNumber","001234567890").put("ifsc","SBIN0000123").put("upi","demo@upi");
    JSONObject health=new JSONObject().put("ready",true).put("readyForPayments",true).put("score",100).put("tallyOnline",true).put("bank",bank)
     .put("items",new JSONArray()
@@ -80,6 +81,7 @@ public class DesignTest {
   }catch(Exception e){throw new RuntimeException(e);}});
   capture("15-payments");
   ui(()->{try{
+   field("tab","More");
    JSONObject health=new JSONObject().put("ready",false).put("score",71).put("tallyOnline",true)
     .put("items",new JSONArray()
      .put(new JSONObject().put("label","GSTIN").put("ok",true).put("value","27ABCDE1234F1Z5").put("required",true))
