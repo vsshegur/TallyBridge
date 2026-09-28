@@ -52,15 +52,15 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
           jarsigner -verify -strict -certs "$APK"
-          sha256sum "$APK" > app/build/outputs/apk/release/SHA256SUMS.txt
-          keytool -list -v -keystore "$TB_KEYSTORE" -storepass "$TB_STORE_PASSWORD" -alias "$TB_KEY_ALIAS"             | sed -n '/Alias name:/p;/SHA1:/p;/SHA256:/p' > app/build/outputs/apk/release/SIGNING-IDENTITY.txt
+          sha256sum "$APK" > app/build/outputs/apk/release/TallyBridge-Android-SHA256SUMS.txt
+          keytool -list -v -keystore "$TB_KEYSTORE" -storepass "$TB_STORE_PASSWORD" -alias "$TB_KEY_ALIAS"             | sed -n '/Alias name:/p;/SHA1:/p;/SHA256:/p' > app/build/outputs/apk/release/TallyBridge-Android-SIGNING-IDENTITY.txt
       - uses: actions/upload-artifact@v4
         with:
           name: TallyBridge-Android-Release
           path: |
             android/app/build/outputs/apk/release/app-release.apk
-            android/app/build/outputs/apk/release/SHA256SUMS.txt
-            android/app/build/outputs/apk/release/SIGNING-IDENTITY.txt
+            android/app/build/outputs/apk/release/TallyBridge-Android-SHA256SUMS.txt
+            android/app/build/outputs/apk/release/TallyBridge-Android-SIGNING-IDENTITY.txt
           if-no-files-found: error
 
   windows-release:
@@ -74,51 +74,44 @@ jobs:
         with:
           go-version: '1.23.12'
           cache: false
-      - name: Test backend and build installers
+      - name: Test backend and prepare signing certificate
         shell: pwsh
         run: |
           go test ./internal/app
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           go vet ./internal/app ./cmd/tallybridge ./cmd/uninstall
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          ./scripts/Build-Windows.ps1
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - name: Sign Windows executables when trusted certificate is configured
-        shell: pwsh
-        run: |
           $signed = $false
           if ($env:WINDOWS_PFX_BASE64 -and $env:WINDOWS_PFX_PASSWORD) {
             $pfx = Join-Path $env:RUNNER_TEMP 'tallybridge-code-signing.pfx'
             [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_PFX_BASE64))
-            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
-              Sort-Object FullName -Descending | Select-Object -First 1
-            if (!$signtool) { throw 'signtool.exe was not found' }
-            Get-ChildItem build\*.exe | ForEach-Object {
-              & $signtool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f $pfx /p $env:WINDOWS_PFX_PASSWORD $_.FullName
-              if ($LASTEXITCODE) { throw "Signing failed for $($_.Name)" }
-              $status = (Get-AuthenticodeSignature $_.FullName).Status
-              if ($status -ne 'Valid') { throw "Authenticode verification failed for $($_.Name): $status" }
-            }
+            "TB_WINDOWS_SIGN_PFX=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "TB_WINDOWS_SIGN_PASSWORD=$env:WINDOWS_PFX_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
             $signed = $true
           } else {
-            Write-Warning 'WINDOWS_PFX_BASE64/WINDOWS_PFX_PASSWORD not configured. Windows artifacts are built but NOT Authenticode signed.'
+            Write-Warning 'Windows code-signing secrets are not configured; this workflow will mark Windows output unsigned.'
           }
           "WINDOWS_SIGNED=$($signed.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Build installers with signed embedded payload when configured
+        shell: pwsh
+        run: |
+          ./scripts/Build-Windows.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Create Windows checksums
         shell: pwsh
         run: |
           Get-ChildItem build\*.exe | ForEach-Object {
             $h=(Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
             "$h  $($_.Name)"
-          } | Set-Content build\SHA256SUMS.txt
-          "Authenticode signed: $env:WINDOWS_SIGNED" | Set-Content build\SIGNING-STATUS.txt
+          } | Set-Content build\TallyBridge-Windows-SHA256SUMS.txt
+          "Authenticode signed: $env:WINDOWS_SIGNED" | Set-Content build\TallyBridge-Windows-SIGNING-STATUS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: TallyBridge-Windows-Release
           path: |
             build/*.exe
-            build/SHA256SUMS.txt
-            build/SIGNING-STATUS.txt
+            build/TallyBridge-Windows-SHA256SUMS.txt
+            build/TallyBridge-Windows-SIGNING-STATUS.txt
           if-no-files-found: error
 
   publish:
