@@ -56,7 +56,7 @@ func TestInvoiceDetailUsesSalesHintsAndStandardDispatch(t *testing.T) {
 		t.Fatalf("bad share text %s", x.ShareText)
 	}
 	var saved VoucherDetail
-	if _, ok := s.cache.Get("voucher-detail-v4", "DEMO TEXTILES", "id:396", &saved); !ok || saved.LRNumber != "LR-396" {
+	if _, ok := s.cache.Get("voucher-detail-v5", "DEMO TEXTILES", "id:396", &saved); !ok || saved.LRNumber != "LR-396" {
 		t.Fatal("invoice detail not atomically saved")
 	}
 }
