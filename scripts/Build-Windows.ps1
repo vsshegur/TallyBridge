@@ -23,7 +23,38 @@ function Sign-TallyBridgeFile([string]$Path) {
     if ($status -ne 'Valid') { throw "Authenticode verification failed for $Path : $status" }
 }
 
+function New-TallyBridgeStatusIcon([string]$Path, [string]$Color, [string]$Kind) {
+    Add-Type -AssemblyName System.Drawing
+    $bmp = New-Object System.Drawing.Bitmap 32,32
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.Clear([System.Drawing.Color]::Transparent)
+    $brush = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]::FromHtml($Color))
+    $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::White), 3
+    $g.FillEllipse($brush, 2, 2, 28, 28)
+    if ($Kind -eq 'ok') {
+        $g.DrawLines($pen, [System.Drawing.Point[]]@(
+            (New-Object System.Drawing.Point 9,17),
+            (New-Object System.Drawing.Point 14,22),
+            (New-Object System.Drawing.Point 24,11)
+        ))
+    } elseif ($Kind -eq 'warn') {
+        $g.DrawLine($pen, 16, 8, 16, 19)
+        $g.FillEllipse([System.Drawing.Brushes]::White, 14.5, 23, 3, 3)
+    } else {
+        $g.DrawLine($pen, 10, 10, 22, 22)
+        $g.DrawLine($pen, 22, 10, 10, 22)
+    }
+    $hicon = $bmp.GetHicon()
+    $icon = [System.Drawing.Icon]::FromHandle($hicon)
+    $fs = [System.IO.File]::Open($Path, [System.IO.FileMode]::Create)
+    try { $icon.Save($fs) } finally { $fs.Dispose(); $icon.Dispose(); $pen.Dispose(); $brush.Dispose(); $g.Dispose(); $bmp.Dispose() }
+}
+
 New-Item -ItemType Directory -Force build, cmd/setup/payload | Out-Null
+New-TallyBridgeStatusIcon 'cmd/setup/payload/TallyBridge-green.ico' '#1CA772' 'ok'
+New-TallyBridgeStatusIcon 'cmd/setup/payload/TallyBridge-yellow.ico' '#D6961F' 'warn'
+New-TallyBridgeStatusIcon 'cmd/setup/payload/TallyBridge-red.ico' '#C63A3E' 'error'
 foreach ($program in @(@('tallybridge','TallyBridge.exe'), @('uninstall','TallyBridge_Uninstall.exe'))) {
     $output = 'build/' + $program[1]
     & go build -buildvcs=false -trimpath '-ldflags=-s -w -H=windowsgui' -o $output ('./cmd/' + $program[0])
