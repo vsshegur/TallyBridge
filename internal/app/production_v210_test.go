@@ -13,17 +13,16 @@ import (
 )
 
 func TestInvoiceAmountVerificationGuard(t *testing.T) {
-	x := VoucherDetail{TotalAmount:1180}
 	s := &Server{}
+	x := VoucherDetail{TotalAmount:1180}
 	s.verifyInvoiceAmount(&x, VoucherRow{Amount:1180})
-	if !x.AmountVerified || x.RegisterAmount!=1180 || x.AmountDelta!=0 {
-		t.Fatalf("expected verified: %+v",x)
-	}
-	y := VoucherDetail{TotalAmount:2360}
-	s.verifyInvoiceAmount(&y, VoucherRow{Amount:1180})
-	if y.AmountVerified || y.AmountDelta!=1180 || !strings.Contains(y.VerificationNote,"mismatch") {
-		t.Fatalf("expected mismatch: %+v",y)
-	}
+	if !x.AmountVerified || x.RegisterAmount!=1180 || x.AmountDelta!=0 { t.Fatalf("expected verified: %+v",x) }
+	within := VoucherDetail{TotalAmount:1180.01}
+	s.verifyInvoiceAmount(&within, VoucherRow{Amount:1180})
+	if !within.AmountVerified || within.AmountDelta < 0.009 || within.AmountDelta > 0.011 { t.Fatalf("₹0.01 must verify: %+v",within) }
+	outside := VoucherDetail{TotalAmount:1180.02}
+	s.verifyInvoiceAmount(&outside, VoucherRow{Amount:1180})
+	if outside.AmountVerified || outside.AmountDelta < 0.019 || !strings.Contains(strings.ToLower(outside.VerificationNote),"mismatch") { t.Fatalf("₹0.02 must fail: %+v",outside) }
 }
 
 func TestCompanyHealthUsesSavedProfileAndPaymentSettings(t *testing.T) {
@@ -105,4 +104,27 @@ func TestBackupContainsOnlyWhitelistedSettingsAndRestoreRequiresRestart(t *testi
 	if json.Unmarshal(out.Body.Bytes(),&response)!=nil || response["restartRequired"]!=true {
 		t.Fatal(out.Body.String())
 	}
+}
+
+
+func TestInvoiceShareTextHasFullNonZeroCalculationBreakdown(t *testing.T) {
+	x:=VoucherDetail{FirmName:"Demo",CustomerName:"Buyer",InvoiceNumber:"INV-1",InvoiceDate:"2026-09-28",TaxableAmount:1000,DiscountAmount:50,Freight:25,CGST:90,SGST:90,RoundOff:-0.25,TotalAmount:1154.75}
+	s:=dispatchShareText(x)
+	for _,want:=range []string{"Taxable Amount - ₹1,000.00","Discount Amount - ₹50.00","Freight Amount - ₹25.00","CGST Amount - ₹90.00","SGST Amount - ₹90.00","Round Off - ₹-0.25","Total Amount - ₹1,154.75"} {
+		if !strings.Contains(s,want){t.Fatalf("missing %q in %s",want,s)}
+	}
+	if strings.Contains(s,"IGST Amount") || strings.Contains(s,"Other Charges") { t.Fatal(s) }
+}
+
+func TestDiagnosticsIncludesBuyerAndInvoiceContextWithoutRawXML(t *testing.T) {
+	s,ts:=testServerWithTally(t,func(w http.ResponseWriter,r *http.Request){io.WriteString(w,`<ENVELOPE/>`)})
+	defer ts.Close()
+	_ = s.cache.Put("ledger-details","Demo","Buyer",map[string]any{"details":map[string]string{"PARTYGSTIN":"27AAAAA0000A1Z5","ADDRESS":"Buyer Road","CITY":"Solapur"}},time.Now())
+	x:=VoucherDetail{Company:"Demo",MasterID:"10",InvoiceNumber:"INV-10",InvoiceDate:"2026-09-28",VoucherType:"Sales",CustomerName:"Buyer",TotalAmount:1180,RegisterAmount:1180,AmountVerified:true,TaxableAmount:1000,CGST:90,SGST:90}
+	_ = s.cache.Put("voucher-detail-v6","Demo","id:10",x,time.Now())
+	req:=httptest.NewRequest(http.MethodGet,"/api/v1/mobile/diagnostics?company=Demo&ledger=Buyer&number=INV-10&date=2026-09-28&masterId=10&voucherType=Sales",nil)
+	d:=s.diagnostics("Demo",req)
+	if d.Buyer["PARTYGSTIN"]=="" || d.Invoice["masterId"]!="10" || d.Invoice["verified"]!=true { t.Fatalf("missing context buyer=%v invoice=%v",d.Buyer,d.Invoice) }
+	raw,_:=json.Marshal(d)
+	if strings.Contains(string(raw),"<ENVELOPE") { t.Fatal("raw XML leaked into diagnostics") }
 }
