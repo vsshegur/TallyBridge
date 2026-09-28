@@ -73,8 +73,9 @@ jobs:
       - name: Build and lint native Android
         working-directory: android
         run: |
-          gradle --no-daemon assembleDebug lintDebug
+          gradle --no-daemon assembleDebug assembleRelease lintDebug
           gradle --no-daemon signingReport > app/build/outputs/apk/debug/SIGNING-REPORT.txt
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
       - name: Verify packaged APK version
         working-directory: android
         run: |
@@ -92,6 +93,11 @@ jobs:
             android/app/build/outputs/apk/debug/app-debug.apk
             android/app/build/outputs/apk/debug/SIGNING-REPORT.txt
             android/app/build/outputs/apk/debug/APK-VERSION.txt
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TallyBridge-Android-Unsigned-Release
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
