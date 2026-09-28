@@ -915,7 +915,7 @@ func parseVoucherDayDetail(b []byte, company, masterID string, hint VoucherRow) 
 		party := strings.TrimSpace(firstDeep(v, "PARTYLEDGERNAME", "PARTYNAME", "BASICBUYERNAME"))
 		if wantParty != "" && strings.EqualFold(party, wantParty) { score += 20 }
 		if hint.Amount != 0 {
-			if total, ok := invoicePartyTotal(v, firstNonBlank(party, wantParty)); ok && abs(abs(total)-abs(hint.Amount)) < 0.02 { score += 10 }
+			if total, ok := invoicePartyTotal(v, firstNonBlank(party, wantParty)); ok && abs(abs(total)-abs(hint.Amount)) <= invoiceVerificationTolerance+0.0000001 { score += 10 }
 		}
 		if score > bestScore { bestScore, best = score, v }
 	}
@@ -940,8 +940,14 @@ func dispatchShareText(x VoucherDetail) string {
 			}
 		}
 	}
+	if x.TaxableAmount != 0 {
+		fmt.Fprintf(&b, "\nTaxable Amount - ₹%s", indianNumber(abs(x.TaxableAmount)))
+	}
 	if x.DiscountAmount != 0 {
-		fmt.Fprintf(&b, "\nDiscount Amount - ₹%s", indianNumber(x.DiscountAmount))
+		fmt.Fprintf(&b, "\nDiscount Amount - ₹%s", indianNumber(abs(x.DiscountAmount)))
+	}
+	if x.Freight != 0 {
+		fmt.Fprintf(&b, "\nFreight Amount - ₹%s", indianNumber(abs(x.Freight)))
 	}
 	if x.CGST != 0 {
 		fmt.Fprintf(&b, "\nCGST Amount - ₹%s", indianNumber(abs(x.CGST)))
@@ -952,7 +958,13 @@ func dispatchShareText(x VoucherDetail) string {
 	if x.IGST != 0 {
 		fmt.Fprintf(&b, "\nIGST Amount - ₹%s", indianNumber(abs(x.IGST)))
 	}
-	fmt.Fprintf(&b, "\nTotal Amount - ₹%s", indianNumber(x.TotalAmount))
+	if x.RoundOff != 0 {
+		fmt.Fprintf(&b, "\nRound Off - ₹%s", indianNumber(x.RoundOff))
+	}
+	if x.OtherCharges != 0 {
+		fmt.Fprintf(&b, "\nOther Charges - ₹%s", indianNumber(abs(x.OtherCharges)))
+	}
+	fmt.Fprintf(&b, "\nTotal Amount - ₹%s", indianNumber(abs(x.TotalAmount)))
 	return b.String()
 }
 func ledgerStatementShareText(x LedgerStatementData) string {
