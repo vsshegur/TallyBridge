@@ -65,6 +65,39 @@ public class DesignTest {
   ui(()->{try{field("tab","More");call("more");call("chooseAppearance");}catch(Exception e){throw new RuntimeException(e);}});
   capture("08-dark-appearance");
   ui(()->{try{
+   field("company","Vijayalaxmi Textiles • Solapur");
+   JSONObject bank=new JSONObject().put("bankName","State Bank").put("accountNumber","001234567890").put("ifsc","SBIN0000123").put("upi","demo@upi");
+   JSONObject health=new JSONObject().put("ready",true).put("readyForPayments",true).put("score",100).put("tallyOnline",true).put("bank",bank)
+    .put("items",new JSONArray()
+     .put(new JSONObject().put("label","GSTIN").put("ok",true).put("value","27ABCDE1234F1Z5").put("required",true))
+     .put(new JSONObject().put("label","Address").put("ok",true).put("value","Market Road, Solapur 413001").put("required",true))
+     .put(new JSONObject().put("label","Mobile number").put("ok",true).put("value","9876543210").put("required",true))
+     .put(new JSONObject().put("label","UPI ID").put("ok",true).put("value","demo@upi")));
+   Method p=MainActivity.class.getDeclaredMethod("renderPayments",JSONObject.class);p.setAccessible(true);p.invoke(rule.getActivity(),health);
+  }catch(Exception e){throw new RuntimeException(e);}});
+  capture("15-payments");
+  ui(()->{try{
+   JSONObject health=new JSONObject().put("ready",false).put("score",71).put("tallyOnline",true)
+    .put("items",new JSONArray()
+     .put(new JSONObject().put("label","GSTIN").put("ok",true).put("value","27ABCDE1234F1Z5").put("required",true))
+     .put(new JSONObject().put("label","Address").put("ok",true).put("value","Market Road, Solapur").put("required",true))
+     .put(new JSONObject().put("label","Mobile number").put("ok",false).put("hint","Add company mobile number in Tally.").put("required",true))
+     .put(new JSONObject().put("label","UPI ID").put("ok",false).put("hint","Optional payment QR setting.")))
+    .put("issues",new JSONArray().put("Mobile number is missing"));
+   Method m=MainActivity.class.getDeclaredMethod("renderHealth",JSONObject.class);m.setAccessible(true);m.invoke(rule.getActivity(),health);
+  }catch(Exception e){throw new RuntimeException(e);}});
+  capture("16-health");
+  ui(()->{try{
+   JSONObject diag=new JSONObject().put("version","2.1.0").put("tallyOnline",true).put("lastSuccess","2026-09-28T03:00:00Z").put("gateState","READY")
+    .put("cache",new JSONObject().put("entries",42).put("latestAt","2026-09-28T03:00:00Z"))
+    .put("autoSync",new JSONObject().put("running",false).put("lastOk","2026-09-28T03:00:00Z"))
+    .put("recentReads",new JSONArray().put(new JSONObject().put("report","Sales register").put("company","Vijayalaxmi Textiles").put("durationMs",220).put("success",true)));
+   Method m=MainActivity.class.getDeclaredMethod("renderDiagnostics",JSONObject.class);m.setAccessible(true);m.invoke(rule.getActivity(),diag);
+  }catch(Exception e){throw new RuntimeException(e);}});
+  capture("17-diagnostics");
+  ui(()->{try{field("tab","More");call("more");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("18-more");
+  ui(()->{try{
    rule.getActivity().getSharedPreferences("appearance",0).edit().putString("mode","Light").commit();call("applyAppearance");
    Field f=MainActivity.class.getDeclaredField("dark");f.setAccessible(true);assertFalse(f.getBoolean(rule.getActivity()));
    rule.getActivity().getSharedPreferences("appearance",0).edit().putString("mode","System").commit();call("applyAppearance");

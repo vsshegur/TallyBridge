@@ -248,7 +248,8 @@ public final class MainActivity extends Activity {
   data.add(row("Favourite customers","Frequently used ledgers","",()->open(this::favourites)));
   local("Reports",this::reports,data,false);
  }
- private void payments(){load("Payments",path("health"),this::payments,x->{List<Row> data=new ArrayList<>();JSONObject bank=object(x,"bank");
+ private void payments(){load("Payments",path("health"),this::payments,this::renderPayments);}
+ private void renderPayments(JSONObject x){List<Row> data=new ArrayList<>();JSONObject bank=object(x,"bank");
   data.add(heading("Payment setup",x.optBoolean("readyForPayments")?"Ready to collect payments":"Complete bank or UPI details on the PC"));
   String bankLine=bank.optString("bankName",bank.optString("ledger"));if(!bank.optString("accountNumber").isEmpty())bankLine+=(bankLine.isEmpty()?"":"\n")+"A/c "+bank.optString("accountNumber");if(!bank.optString("ifsc").isEmpty())bankLine+=(bankLine.isEmpty()?"":" • ")+"IFSC "+bank.optString("ifsc");if(!bank.optString("upi").isEmpty())bankLine+=(bankLine.isEmpty()?"":"\n")+"UPI "+bank.optString("upi");
   data.add(row("Default payment account",bankLine.isEmpty()?"Not configured • open Windows TallyBridge → Payments":bankLine,"",null));
@@ -260,16 +261,20 @@ public final class MainActivity extends Activity {
   data.add(heading("Outgoing payments","Supplier balances"));
   data.add(row("Bills payable","Amounts we need to pay","",()->open(()->outstanding("payable"))));
   data.add(row("Company health","GST, address, mobile, bank and UPI readiness","",()->open(this::healthScreen)));
-  rows("Payments",data,false);});}
- private void healthScreen(){load("Company health",path("health"),this::healthScreen,x->{List<Row> data=new ArrayList<>();
+  rows("Payments",data,false);
+ }
+ private void healthScreen(){load("Company health",path("health"),this::healthScreen,this::renderHealth);}
+ private void renderHealth(JSONObject x){List<Row> data=new ArrayList<>();
   data.add(heading(x.optBoolean("ready")?"Company ready":"Company needs attention",x.optInt("score")+"% health • "+(x.optBoolean("tallyOnline")?"Tally connected":"Tally unavailable")));
   JSONArray items=array(x,"items");for(int i=0;i<items.length();i++){JSONObject it=items.optJSONObject(i);if(it==null)continue;String state=it.optBoolean("ok")?"Ready":it.optBoolean("required")?"Required":"Optional";String detail=it.optString("value");if(detail.isEmpty())detail=it.optString("hint");data.add(row((it.optBoolean("ok")?"✓ ":"• ")+it.optString("label"),detail,state,null));}
   JSONArray issues=array(x,"issues");if(issues.length()>0)data.add(heading("What needs attention",join(issues)));
   data.add(row("Refresh company data","Read supplier identity again from Tally","",()->open(this::refreshHealth)));
   data.add(row("Open diagnostics","Technical status without raw accounting XML","",()->open(this::diagnosticsScreen)));
-  rows("Company health",data,false);});}
+  rows("Company health",data,false);
+ }
  private void refreshHealth(){load("Refresh company health",path("health","refresh","1"),this::refreshHealth,x->{try{JSONObject all=object(boot,"health");all.put(company,x);boot.put("health",all);}catch(Exception ignored){}healthScreen();});}
- private void diagnosticsScreen(){load("Diagnostics",path("diagnostics"),this::diagnosticsScreen,x->{List<Row> data=new ArrayList<>();
+ private void diagnosticsScreen(){load("Diagnostics",path("diagnostics"),this::diagnosticsScreen,this::renderDiagnostics);}
+ private void renderDiagnostics(JSONObject x){List<Row> data=new ArrayList<>();
   data.add(heading("System status","TallyBridge "+x.optString("version")+" • "+(x.optBoolean("tallyOnline")?"Tally connected":"Tally unavailable")));
   data.add(row("Last successful Tally read",time(x.optString("lastSuccess")),"",null));
   data.add(row("Request gate",x.optString("gateState")+" "+x.optString("busyReport"),"",null));
@@ -279,7 +284,8 @@ public final class MainActivity extends Activity {
   JSONArray logs=array(x,"recentReads");data.add(heading("Recent Tally reads",logs.length()+" normalized records • no raw XML"));
   for(int i=Math.max(0,logs.length()-6);i<logs.length();i++){JSONObject l=logs.optJSONObject(i);if(l!=null)data.add(row(l.optString("report"),l.optString("company")+" • "+l.optLong("durationMs")+" ms"+(l.optBoolean("success")?"":"\n"+l.optString("error")),l.optBoolean("success")?"OK":"Error",null));}
   data.add(row("Share diagnostic report","Normalized troubleshooting data only","",()->shareText(x.toString())));
-  rows("Diagnostics",data,false);});}
+  rows("Diagnostics",data,false);
+ }
  private void updateCheck(){load("Updates","/api/v1/mobile/update-check",this::updateCheck,x->{List<Row> data=new ArrayList<>();
   data.add(heading(x.optBoolean("available")?"Update available":"You're up to date","Current "+x.optString("current")+(x.optString("latest").isEmpty()?"":" • Latest "+x.optString("latest"))));
   if(!x.optString("notes").isEmpty())data.add(row("Release notes",x.optString("notes"),"",null));
