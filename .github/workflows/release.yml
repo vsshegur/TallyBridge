@@ -51,7 +51,10 @@ jobs:
           gradle --no-daemon test assembleRelease lintRelease
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
-          jarsigner -verify -strict -certs "$APK"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee app/build/outputs/apk/release/TallyBridge-Android-APK-SIGNATURE.txt
+          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" app/build/outputs/apk/release/TallyBridge-Android-APK-SIGNATURE.txt
           sha256sum "$APK" > app/build/outputs/apk/release/TallyBridge-Android-SHA256SUMS.txt
           keytool -list -v -keystore "$TB_KEYSTORE" -storepass "$TB_STORE_PASSWORD" -alias "$TB_KEY_ALIAS"             | sed -n '/Alias name:/p;/SHA1:/p;/SHA256:/p' > app/build/outputs/apk/release/TallyBridge-Android-SIGNING-IDENTITY.txt
       - uses: actions/upload-artifact@v4
@@ -61,6 +64,7 @@ jobs:
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/apk/release/TallyBridge-Android-SHA256SUMS.txt
             android/app/build/outputs/apk/release/TallyBridge-Android-SIGNING-IDENTITY.txt
+            android/app/build/outputs/apk/release/TallyBridge-Android-APK-SIGNATURE.txt
           if-no-files-found: error
 
   windows-release:
@@ -81,17 +85,16 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           go vet ./internal/app ./cmd/tallybridge ./cmd/uninstall
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          $signed = $false
-          if ($env:WINDOWS_PFX_BASE64 -and $env:WINDOWS_PFX_PASSWORD) {
-            $pfx = Join-Path $env:RUNNER_TEMP 'tallybridge-code-signing.pfx'
-            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_PFX_BASE64))
-            "TB_WINDOWS_SIGN_PFX=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            "TB_WINDOWS_SIGN_PASSWORD=$env:WINDOWS_PFX_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            $signed = $true
-          } else {
-            Write-Warning 'Windows code-signing secrets are not configured; this workflow will mark Windows output unsigned.'
+          if (!$env:WINDOWS_PFX_BASE64 -or !$env:WINDOWS_PFX_PASSWORD) {
+            throw 'Production release blocked: trusted Windows code-signing certificate secrets are required.'
           }
-          "WINDOWS_SIGNED=$($signed.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $pfx = Join-Path $env:RUNNER_TEMP 'tallybridge-code-signing.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_PFX_BASE64))
+          $cert = Get-PfxCertificate -FilePath $pfx
+          if (!$cert -or $cert.NotAfter -le (Get-Date)) { throw 'Production release blocked: Windows signing certificate is missing or expired.' }
+          "TB_WINDOWS_SIGN_PFX=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TB_WINDOWS_SIGN_PASSWORD=$env:WINDOWS_PFX_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "WINDOWS_SIGNED=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Build installers with signed embedded payload when configured
         shell: pwsh
         run: |
