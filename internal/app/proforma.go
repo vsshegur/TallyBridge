@@ -272,12 +272,20 @@ func proformaHTML(p Proforma) string {
 		if p.LR != "" { fmt.Fprintf(&b, "<tr><td>LR / RR number</td><td>%s</td></tr>", he(p.LR)) }
 		b.WriteString(`</table>`)
 	}
-	b.WriteString(`<table class="items"><colgroup><col style="width:5%"><col style="width:29%"><col style="width:11%"><col style="width:13%"><col style="width:10%"><col style="width:10%"><col style="width:22%"></colgroup><thead><tr><th>#</th><th>Product</th><th>HSN</th><th class="num">Quantity</th><th class="num">Rate</th><th class="num">Disc %</th><th class="num">Taxable (INR)</th></tr></thead><tbody>`)
+	b.WriteString(`<table class="items"><colgroup><col style="width:5%"><col style="width:33%"><col style="width:11%"><col style="width:14%"><col style="width:16%"><col style="width:21%"></colgroup><thead><tr><th>#</th><th>Product</th><th>HSN</th><th class="num">Quantity</th><th class="num">Rate</th><th class="num">Amount (INR)</th></tr></thead><tbody>`)
 	for i, r := range p.Items {
-		fmt.Fprintf(&b, `<tr><td>%d</td><td>%s</td><td>%s</td><td class="num">%s %s</td><td class="num">%s</td><td class="num">%s</td><td class="num">%s</td></tr>`,
-			i+1, he(r.Name)+descriptionHTML(r.Description), he(r.HSN), he(r.Quantity), he(r.Unit), he(r.Rate), he(r.Discount), he(indianNumber(r.Taxable)))
+		detail := r.Description
+		extra := []string{}
+		if strings.TrimSpace(r.Discount) != "" && strings.TrimSpace(r.Discount) != "0" && strings.TrimSpace(r.Discount) != "0.0" { extra = append(extra, "Discount "+r.Discount+"%") }
+		if strings.TrimSpace(r.GST) != "" && strings.TrimSpace(r.GST) != "0" && strings.TrimSpace(r.GST) != "0.0" { extra = append(extra, "GST "+r.GST+"%") }
+		if len(extra) > 0 {
+			if detail != "" { detail += " • " }
+			detail += strings.Join(extra, " • ")
+		}
+		fmt.Fprintf(&b, `<tr><td>%d</td><td>%s</td><td>%s</td><td class="num">%s %s</td><td class="num">%s</td><td class="num">%s</td></tr>`,
+			i+1, he(r.Name)+descriptionHTML(detail), he(r.HSN), he(r.Quantity), he(r.Unit), he(r.Rate), he(indianNumber(r.Taxable)))
 	}
-	if len(p.Items)==0 { b.WriteString(`<tr><td colspan="7">No items added.</td></tr>`) }
+	if len(p.Items)==0 { b.WriteString(`<tr><td colspan="6">No items added.</td></tr>`) }
 	b.WriteString(`</tbody></table><table class="totals">`)
 	for _, f := range []struct{ label string; value float64 }{
 		{"Items subtotal", p.Gross},
