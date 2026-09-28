@@ -36,6 +36,8 @@ type Server struct {
 	updateMu        sync.Mutex
 	updateInfo      UpdateInfo
 	updateChecking  bool
+	diagMu          sync.Mutex
+	diagByCompany   map[string]DiagnosticContext
 }
 
 func NewServer(base string) (*Server, error) {
@@ -51,7 +53,7 @@ func NewServer(base string) (*Server, error) {
 	if e != nil {
 		return nil, e
 	}
-	s := &Server{store: st, cache: c, native: n, nonces: map[string]map[string]time.Time{}}
+	s := &Server{store: st, cache: c, native: n, nonces: map[string]map[string]time.Time{}, diagByCompany: map[string]DiagnosticContext{}}
 	s.tally = NewTallyClient(st)
 	return s, nil
 }
@@ -616,6 +618,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 		if at, ok := s.cache.Get("voucher-detail-v6", c, key, &old); ok && old.TotalsVersion == 2 {
 			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at
 			s.applyVoucherPresentation(c, &old)
+			s.setDiagnosticInvoiceContext(c,old)
 			jsonOut(w, old); return
 		}
 		jsonOut(w, map[string]any{"pending": true, "reason": reason, "retryAfterMs": retry.Milliseconds()})
@@ -627,11 +630,13 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 		if at, ok := s.cache.Get("voucher-detail-v6", c, key, &old); ok && old.TotalsVersion == 2 {
 			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at; old.LiveError = e.Error()
 			s.applyVoucherPresentation(c, &old)
+			s.setDiagnosticInvoiceContext(c,old)
 			jsonOut(w, old); return
 		}
 		jsonErr(w, 503, e); return
 	}
 	s.applyVoucherPresentation(c, &x)
+	s.setDiagnosticInvoiceContext(c,x)
 	jsonOut(w, x)
 }
 func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) {
@@ -670,6 +675,7 @@ func (s *Server) handleLedgerDetails(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, 400, errors.New("company and ledger required"))
 		return
 	}
+	s.setDiagnosticLedgerContext(c,l)
 	details := map[string]string{}
 	var duration int64
 	var liveErr error
