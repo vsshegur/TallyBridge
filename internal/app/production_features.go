@@ -362,3 +362,10 @@ func (s *Server) TrayStatus() string {
 	}
 	return "TallyBridge • Waiting for Tally"
 }
+
+func (s *Server) TrayLevel() string {
+	st:=s.stateSnapshot()
+	if st.TallyOnline { return "green" }
+	if strings.TrimSpace(st.LastError)!="" { return "red" }
+	return "yellow"
+}
