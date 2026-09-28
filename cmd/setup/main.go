@@ -15,7 +15,7 @@ import (
 	"tallybridge-live/internal/app"
 )
 
-//go:embed payload/TallyBridge.exe payload/TallyBridge_Uninstall.exe payload/TallyBridge.ico
+//go:embed payload/TallyBridge.exe payload/TallyBridge_Uninstall.exe payload/TallyBridge.ico payload/TallyBridge-green.ico payload/TallyBridge-yellow.ico payload/TallyBridge-red.ico
 var payload embed.FS
 
 const hiddenFlag = 0x08000000
@@ -44,7 +44,14 @@ func main() {
 		_ = hidden("taskkill.exe", "/F", "/IM", n).Run()
 	}
 	time.Sleep(350 * time.Millisecond)
-	files := map[string]string{"payload/TallyBridge.exe": "TallyBridge.exe", "payload/TallyBridge_Uninstall.exe": "TallyBridge_Uninstall.exe", "payload/TallyBridge.ico": "TallyBridge.ico"}
+	files := map[string]string{
+		"payload/TallyBridge.exe":"TallyBridge.exe",
+		"payload/TallyBridge_Uninstall.exe":"TallyBridge_Uninstall.exe",
+		"payload/TallyBridge.ico":"TallyBridge.ico",
+		"payload/TallyBridge-green.ico":"TallyBridge-green.ico",
+		"payload/TallyBridge-yellow.ico":"TallyBridge-yellow.ico",
+		"payload/TallyBridge-red.ico":"TallyBridge-red.ico",
+	}
 	for src, dst := range files {
 		b, e := payload.ReadFile(src)
 		if e != nil {
