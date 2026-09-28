@@ -41,6 +41,41 @@ type CompanyHealth struct {
 	LastSuccess      time.Time       `json:"lastSuccess,omitempty"`
 	Issues           []string        `json:"issues,omitempty"`
 }
+type DiagnosticContext struct {
+	Ledger      string
+	Number      string
+	Date        string
+	MasterID    string
+	VoucherType string
+}
+func (s *Server) setDiagnosticLedgerContext(company, ledger string) {
+	s.diagMu.Lock()
+	defer s.diagMu.Unlock()
+	if s.diagByCompany==nil { s.diagByCompany=map[string]DiagnosticContext{} }
+	k:=strings.ToLower(strings.TrimSpace(company))
+	x:=s.diagByCompany[k]
+	x.Ledger=strings.TrimSpace(ledger)
+	s.diagByCompany[k]=x
+}
+func (s *Server) setDiagnosticInvoiceContext(company string, v VoucherDetail) {
+	s.diagMu.Lock()
+	defer s.diagMu.Unlock()
+	if s.diagByCompany==nil { s.diagByCompany=map[string]DiagnosticContext{} }
+	k:=strings.ToLower(strings.TrimSpace(company))
+	x:=s.diagByCompany[k]
+	x.Ledger=firstNonBlank(strings.TrimSpace(v.CustomerName),x.Ledger)
+	x.Number=strings.TrimSpace(v.InvoiceNumber)
+	x.Date=strings.TrimSpace(v.InvoiceDate)
+	x.MasterID=strings.TrimSpace(v.MasterID)
+	x.VoucherType=strings.TrimSpace(v.VoucherType)
+	s.diagByCompany[k]=x
+}
+func (s *Server) diagnosticContext(company string) DiagnosticContext {
+	s.diagMu.Lock()
+	defer s.diagMu.Unlock()
+	return s.diagByCompany[strings.ToLower(strings.TrimSpace(company))]
+}
+
 type DiagnosticReport struct {
 	Version      string         `json:"version"`
 	GeneratedAt  time.Time      `json:"generatedAt"`
@@ -141,17 +176,20 @@ func (s *Server) diagnostics(company string, r *http.Request) DiagnosticReport {
 		AutoSync:s.autoSyncSnapshot(), Health:s.companyHealth(company,false), RecentReads:logs,
 	}
 	if r != nil {
-		ledger := strings.TrimSpace(r.URL.Query().Get("ledger"))
+		ctx := s.diagnosticContext(company)
+		ledger := firstNonBlank(strings.TrimSpace(r.URL.Query().Get("ledger")),ctx.Ledger)
 		if ledger != "" {
 			var saved struct { Details map[string]string `json:"details"` }
 			if _, ok := s.cache.Get("ledger-details", company, ledger, &saved); ok && len(saved.Details) > 0 {
 				d.Buyer = saved.Details
 			}
 		}
-		number := strings.TrimSpace(r.URL.Query().Get("number"))
-		date := normISODate(r.URL.Query().Get("date"))
+		number := firstNonBlank(strings.TrimSpace(r.URL.Query().Get("number")),ctx.Number)
+		date := normISODate(firstNonBlank(strings.TrimSpace(r.URL.Query().Get("date")),ctx.Date))
+		masterID := firstNonBlank(strings.TrimSpace(r.URL.Query().Get("masterId")),ctx.MasterID)
+		voucherType := firstNonBlank(strings.TrimSpace(r.URL.Query().Get("voucherType")),ctx.VoucherType)
 		if number!="" && date!="" {
-			key := voucherCacheKey(strings.TrimSpace(r.URL.Query().Get("masterId")), VoucherRow{Number:number,Date:date,VoucherType:r.URL.Query().Get("voucherType")})
+			key := voucherCacheKey(masterID, VoucherRow{Number:number,Date:date,VoucherType:voucherType})
 			var x VoucherDetail
 			if _, ok := s.cache.Get("voucher-detail-v6", company, key, &x); ok {
 				d.Invoice = map[string]any{
