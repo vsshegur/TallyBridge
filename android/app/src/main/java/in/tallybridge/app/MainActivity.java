@@ -279,6 +279,7 @@ public final class MainActivity extends Activity {
  private void setDiagnosticInvoice(JSONObject x){if(x==null)return;diagLedger=x.optString("customerName",x.optString("party",diagLedger));diagNumber=x.optString("invoiceNumber",x.optString("number",diagNumber));diagDate=x.optString("invoiceDate",x.optString("date",diagDate));diagMasterId=x.optString("masterId",diagMasterId);diagVoucherType=x.optString("voucherType",diagVoucherType);}
  private void renderDiagnostics(JSONObject x){List<Row> data=new ArrayList<>();
   data.add(heading("System status","TallyBridge "+x.optString("version")+" • "+(x.optBoolean("tallyOnline")?"Tally connected":"Tally unavailable")));
+  data.add(row("Selected company",x.optString("company",company),"",null));
   data.add(row("Last successful Tally read",time(x.optString("lastSuccess")),"",null));
   data.add(row("Request gate",x.optString("gateState")+" "+x.optString("busyReport"),"",null));
   JSONObject c=object(x,"cache");data.add(row("Saved cache",c.optInt("entries")+" entries",time(c.optString("latestAt")),null));
