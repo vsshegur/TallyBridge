@@ -2,13 +2,15 @@ package app
 
 import "time"
 
-const Version = "2.0.16-design-preview"
+const Version = "2.1.0"
 
 type Settings struct {
 	TallyURL    string `json:"tallyUrl"`
 	TimeoutSec  int    `json:"timeoutSec"`
 	CooldownSec int    `json:"cooldownSec"`
 	Port        int    `json:"port"`
+	PDFTemplate string `json:"pdfTemplate,omitempty"`
+	AutoUpdate  bool   `json:"autoUpdate"`
 }
 
 type Device struct {
@@ -178,6 +180,10 @@ type VoucherDetail struct {
 	Freight           float64       `json:"freight,omitempty"`
 	RoundOff          float64       `json:"roundOff,omitempty"`
 	TotalAmount       float64       `json:"totalAmount"`
+	RegisterAmount    float64       `json:"registerAmount,omitempty"`
+	AmountDelta       float64       `json:"amountDelta,omitempty"`
+	AmountVerified    bool          `json:"amountVerified"`
+	VerificationNote  string        `json:"verificationNote,omitempty"`
 	Narration         string        `json:"narration,omitempty"`
 	ShareText         string        `json:"shareText"`
 	ShareTextWithBank string        `json:"shareTextWithBank,omitempty"`
@@ -237,8 +243,9 @@ type GroupBalanceData struct {
 }
 
 type CommonData struct {
-	Live       bool      `json:"live"`
-	Supplier   CompanyProfile `json:"supplier,omitempty"`
+	Live        bool           `json:"live"`
+	Supplier    CompanyProfile `json:"supplier,omitempty"`
+	PDFTemplate string         `json:"pdfTemplate,omitempty"`
 	Source     string    `json:"source,omitempty"`
 	Stale      bool      `json:"stale,omitempty"`
 	FetchedAt  time.Time `json:"fetchedAt"`

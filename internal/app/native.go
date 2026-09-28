@@ -212,7 +212,7 @@ func (s *Server) handleNativeApproval(w http.ResponseWriter, r *http.Request) {
 func (s *Server) NativeHandler() http.Handler {
 	mobile := s.Handler()
 	allowed := map[string]bool{}
-	for _, p := range []string{"proforma-masters", "proforma-preview", "proforma-pdf", "auth-check", "bootstrap", "status", "sync", "probe", "ledgers", "outstanding", "party-outstanding", "vouchers", "voucher-detail", "voucher-pdf", "ledger-details", "ledger-statement", "ledger-statement-pdf", "ledger-outstanding", "ledger-outstanding-pdf", "group-balances", "group-balances-pdf", "customer360", "customer360-pdf", "today-dispatch", "search-index", "ageing", "banks", "bank-details", "report"} {
+	for _, p := range []string{"proforma-masters", "proforma-preview", "proforma-pdf", "auth-check", "bootstrap", "status", "sync", "probe", "ledgers", "outstanding", "party-outstanding", "vouchers", "voucher-detail", "voucher-pdf", "ledger-details", "ledger-statement", "ledger-statement-pdf", "ledger-outstanding", "ledger-outstanding-pdf", "group-balances", "group-balances-pdf", "customer360", "customer360-pdf", "today-dispatch", "search-index", "ageing", "banks", "bank-details", "report", "health", "diagnostics", "payment-qr", "update-check"} {
 		allowed["/api/v1/mobile/"+p] = true
 	}
 	return securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

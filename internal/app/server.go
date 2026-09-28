@@ -70,6 +70,10 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("/api/v1/admin/revoke", s.localAdmin(s.handleRevoke))
 	m.HandleFunc("/api/v1/admin/pdf-bank", s.localAdmin(s.handlePDFBank))
 	m.HandleFunc("/api/v1/admin/settings", s.localAdmin(s.handleSettings))
+	m.HandleFunc("/api/v1/admin/health", s.localAdmin(s.handleHealth))
+	m.HandleFunc("/api/v1/admin/diagnostics", s.localAdmin(s.handleDiagnostics))
+	m.HandleFunc("/api/v1/admin/backup", s.localAdmin(s.handleBackup))
+	m.HandleFunc("/api/v1/admin/update-check", s.localAdmin(s.handleUpdateCheck))
 	m.HandleFunc("/api/v1/admin/sync", s.localAdmin(s.handleAdminSync))
 	m.HandleFunc("/api/v1/admin/report", s.localAdmin(s.handleAdminReport))
 	m.HandleFunc("/api/v1/admin/tailscale/check", s.localAdmin(s.handleTailscaleCheck))
@@ -103,6 +107,10 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("/api/v1/mobile/banks", s.mobileAuth(s.handleBanks))
 	m.HandleFunc("/api/v1/mobile/bank-details", s.mobileAuth(s.handleBankDetails))
 	m.HandleFunc("/api/v1/mobile/report", s.mobileAuth(s.handleMobileReport))
+	m.HandleFunc("/api/v1/mobile/health", s.mobileAuth(s.handleHealth))
+	m.HandleFunc("/api/v1/mobile/diagnostics", s.mobileAuth(s.handleDiagnostics))
+	m.HandleFunc("/api/v1/mobile/payment-qr", s.mobileAuth(s.handlePaymentQR))
+	m.HandleFunc("/api/v1/mobile/update-check", s.mobileAuth(s.handleUpdateCheck))
 	return securityHeaders(m)
 }
 func securityHeaders(next http.Handler) http.Handler {
@@ -275,6 +283,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		TallyURL    string `json:"tallyUrl"`
 		TimeoutSec  int    `json:"timeoutSec"`
 		CooldownSec int    `json:"cooldownSec"`
+		PDFTemplate string `json:"pdfTemplate"`
+		AutoUpdate  *bool  `json:"autoUpdate"`
 	}
 	if readJSON(r, &q) != nil {
 		jsonErr(w, 400, errors.New("invalid settings"))
@@ -292,6 +302,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	cfg.TallyURL = q.TallyURL
 	cfg.TimeoutSec = q.TimeoutSec
 	cfg.CooldownSec = q.CooldownSec
+	if q.PDFTemplate != "" { cfg.PDFTemplate = validPDFTemplate(q.PDFTemplate) }
+	if q.AutoUpdate != nil { cfg.AutoUpdate = *q.AutoUpdate }
 	if e := s.store.UpdateSettings(cfg); e != nil {
 		jsonErr(w, 500, e)
 		return
@@ -459,7 +471,10 @@ func (s *Server) bootstrapPayload() map[string]any {
 	if len(cs) == 0 {
 		cs = cc
 	}
-	return map[string]any{"bridgeOnline": true, "tallyOnline": st.TallyOnline, "companies": cs, "lastSuccess": st.LastSuccess, "cacheLatestAt": s.cache.Stats().LatestAt, "summaries": s.summaries(cs), "autoSync": s.autoSyncSnapshot(), "version": Version, "pdfBanks": s.store.PDFBankNames()}
+	health := map[string]CompanyHealth{}
+	for _, c := range cs { health[c.Name] = s.companyHealth(c.Name, false) }
+	cfg := s.store.Settings()
+	return map[string]any{"bridgeOnline": true, "tallyOnline": st.TallyOnline, "companies": cs, "lastSuccess": st.LastSuccess, "cacheLatestAt": s.cache.Stats().LatestAt, "summaries": s.summaries(cs), "autoSync": s.autoSyncSnapshot(), "version": Version, "pdfBanks": s.store.PDFBankNames(), "health": health, "pdfTemplate": validPDFTemplate(cfg.PDFTemplate), "autoUpdate": cfg.AutoUpdate}
 }
 func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 	s.ensureAutoSync()
@@ -567,8 +582,14 @@ func (s *Server) applyVoucherPresentation(company string, x *VoucherDetail) {
 	if x == nil { return }
 	profile, _ := s.companyProfile(company, false)
 	x.Supplier = profile
+	x.PDFTemplate = validPDFTemplate(s.store.Settings().PDFTemplate)
 	bank, _ := s.store.PDFBank(company)
 	x.Bank = bank
+	if x.RegisterAmount != 0 && !x.AmountVerified {
+		x.ShareText = ""
+		x.ShareTextWithBank = ""
+		return
+	}
 	x.ShareText = dispatchShareText(*x)
 	x.ShareTextWithBank = x.ShareText + bankText(bank)
 }
@@ -582,7 +603,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	key := voucherCacheKey(mid, hint)
 	if reason, retry, p := s.tally.Pending(); p {
 		var old VoucherDetail
-		if at, ok := s.cache.Get("voucher-detail-v4", c, key, &old); ok && old.TotalsVersion == 2 {
+		if at, ok := s.cache.Get("voucher-detail-v5", c, key, &old); ok && old.TotalsVersion == 2 {
 			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at
 			s.applyVoucherPresentation(c, &old)
 			jsonOut(w, old); return
@@ -593,7 +614,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	x, e := s.fetchVoucherDetail(c, mid, hint)
 	if e != nil {
 		var old VoucherDetail
-		if at, ok := s.cache.Get("voucher-detail-v4", c, key, &old); ok && old.TotalsVersion == 2 {
+		if at, ok := s.cache.Get("voucher-detail-v5", c, key, &old); ok && old.TotalsVersion == 2 {
 			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at; old.LiveError = e.Error()
 			s.applyVoucherPresentation(c, &old)
 			jsonOut(w, old); return
@@ -612,13 +633,18 @@ func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) 
 	}
 	key := voucherCacheKey(mid, hint)
 	var x VoucherDetail
-	if _, ok := s.cache.Get("voucher-detail-v4", c, key, &x); !ok || x.TotalsVersion != 2 {
+	if _, ok := s.cache.Get("voucher-detail-v5", c, key, &x); !ok || x.TotalsVersion != 2 {
 		var e error
 		x, e = s.fetchVoucherDetail(c, mid, hint)
 		if e != nil { jsonErr(w, 503, e); return }
 	}
+	if x.RegisterAmount != 0 && !x.AmountVerified {
+		jsonErr(w, 409, errors.New(x.VerificationNote))
+		return
+	}
 	profile, _ := s.companyProfile(c, false)
 	x.Supplier = profile
+	x.PDFTemplate = validPDFTemplate(s.store.Settings().PDFTemplate)
 	bank, e := s.optionalBank(c, r.URL.Query().Get("bank"))
 	if e != nil { jsonErr(w, 503, e); return }
 	data, pe := invoicePDF(x, bank...)
@@ -1082,7 +1108,7 @@ func (s *Server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
 			out = append(out, SearchResult{Kind: "bill", Title: firstNonBlank(b.BillNumber, po.Party), Subtitle: po.Party + " • pending " + indianNumber(b.PendingAmount), Party: po.Party, Ledger: po.Party, Number: b.BillNumber, Date: b.Date, Amount: b.PendingAmount})
 		}
 	}
-	for _, d := range s.cache.Matching("voucher-detail-v4", c) {
+	for _, d := range s.cache.Matching("voucher-detail-v5", c) {
 		var v VoucherDetail
 		if json.Unmarshal(d.Data, &v) != nil {
 			continue
@@ -1543,9 +1569,10 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 		if lastErr != nil { return VoucherDetail{}, lastErr }
 		return VoucherDetail{}, errors.New("Tally did not return a verified invoice total for this register row")
 	}
-	x.CommonData = CommonData{Live: true, Source: "live", FetchedAt: time.Now(), DurationMS: duration}
+	s.verifyInvoiceAmount(&x, hint)
+	x.CommonData = CommonData{Live: true, Source: "live", FetchedAt: time.Now(), DurationMS: duration, PDFTemplate: validPDFTemplate(s.store.Settings().PDFTemplate)}
 	x.ShareText = dispatchShareText(x)
-	_ = s.cache.Put("voucher-detail-v4", c, voucherCacheKey(mid, hint), x, x.FetchedAt)
+	_ = s.cache.Put("voucher-detail-v5", c, voucherCacheKey(mid, hint), x, x.FetchedAt)
 	return x, nil
 }
 func mergeVoucherDetail(a, b VoucherDetail) VoucherDetail {

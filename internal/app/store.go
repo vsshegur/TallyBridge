@@ -28,7 +28,7 @@ type Store struct {
 }
 
 func defaultSettings() Settings {
-	return Settings{TallyURL: "http://127.0.0.1:9000", TimeoutSec: 6, CooldownSec: 12, Port: 8765}
+	return Settings{TallyURL: "http://127.0.0.1:9000", TimeoutSec: 6, CooldownSec: 12, Port: 8765, PDFTemplate: "standard", AutoUpdate: true}
 }
 
 func NewStore(dir string) (*Store, error) {
@@ -55,6 +55,15 @@ func (s *Store) load() {
 			}
 			if x.Port > 0 {
 				s.settings.Port = x.Port
+			}
+			if x.PDFTemplate == "standard" || x.PDFTemplate == "compact" || x.PDFTemplate == "detailed" {
+				s.settings.PDFTemplate = x.PDFTemplate
+			}
+			var raw map[string]json.RawMessage
+			if json.Unmarshal(b, &raw) == nil {
+				if _, ok := raw["autoUpdate"]; ok {
+					s.settings.AutoUpdate = x.AutoUpdate
+				}
 			}
 		}
 	}
