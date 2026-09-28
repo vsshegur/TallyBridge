@@ -1,7 +1,7 @@
 name: Build Windows and Android preview
 on:
   push:
-    branches: [main, production-2.1.0, production-2.1.1-hardening]
+    branches: [main, production-2.1.0, production-2.1.1-hardening, production-2.1.3-pdf-details]
   workflow_dispatch:
 permissions:
   contents: read
@@ -139,7 +139,7 @@ jobs:
           adb install -r android/app/build/outputs/apk/debug/app-debug.apk
           adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           adb shell am instrument -w in.tallybridge.app.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/design-results.txt
-          grep -q 'OK (3 tests)' /tmp/design-results.txt
+          grep -q 'OK (5 tests)' /tmp/design-results.txt
           mkdir -p android/ui-screenshots
           for screen in 01-unlock 02-overview 03-reports 04-connect 05-dark-overview 06-dark-reports 07-dark-connect 08-dark-appearance 09-outstanding 10-filters 11-sync 12-proforma 13-proforma-totals 14-proforma-review 15-payments 16-health 17-diagnostics 18-more; do
             adb exec-out run-as in.tallybridge.app cat "files/ui/$screen.png" > "android/ui-screenshots/$screen.png"
