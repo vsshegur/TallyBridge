@@ -293,8 +293,7 @@ func checkLatestRelease(ctx context.Context) UpdateInfo {
 	defer resp.Body.Close()
 	if resp.StatusCode==http.StatusNotFound { info.Notes="No production release has been published yet."; return info }
 	if resp.StatusCode<200||resp.StatusCode>=300 { info.Error="GitHub update check returned "+resp.Status; return info }
-	var x struct{ TagName,HTMLURL,Body string `json:"tag_name"` }
-	// Decode explicitly because GitHub fields use different names.
+ 	// Decode explicitly because GitHub fields use different names.
 	var raw struct {
 		TagName string `json:"tag_name"`
 		HTMLURL string `json:"html_url"`
