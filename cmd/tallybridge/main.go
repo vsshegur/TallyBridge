@@ -46,11 +46,11 @@ func main() {
 	}
 
 	h := &http.Server{
-		Handler:           srv.DesktopHandler(),
+		Handler:           srv.DesktopHandlerWithOrders(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	nativeHTTP := &http.Server{
-		Handler:           srv.NativeHandler(),
+		Handler:           srv.NativeHandlerWithOrders(),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    32768,
