@@ -12,7 +12,7 @@ jobs:
         with:
           ref: feature/orders-workflow
           fetch-depth: 0
-      - name: Apply isolated feature fixes
+      - name: Apply isolated source fixes
         shell: python
         run: |
           from pathlib import Path
@@ -30,19 +30,14 @@ jobs:
           orders = '  quick(page,"Reports","Orders","Take a new order or review pending orders",()->startActivity(new Intent(this,OrdersActivity.class)));\n'
           if orders not in text and anchor in text:
               main.write_text(text.replace(anchor, anchor + orders))
-
-          verify = Path('.github/workflows/orders-verify.yml')
-          text = verify.read_text()
-          text = text.replace('go vet ./internal/app ./cmd/tallybridge ./cmd/uninstall', 'go vet ./internal/app ./cmd/tallybridge')
-          verify.write_text(text)
-      - name: Commit fixes when needed
+      - name: Commit source fixes when needed
         run: |
           if git diff --quiet; then
-            echo "No fixes needed"
+            echo "No source fixes needed"
             exit 0
           fi
           git config user.name "TallyBridge CI"
           git config user.email "actions@users.noreply.github.com"
-          git add android/app/src/main/java/in/tallybridge/app/OrdersActivity.java android/app/src/main/java/in/tallybridge/app/MainActivity.java .github/workflows/orders-verify.yml
+          git add android/app/src/main/java/in/tallybridge/app/OrdersActivity.java android/app/src/main/java/in/tallybridge/app/MainActivity.java
           git commit -m "Fix Orders Android build and add in-app entry"
           git push origin HEAD:feature/orders-workflow
