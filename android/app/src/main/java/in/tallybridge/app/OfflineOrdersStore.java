@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Encrypted phone-side Orders cache. Phone changes queue locally and reconcile with the PC later. */
 final class OfflineOrdersStore {
- private static final String STATE="orders_offline_state_v1", BOOT="orders_offline_boot_v1", MASTERS="orders_offline_masters_v1", BUYERS="orders_offline_buyers_v1";
+ private static final String STATE="orders_offline_state_v1", BOOT="orders_offline_boot_v1", MASTERS="orders_offline_masters_v1", BUYERS="orders_offline_buyers_v1", PHONE_TOKEN="__PHONE_ORDER_ID";
  private static final long RETENTION_MS=7L*24*60*60*1000;
  private final CryptoStore secure;
  OfflineOrdersStore(CryptoStore secure){this.secure=secure;}
@@ -29,15 +29,16 @@ final class OfflineOrdersStore {
  JSONObject dispatchLocal(JSONObject original)throws Exception {synchronized(OfflineOrdersStore.class){JSONObject s=state();JSONArray a=s.getJSONArray("orders");JSONObject o=clone(original);String ts=now();o.put("status","dispatched").put("dispatchedAt",ts).put("updatedAt",ts).put("shareText","").put("_dispatchDirty",true);replace(a,o);write(STATE,s);return decorate(clone(o));}}
 
  private void replace(JSONArray a,JSONObject order)throws Exception {String id=order.optString("id");for(int i=0;i<a.length();i++){JSONObject x=a.optJSONObject(i);if(x!=null&&id.equals(x.optString("id"))){a.put(i,order);return;}}a.put(order);}
- private JSONObject serverPayload(JSONObject o,boolean includeId)throws Exception {JSONObject p=new JSONObject().put("company",o.optString("company")).put("buyer",o.optString("buyer")).put("buyerDetails",clone(o.optJSONObject("buyerDetails"))).put("items",clone(o.optJSONArray("items"))).put("notes",o.optString("notes"));if(includeId)p.put("id",o.optString("id"));return p;}
+ private JSONObject serverPayload(JSONObject o,boolean includeId)throws Exception {JSONObject details=clone(o.optJSONObject("buyerDetails"));if(o.optBoolean("_localOnly"))details.put(PHONE_TOKEN,o.optString("id"));JSONObject p=new JSONObject().put("company",o.optString("company")).put("buyer",o.optString("buyer")).put("buyerDetails",details).put("items",clone(o.optJSONArray("items"))).put("notes",o.optString("notes"));if(includeId)p.put("id",o.optString("id"));return p;}
+ private JSONObject findPhoneOrder(JSONObject remote,String localId){for(String key:new String[]{"pending","dispatched"}){JSONArray a=remote.optJSONArray(key);if(a==null)continue;for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;JSONObject d=o.optJSONObject("buyerDetails");if(d!=null&&localId.equals(d.optString(PHONE_TOKEN)))return o;}}return null;}
 
  JSONObject sync(BridgeApi api)throws Exception {
   // Push phone-side changes one by one, saving progress after every successful request.
-  while(true){JSONObject target=null;JSONObject snapshot; synchronized(OfflineOrdersStore.class){snapshot=state();JSONArray a=snapshot.getJSONArray("orders");for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&(o.optBoolean("_localOnly")||o.optBoolean("_dirty")||o.optBoolean("_dispatchDirty"))){target=clone(o);break;}}}
+  while(true){JSONObject target=null; synchronized(OfflineOrdersStore.class){JSONObject snapshot=state();JSONArray a=snapshot.getJSONArray("orders");for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&(o.optBoolean("_localOnly")||o.optBoolean("_dirty")||o.optBoolean("_dispatchDirty"))){target=clone(o);break;}}}
    if(target==null)break;
    boolean localOnly=target.optBoolean("_localOnly"),dirty=target.optBoolean("_dirty"),dispatchDirty=target.optBoolean("_dispatchDirty");JSONObject saved=target;
-   // Always send the stable phone ID. The bridge treats local-* creates idempotently, so a retry cannot duplicate the order.
-   if(localOnly||dirty){saved=api.call("/api/v1/mobile/orders","POST",serverPayload(target,true).toString());}
+   if(localOnly){JSONObject remote=api.get("/api/v1/mobile/orders");JSONObject existing=findPhoneOrder(remote,target.optString("id"));saved=existing!=null?existing:api.call("/api/v1/mobile/orders","POST",serverPayload(target,false).toString());}
+   else if(dirty){saved=api.call("/api/v1/mobile/orders","POST",serverPayload(target,true).toString());}
    if(dispatchDirty||"dispatched".equals(target.optString("status"))){JSONObject q=new JSONObject().put("id",saved.optString("id"));saved=api.call("/api/v1/mobile/orders/dispatch","POST",q.toString());}
    synchronized(OfflineOrdersStore.class){JSONObject latest=state();JSONArray a=latest.getJSONArray("orders");String oldId=target.optString("id");int found=-1;for(int i=0;i<a.length();i++){JSONObject x=a.optJSONObject(i);if(x!=null&&oldId.equals(x.optString("id"))){found=i;break;}}if(found>=0){saved.remove("_localOnly");saved.remove("_dirty");saved.remove("_dispatchDirty");a.put(found,decorate(saved));write(STATE,latest);}}
   }
