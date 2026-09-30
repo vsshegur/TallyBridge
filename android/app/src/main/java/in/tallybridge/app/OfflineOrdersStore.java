@@ -14,8 +14,8 @@ final class OfflineOrdersStore {
 
  private JSONObject read(String key)throws Exception {String s=secure.secret(key);return s.isEmpty()?new JSONObject():new JSONObject(s);}
  private void write(String key,JSONObject value)throws Exception {secure.putSecret(key,value.toString());}
- private JSONObject clone(JSONObject x){return x==null?new JSONObject():new JSONObject(x.toString());}
- private JSONArray clone(JSONArray x){return x==null?new JSONArray():new JSONArray(x.toString());}
+ private JSONObject clone(JSONObject x)throws Exception{return x==null?new JSONObject():new JSONObject(x.toString());}
+ private JSONArray clone(JSONArray x)throws Exception{return x==null?new JSONArray():new JSONArray(x.toString());}
  private JSONObject state()throws Exception {JSONObject s=read(STATE);if(s.optJSONArray("orders")==null)s.put("orders",new JSONArray());prune(s);return s;}
  private void prune(JSONObject s)throws Exception {JSONArray src=s.optJSONArray("orders"),kept=new JSONArray();long now=System.currentTimeMillis();boolean changed=false;if(src==null)src=new JSONArray();for(int i=0;i<src.length();i++){JSONObject o=src.optJSONObject(i);if(o==null)continue;if("dispatched".equals(o.optString("status"))){long at=instantMs(o.optString("dispatchedAt"));if(at>0&&now-at>=RETENTION_MS){changed=true;continue;}}kept.put(o);}if(changed)s.put("orders",kept);}
  private long instantMs(String value){try{return Instant.parse(value).toEpochMilli();}catch(Exception e){try{return OffsetDateTime.parse(value).toInstant().toEpochMilli();}catch(Exception ignored){return 0;}}}
@@ -33,10 +33,11 @@ final class OfflineOrdersStore {
 
  JSONObject sync(BridgeApi api)throws Exception {
   // Push phone-side changes one by one, saving progress after every successful request.
-  while(true){JSONObject target=null;int index=-1;JSONObject snapshot; synchronized(OfflineOrdersStore.class){snapshot=state();JSONArray a=snapshot.getJSONArray("orders");for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&(o.optBoolean("_localOnly")||o.optBoolean("_dirty")||o.optBoolean("_dispatchDirty"))){target=clone(o);index=i;break;}}}
+  while(true){JSONObject target=null;JSONObject snapshot; synchronized(OfflineOrdersStore.class){snapshot=state();JSONArray a=snapshot.getJSONArray("orders");for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&(o.optBoolean("_localOnly")||o.optBoolean("_dirty")||o.optBoolean("_dispatchDirty"))){target=clone(o);break;}}}
    if(target==null)break;
    boolean localOnly=target.optBoolean("_localOnly"),dirty=target.optBoolean("_dirty"),dispatchDirty=target.optBoolean("_dispatchDirty");JSONObject saved=target;
-   if(localOnly||dirty){saved=api.call("/api/v1/mobile/orders","POST",serverPayload(target,!localOnly).toString());}
+   // Always send the stable phone ID. The bridge treats local-* creates idempotently, so a retry cannot duplicate the order.
+   if(localOnly||dirty){saved=api.call("/api/v1/mobile/orders","POST",serverPayload(target,true).toString());}
    if(dispatchDirty||"dispatched".equals(target.optString("status"))){JSONObject q=new JSONObject().put("id",saved.optString("id"));saved=api.call("/api/v1/mobile/orders/dispatch","POST",q.toString());}
    synchronized(OfflineOrdersStore.class){JSONObject latest=state();JSONArray a=latest.getJSONArray("orders");String oldId=target.optString("id");int found=-1;for(int i=0;i<a.length();i++){JSONObject x=a.optJSONObject(i);if(x!=null&&oldId.equals(x.optString("id"))){found=i;break;}}if(found>=0){saved.remove("_localOnly");saved.remove("_dirty");saved.remove("_dispatchDirty");a.put(found,decorate(saved));write(STATE,latest);}}
   }
