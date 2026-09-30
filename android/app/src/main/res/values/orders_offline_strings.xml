@@ -1,0 +1,4 @@
+<resources>
+    <string name="orders_offline_status">OFFLINE • saved on phone • will sync automatically</string>
+    <string name="orders_offline_note">Pending orders can be edited/shared offline. Dispatched orders stay view-only and are removed after 7 days.</string>
+</resources>
