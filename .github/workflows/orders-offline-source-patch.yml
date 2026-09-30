@@ -1,0 +1,68 @@
+name: Apply offline Orders source integration
+on:
+  push:
+    branches: [feature/orders-offline]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/orders-offline
+          fetch-depth: 0
+      - name: Patch backend idempotency, regression test and main visual workflow
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p=Path('internal/app/orders.go')
+          s=p.read_text()
+          old='''\t\tif !found {\n\t\t\treturn SalesOrder{}, errors.New("order not found")\n\t\t}\n'''
+          new='''\t\tif !found {\n\t\t\tif strings.HasPrefix(clean.ID, "local-") {\n\t\t\t\tclean.Number = nextOrderNumber(orders, now)\n\t\t\t\tclean.Status = "pending"\n\t\t\t\tclean.CreatedAt = now\n\t\t\t\tclean.UpdatedAt = now\n\t\t\t\tclean.DispatchedAt = time.Time{}\n\t\t\t\torders = append(orders, clean)\n\t\t\t} else {\n\t\t\t\treturn SalesOrder{}, errors.New("order not found")\n\t\t\t}\n\t\t}\n'''
+          if old not in s:
+              raise SystemExit('orders.go target not found')
+          p.write_text(s.replace(old,new,1))
+
+          p=Path('internal/app/orders_test.go')
+          s=p.read_text()
+          test='''
+
+func TestOfflinePhoneOrderIDIsIdempotent(t *testing.T) {
+\ts := newOrderTestServer(t)
+\tinput := SalesOrder{ID: "local-phone-order-123", Company: "Vijayalaxmi Textiles", Buyer: "Offline Buyer", Items: []OrderItem{{Name: "Bath Towel", Quantity: 2}}}
+\tfirst, err := s.saveOrder(input)
+\tif err != nil { t.Fatal(err) }
+\tif first.ID != input.ID || first.Number == "" { t.Fatalf("phone identity was not preserved: %#v", first) }
+\tinput.Items[0].Quantity = 7
+\tsecond, err := s.saveOrder(input)
+\tif err != nil { t.Fatal(err) }
+\tif second.ID != first.ID || second.Number != first.Number || second.Items[0].Quantity != 7 { t.Fatalf("retry did not update same order: first=%#v second=%#v", first, second) }
+\tlist, err := s.listOrders("")
+\tif err != nil { t.Fatal(err) }
+\tif list.PendingCount != 1 { t.Fatalf("retry created duplicate orders: %#v", list) }
+}
+'''
+          if 'TestOfflinePhoneOrderIDIsIdempotent' not in s:
+              p.write_text(s+test)
+
+          p=Path('.github/workflows/build.yml')
+          s=p.read_text()
+          s=s.replace("grep -q 'OK (5 tests)' /tmp/design-results.txt", "grep -q 'OK (6 tests)' /tmp/design-results.txt")
+          old_names='17-diagnostics 18-more; do'
+          new_names='17-diagnostics 18-more 19-orders-offline 20-orders-details-only; do'
+          if old_names not in s and new_names not in s:
+              raise SystemExit('build screenshot list target not found')
+          s=s.replace(old_names,new_names)
+          p.write_text(s)
+      - name: Verify Go changes before committing
+        run: go test ./internal/app
+      - name: Commit source integration
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "TallyBridge CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add internal/app/orders.go internal/app/orders_test.go .github/workflows/build.yml
+          git commit -m "Make offline order sync idempotent and keep visual regression coverage"
+          git push origin HEAD:feature/orders-offline
