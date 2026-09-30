@@ -170,6 +170,7 @@ public final class MainActivity extends Activity {
   gap(page,8);TextView workTitle=text("DAILY WORK",11,MUTED);workTitle.setTypeface(null,Typeface.BOLD);workTitle.setLetterSpacing(.10f);page.addView(workTitle);gap(page,8);
   quick(page,"Reports","Sales register","Month-wise invoices with verified totals",()->open(()->register("sales")));
   quick(page,"share","Today's dispatch","Open and share today's invoices",()->open(this::dispatch));
+  quick(page,"Reports","Orders","Take a new order or review pending orders",()->startActivity(new Intent(this,OrdersActivity.class)));
   quick(page,"search","Search everything","Customers, invoices and LR/RR numbers",()->open(this::search));
   quick(page,"health","Company health",healthLine,()->open(this::healthScreen));
   JSONObject update=object(boot,"update");if(update.optBoolean("available")){gap(page,8);quick(page,"refresh","Update available","TallyBridge "+update.optString("latest")+" • review signed release",()->open(this::updateCheck));}
