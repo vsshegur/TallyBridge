@@ -107,7 +107,7 @@ public final class OrdersActivity extends Activity {
 
  private void openForm(JSONObject order){
   editing=order;try{companies=offline.companies();}catch(Exception ignored){companies=new JSONArray();}
-  if(companies.length()==0){String c=store.get("company");if(!c.isEmpty())companies.put(new JSONObject().put("name",c));}
+  if(companies.length()==0){String c=store.get("company");if(!c.isEmpty()){JSONObject fallback=new JSONObject();try{fallback.put("name",c);companies.put(fallback);}catch(Exception ignored){}}}
   if(companies.length()>0){buildForm(order);refreshBootstrapSilently();return;}
   frame(order==null?"Add order":"Edit order","Loading company list. After the first sync, this screen works offline.");body.addView(txt("No saved company list yet. Trying the PC once…",15,MUTED));busy(true);work.execute(()->{try{JSONObject x=api.get("/api/v1/mobile/bootstrap");offline.cacheBootstrap(x);JSONArray cs=offline.companies();main.post(()->{if(destroyed)return;busy(false);companies=cs;buildForm(order);});}catch(Exception e){main.post(()->{if(!destroyed){busy(false);body.addView(txt("PC is offline and this phone has no saved company list yet. Open Orders once while connected, then it will work offline.",15,AMBER),full(16));}});}});
  }
