@@ -1,0 +1,75 @@
+name: Finalize Orders 2.3.1 hardening
+on:
+  push:
+    branches: [hardening/2.3.1-orders]
+permissions:
+  contents: write
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Apply guarded lifecycle patch
+        run: python3 scripts/finalize-orders-231.py
+      - name: Build and lint Android
+        working-directory: android
+        run: gradle --no-daemon test assembleDebug assembleDebugAndroidTest lintDebug
+      - name: Run all nine native Android tests
+        run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/tallybridge-orders-231-final"
+          export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          trap 'cat /tmp/emulator.log || true' EXIT
+          sudo apt-get update -qq
+          sudo apt-get install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0
+          sudo chmod 666 /dev/kvm
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "system-images;android-30;google_apis;x86_64" "emulator" "platform-tools"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n orders231final -k "system-images;android-30;google_apis;x86_64" --force
+          "$ANDROID_HOME/emulator/emulator" -avd orders231final -skin 1080x1920 -no-window -no-audio -no-boot-anim -gpu swiftshader -no-snapshot -no-metrics > /tmp/emulator.log 2>&1 &
+          timeout 90 adb wait-for-device
+          timeout 240 bash -c 'until adb shell getprop sys.boot_completed | tr -d "\r" | grep -q 1; do sleep 3; done'
+          adb shell wm size 1080x1920
+          adb shell wm density 420
+          adb shell input keyevent 82
+          adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+          adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell am instrument -w in.tallybridge.app.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/orders231-final-results.txt
+          grep -q 'OK (9 tests)' /tmp/orders231-final-results.txt
+          mkdir -p android/orders231-final-proof
+          for screen in 19-orders-offline 20-orders-details-only 21-orders-widget 22-photo-order-share; do
+            adb exec-out run-as in.tallybridge.app cat "files/ui/$screen.png" > "android/orders231-final-proof/$screen.png"
+            test -s "android/orders231-final-proof/$screen.png"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TallyBridge-2.3.1-Final-Orders-Proof
+          path: android/orders231-final-proof/*.png
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TallyBridge-2.3.1-Final-Android-Preview
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Commit verified production changes only
+        run: |
+          rm -f scripts/finalize-orders-231.py .github/workflows/finalize-orders-231-temp.yml
+          git config user.name "TallyBridge CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git diff --cached --exit-code -- .github/workflows/finalize-orders-231-temp.yml scripts/finalize-orders-231.py || true
+          git commit -m "Close photo-order cleanup race and require nine Android tests"
+          git push origin HEAD:hardening/2.3.1-orders
