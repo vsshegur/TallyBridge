@@ -33,10 +33,13 @@ public final class PhotoOrderActivity extends Activity {
   try{companies=offline.companies();}catch(Exception ignored){}
   if(companies.length()==0){String c=store.get("company");if(!c.isEmpty())try{companies.put(new JSONObject().put("name",c));}catch(Exception ignored){}}
   buildLoading();
-  work.execute(()->{try{List<Uri> uris=sharedUris(getIntent());if(uris.isEmpty())throw new Exception("No image was shared");sharedUriCount=uris.size();for(int i=0;i<Math.min(5,uris.size());i++)photos.add(copyAndCompress(uris.get(i),i));main.post(()->{if(!destroyed)buildForm();});}catch(Exception e){main.post(()->{if(!destroyed)fatal(e.getMessage());});}});
+  work.execute(()->{try{List<Uri> uris=sharedUris(getIntent());if(uris.isEmpty())throw new Exception("No image was shared");sharedUriCount=uris.size();for(int i=0;i<Math.min(5,uris.size());i++)addPreparedPhoto(copyAndCompress(uris.get(i),i));main.post(()->{if(!destroyed)buildForm();});}catch(Exception e){main.post(()->{if(!destroyed)fatal(e.getMessage());});}});
  }
- @Override protected void onDestroy(){destroyed=true;if(!saved)cleanupUnsavedPhotos();work.shutdownNow();main.removeCallbacksAndMessages(null);super.onDestroy();}
- private void cleanupUnsavedPhotos(){for(JSONObject p:photos){String path=p.optString("localPath");if(!path.isEmpty())try{new File(path).delete();}catch(Exception ignored){}}}
+ @Override protected void onDestroy(){destroyed=true;work.shutdownNow();if(!saved)cleanupUnsavedPhotos();main.removeCallbacksAndMessages(null);super.onDestroy();}
+ private void deleteLocalPhoto(JSONObject p){if(p==null)return;String path=p.optString("localPath");if(!path.isEmpty())try{new File(path).delete();}catch(Exception ignored){}}
+ private void cleanupUnsavedPhotos(){synchronized(photos){for(JSONObject p:photos)deleteLocalPhoto(p);photos.clear();}}
+ private void ensurePhotoWorkActive()throws InterruptedException{if(destroyed||Thread.currentThread().isInterrupted())throw new InterruptedException("Photo order closed");}
+ private void addPreparedPhoto(JSONObject p)throws Exception{synchronized(photos){if(destroyed||Thread.currentThread().isInterrupted()){deleteLocalPhoto(p);throw new InterruptedException("Photo order closed");}photos.add(p);}}
  private Bitmap previewBitmap(String path){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(path,bounds);int sample=1;while(Math.max(bounds.outWidth/sample,bounds.outHeight/sample)>700)sample*=2;BitmapFactory.Options opt=new BitmapFactory.Options();opt.inSampleSize=Math.max(1,sample);return BitmapFactory.decodeFile(path,opt);}
 
  private int dp(float v){return Math.round(v*getResources().getDisplayMetrics().density);}
@@ -55,11 +58,13 @@ public final class PhotoOrderActivity extends Activity {
  private static String hex(byte[] b){StringBuilder s=new StringBuilder();for(byte x:b)s.append(String.format(Locale.US,"%02x",x&255));return s.toString();}
  private Bitmap rotateIfNeeded(Bitmap src,Uri uri){int orientation=ExifInterface.ORIENTATION_NORMAL;try(InputStream in=getContentResolver().openInputStream(uri)){if(in!=null)orientation=new ExifInterface(in).getAttributeInt(ExifInterface.TAG_ORIENTATION,ExifInterface.ORIENTATION_NORMAL);}catch(Exception ignored){}float deg=0;if(orientation==ExifInterface.ORIENTATION_ROTATE_90)deg=90;else if(orientation==ExifInterface.ORIENTATION_ROTATE_180)deg=180;else if(orientation==ExifInterface.ORIENTATION_ROTATE_270)deg=270;if(deg==0)return src;Matrix m=new Matrix();m.postRotate(deg);Bitmap out=Bitmap.createBitmap(src,0,0,src.getWidth(),src.getHeight(),m,true);if(out!=src)src.recycle();return out;}
  private JSONObject copyAndCompress(Uri uri,int index)throws Exception{
+  ensurePhotoWorkActive();
   BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new Exception("Could not open shared image");BitmapFactory.decodeStream(in,null,bounds);}if(bounds.outWidth<=0||bounds.outHeight<=0)throw new Exception("Shared file is not a readable image");
   int sample=1;while(Math.max(bounds.outWidth/sample,bounds.outHeight/sample)>2200)sample*=2;BitmapFactory.Options opt=new BitmapFactory.Options();opt.inSampleSize=sample;Bitmap bmp;try(InputStream in=getContentResolver().openInputStream(uri)){bmp=BitmapFactory.decodeStream(in,null,opt);}if(bmp==null)throw new Exception("Could not decode shared image");bmp=rotateIfNeeded(bmp,uri);
   int w=bmp.getWidth(),h=bmp.getHeight();float scale=Math.min(1f,1600f/Math.max(w,h));if(scale<1f){Bitmap scaled=Bitmap.createScaledBitmap(bmp,Math.max(1,Math.round(w*scale)),Math.max(1,Math.round(h*scale)),true);if(scaled!=bmp)bmp.recycle();bmp=scaled;}
   ByteArrayOutputStream out=new ByteArrayOutputStream();if(!bmp.compress(Bitmap.CompressFormat.JPEG,84,out))throw new Exception("Could not prepare shared image");if(out.size()>2500000){out.reset();bmp.compress(Bitmap.CompressFormat.JPEG,70,out);}bmp.recycle();byte[] data=out.toByteArray();if(data.length==0||data.length>3*1024*1024)throw new Exception("One order photo is too large. Please share a smaller image.");
-  File dir=new File(getFilesDir(),"order-images");if(!dir.exists()&&!dir.mkdirs())throw new Exception("Could not create private order image storage");File file=new File(dir,"photo-"+UUID.randomUUID()+".jpg");try(FileOutputStream fos=new FileOutputStream(file)){fos.write(data);fos.getFD().sync();}
+  ensurePhotoWorkActive();
+  File dir=new File(getFilesDir(),"order-images");if(!dir.exists()&&!dir.mkdirs())throw new Exception("Could not create private order image storage");File file=new File(dir,"photo-"+UUID.randomUUID()+".jpg");try(FileOutputStream fos=new FileOutputStream(file)){fos.write(data);fos.getFD().sync();}if(destroyed||Thread.currentThread().isInterrupted()){file.delete();throw new InterruptedException("Photo order closed");}
   String sha=hex(MessageDigest.getInstance("SHA-256").digest(data));return new JSONObject().put("name","customer-order-"+(index+1)+".jpg").put("contentType","image/jpeg").put("size",data.length).put("sha256",sha).put("localPath",file.getAbsolutePath()).put("_uploadDirty",true);
  }
 
