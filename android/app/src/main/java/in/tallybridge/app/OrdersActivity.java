@@ -2,6 +2,8 @@ package in.tallybridge.app;
 
 import android.app.*;
 import android.content.*;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -10,6 +12,7 @@ import android.text.InputType;
 import android.view.*;
 import android.widget.*;
 import org.json.*;
+import java.io.File;
 import java.text.NumberFormat;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -66,11 +69,11 @@ public final class OrdersActivity extends Activity {
  private List<String> companyNames(){List<String> out=new ArrayList<>();for(int i=0;i<companies.length();i++){JSONObject x=companies.optJSONObject(i);String n=x==null?companies.optString(i):x.optString("name");if(!n.isEmpty()&&!out.contains(n))out.add(n);}return out;}
 
  private void showOrders(){
-  frame("Orders","Works offline • saved securely on this phone • syncs to your PC automatically.");
+  frame("Orders","Works offline • typed and photo orders sync to your PC automatically.");
   syncState=txt("Phone copy ready",12,TEAL);syncState.setTypeface(Typeface.DEFAULT_BOLD);body.addView(syncState);
   body.addView(primary("+ Add order",v->openForm(null)),full(8));
   LinearLayout tabs=new LinearLayout(this);tabs.setPadding(0,dp(12),0,dp(8));Button pending=btn("Pending",v->{dispatchedTab=false;paintOrders();}),dispatched=btn("Dispatched",v->{dispatchedTab=true;paintOrders();});tabs.addView(pending,new LinearLayout.LayoutParams(0,-2,1));tabs.addView(dispatched,new LinearLayout.LayoutParams(0,-2,1));body.addView(tabs);
-  body.addView(txt("Pending orders can be edited/shared offline. Dispatched orders stay view-only and are removed after 7 days.",12,MUTED));
+  body.addView(txt("Pending orders can be shared offline. Photo orders come from Android Share. Dispatched orders are removed after 7 days.",12,MUTED));
   ordersHeaderCount=body.getChildCount();loadOrders();
  }
  private void loadOrders(){
@@ -83,18 +86,20 @@ public final class OrdersActivity extends Activity {
  private void paintOrders(){
   if(body==null)return;while(body.getChildCount()>ordersHeaderCount)body.removeViewAt(ordersHeaderCount);
   int count=dispatchedTab?orderData.optInt("dispatchedCount"):orderData.optInt("pendingCount");TextView head=txt((dispatchedTab?"Dispatched":"Pending")+" • "+count,20,NAVY);head.setTypeface(Typeface.DEFAULT_BOLD);body.addView(head,full(10));
-  JSONArray a=orderData.optJSONArray(dispatchedTab?"dispatched":"pending");if(a==null||a.length()==0){body.addView(txt(dispatchedTab?"No dispatched orders from the last 7 days.":"No pending orders. Tap + Add order — it works without the PC.",15,MUTED),full(18));return;}
+  JSONArray a=orderData.optJSONArray(dispatchedTab?"dispatched":"pending");if(a==null||a.length()==0){body.addView(txt(dispatchedTab?"No dispatched orders from the last 7 days.":"No pending orders. Tap + Add order or share a customer image to TallyBridge Orders.",15,MUTED),full(18));return;}
   for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null)body.addView(orderCard(o,!dispatchedTab),full(12));}
  }
  private View orderCard(JSONObject o,boolean pending){
   LinearLayout card=col();card.setPadding(dp(16),dp(14),dp(16),dp(14));card.setBackground(shape(SURFACE,14));TextView title=txt(o.optString("number","Order")+" • "+o.optString("buyer"),18,NAVY);title.setTypeface(Typeface.DEFAULT_BOLD);card.addView(title);card.addView(txt(o.optString("company")+(pending?" • Pending":" • Dispatched "+dateTime(o.optString("dispatchedAt"))),12,MUTED));
   if(o.optBoolean("_localOnly")||o.optBoolean("_dirty")||o.optBoolean("_dispatchDirty")){TextView waiting=txt("● Saved on phone • waiting to sync",12,AMBER);waiting.setTypeface(Typeface.DEFAULT_BOLD);card.addView(waiting);}
+  JSONArray photos=o.optJSONArray("attachments");boolean photoOrder=o.optBoolean("photoOrder");if(photoOrder){int n=photos==null?0:photos.length();TextView badge=txt("📷 Customer photo order • "+n+" image"+(n==1?"":"s"),13,TEAL);badge.setTypeface(Typeface.DEFAULT_BOLD);card.addView(badge,full(7));}
   JSONArray items=o.optJSONArray("items");if(items!=null){for(int j=0;j<items.length();j++){JSONObject x=items.optJSONObject(j);if(x==null)continue;String line=(j+1)+". "+x.optString("name")+" — Qty "+qty(x.optDouble("quantity"))+(x.optString("unit").isEmpty()?"":" "+x.optString("unit"));if(x.has("rate")&&!x.isNull("rate"))line+=" • "+currency.format(x.optDouble("rate"));card.addView(txt(line,14,NAVY),full(5));}}
   if(!o.optString("notes").isEmpty())card.addView(txt("Notes: "+o.optString("notes"),13,MUTED),full(8));
-  if(pending){LinearLayout actions=new LinearLayout(this);actions.setPadding(0,dp(12),0,0);actions.addView(btn("Details only",v->shareOrder(o)),new LinearLayout.LayoutParams(0,-2,1));actions.addView(btn("Edit",v->openForm(o)),new LinearLayout.LayoutParams(0,-2,1));actions.addView(primary("Dispatched",v->dispatch(o)),new LinearLayout.LayoutParams(0,-2,1));card.addView(actions);}else card.addView(txt("View only • no sharing after dispatch",12,MUTED),full(10));return card;
+  if(pending){LinearLayout actions=new LinearLayout(this);actions.setPadding(0,dp(12),0,0);actions.addView(btn("Details only",v->shareOrder(o)),new LinearLayout.LayoutParams(0,-2,1));if(photoOrder)actions.addView(btn("Photos",v->showPhotos(o)),new LinearLayout.LayoutParams(0,-2,1));else actions.addView(btn("Edit",v->openForm(o)),new LinearLayout.LayoutParams(0,-2,1));actions.addView(primary("Dispatched",v->dispatch(o)),new LinearLayout.LayoutParams(0,-2,1));card.addView(actions);}else{if(photoOrder)card.addView(btn("View photos",v->showPhotos(o)),full(10));card.addView(txt("View only • no sharing after dispatch",12,MUTED),full(8));}return card;
  }
  private String qty(double v){return Math.rint(v)==v?String.valueOf((long)v):String.valueOf(v);}
  private String dateTime(String v){try{return OffsetDateTime.parse(v).toLocalDateTime().format(DateTimeFormatter.ofPattern("dd-MM-yyyy hh:mm a"));}catch(Exception e){try{return Instant.parse(v).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd-MM-yyyy hh:mm a"));}catch(Exception ignored){return "";}}}
+ private void showPhotos(JSONObject o){JSONArray a=o.optJSONArray("attachments");if(a==null||a.length()==0){toast("Order photo is still waiting to sync");return;}HorizontalScrollView strip=new HorizontalScrollView(this);LinearLayout row=new LinearLayout(this);row.setPadding(dp(12),dp(8),dp(12),dp(8));strip.addView(row);int shown=0;for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String path=p.optString("localPath");if(path.isEmpty()||!new File(path).exists())continue;Bitmap b=BitmapFactory.decodeFile(path);if(b==null)continue;ImageView iv=new ImageView(this);iv.setImageBitmap(b);iv.setScaleType(ImageView.ScaleType.FIT_CENTER);iv.setBackground(shape(SURFACE,12));LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(dp(260),dp(330));ip.setMargins(0,0,dp(10),0);row.addView(iv,ip);shown++;}if(shown==0){toast("Photo is synced to the PC. Open Desktop Orders to view the original image.");return;}new AlertDialog.Builder(this).setTitle("Customer order photos").setView(strip).setPositiveButton("Close",null).show();}
 
  private void shareOrder(JSONObject o){
   String text=o.optString("shareText");if(text.isEmpty()){toast("Only pending orders can be shared");return;}
@@ -102,7 +107,7 @@ public final class OrdersActivity extends Activity {
   new AlertDialog.Builder(this).setTitle("Details only").setMessage("Review before sharing").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Share",(d,w)->{Intent i=new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text);startActivity(Intent.createChooser(i,"Share order details"));}).show();
  }
  private void dispatch(JSONObject o){
-  new AlertDialog.Builder(this).setTitle("Mark dispatched?").setMessage(o.optString("number")+" • "+o.optString("buyer")+"\n\nThis works offline. It will sync to the PC later, remain view-only for 7 days, then be removed.").setNegativeButton("Cancel",null).setPositiveButton("Dispatched",(d,w)->{try{offline.dispatchLocal(o);OrdersWidget.refreshAll(this);toast("Marked dispatched on phone");showOrders();}catch(Exception e){toast(e.getMessage());}}).show();
+  new AlertDialog.Builder(this).setTitle("Mark dispatched?").setMessage(o.optString("number")+" • "+o.optString("buyer")+"\n\nThis works offline. It will sync to the PC later, remain view-only for 7 days, then be removed with any saved photos.").setNegativeButton("Cancel",null).setPositiveButton("Dispatched",(d,w)->{try{offline.dispatchLocal(o);OrdersWidget.refreshAll(this);toast("Marked dispatched on phone");showOrders();}catch(Exception e){toast(e.getMessage());}}).show();
  }
 
  private void openForm(JSONObject order){
