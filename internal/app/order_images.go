@@ -20,9 +20,11 @@ import (
 )
 
 const (
-	maxOrderPhotos    = 5
-	maxOrderPhotoSize = 3 * 1024 * 1024
-	maxPhotoJSONBody  = 6 * 1024 * 1024
+	maxOrderPhotos      = 5
+	maxOrderPhotoSize   = 3 * 1024 * 1024
+	maxPhotoJSONBody    = 6 * 1024 * 1024
+	maxOrderPhotoSide   = 12000
+	maxOrderPhotoPixels = 40_000_000
 )
 
 type OrderAttachment struct {
@@ -74,9 +76,12 @@ func validatePhotoBytes(contentType string, data []byte) error {
 	if ct != "image/jpeg" && ct != "image/png" {
 		return errors.New("only JPEG or PNG order photos are supported")
 	}
-	_, format, err := image.DecodeConfig(bytes.NewReader(data))
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return errors.New("order photo is not a valid image")
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > maxOrderPhotoSide || cfg.Height > maxOrderPhotoSide || int64(cfg.Width)*int64(cfg.Height) > maxOrderPhotoPixels {
+		return errors.New("order photo dimensions are too large")
 	}
 	if (format == "jpeg" && ct != "image/jpeg") || (format == "png" && ct != "image/png") {
 		return errors.New("order photo content type does not match the image")
@@ -217,7 +222,9 @@ func (s *Server) serveOrderPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", att.ContentType)
 	w.Header().Set("Content-Disposition", `inline; filename="`+strings.ReplaceAll(att.Name, `"`, "")+`"`)
-	w.Header().Set("Cache-Control", "private, max-age=300")
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
 	http.ServeContent(w, r, att.Name, st.ModTime(), f)
 }
 
