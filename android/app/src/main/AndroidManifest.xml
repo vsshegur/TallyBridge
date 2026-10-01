@@ -15,6 +15,19 @@
         </activity>
         <activity android:name=".OrdersActivity" android:exported="false"
             android:label="Orders" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".PhotoOrderActivity" android:exported="true"
+            android:label="TallyBridge Orders" android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
         <receiver android:name=".OrdersWidget" android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
