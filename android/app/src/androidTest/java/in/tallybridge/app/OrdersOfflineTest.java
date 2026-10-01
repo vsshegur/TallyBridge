@@ -2,7 +2,9 @@ package in.tallybridge.app;
 
 import android.content.*;
 import android.graphics.Bitmap;
-import android.view.WindowManager;
+import android.graphics.Color;
+import android.view.*;
+import android.widget.*;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.ActivityTestRule;
@@ -44,5 +46,18 @@ public class OrdersOfflineTest {
   capture("20-orders-details-only");
   assertTrue(finalOrder.optString("shareText").contains("ORDER DETAILS"));
   assertTrue(finalOrder.optString("shareText").contains("Vijayalaxmi Textiles"));
+
+  InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+  InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+  ui(()->{
+   OrdersActivity a=rule.getActivity();
+   FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(232,237,242));
+   View widget=a.getLayoutInflater().inflate(R.layout.orders_widget,stage,false);
+   ((TextView)widget.findViewById(R.id.widget_pending)).setText("Pending orders: 2 • Offline");
+   ((TextView)widget.findViewById(R.id.widget_names)).setText("Raj Fabrics • Mahesh Textiles");
+   int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(190*a.getResources().getDisplayMetrics().density);
+   FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(w,h,Gravity.CENTER);stage.addView(widget,lp);a.setContentView(stage);
+  });
+  capture("21-orders-widget");
  }
 }
