@@ -31,6 +31,8 @@ type SalesOrder struct {
 	Buyer        string            `json:"buyer"`
 	BuyerDetails map[string]string `json:"buyerDetails,omitempty"`
 	Items        []OrderItem       `json:"items"`
+	PhotoOrder   bool              `json:"photoOrder,omitempty"`
+	Attachments  []OrderAttachment `json:"attachments,omitempty"`
 	Notes        string            `json:"notes,omitempty"`
 	Status       string            `json:"status"`
 	ShareText    string            `json:"shareText,omitempty"`
@@ -88,6 +90,7 @@ func (s *Server) loadOrdersLocked(now time.Time) ([]SalesOrder, error) {
 	changed := false
 	for _, o := range f.Orders {
 		if o.Status == "dispatched" && !o.DispatchedAt.IsZero() && !o.DispatchedAt.Add(dispatchedOrderRetention).After(now) {
+			s.deleteOrderImages(o)
 			changed = true
 			continue
 		}
@@ -138,8 +141,8 @@ func validateOrder(in SalesOrder) (SalesOrder, error) {
 	if in.Company == "" || in.Buyer == "" {
 		return SalesOrder{}, errors.New("company and buyer are required")
 	}
-	if len(in.Items) == 0 || len(in.Items) > 100 {
-		return SalesOrder{}, errors.New("add between 1 and 100 order items")
+	if (len(in.Items) == 0 && !in.PhotoOrder) || len(in.Items) > 100 {
+		return SalesOrder{}, errors.New("add at least one order item, or attach a customer order photo")
 	}
 	cleanDetails := map[string]string{}
 	for k, v := range in.BuyerDetails {
@@ -199,6 +202,13 @@ func orderShareText(o SalesOrder) string {
 	}
 	b.WriteString("Order No: " + o.Number + "\n")
 	b.WriteString("Order Date: " + o.CreatedAt.Local().Format("02-01-2006 03:04 PM") + "\n\n")
+	if o.PhotoOrder {
+		if len(o.Attachments) > 0 {
+			b.WriteString(fmt.Sprintf("Photo order: %d image(s) attached\n", len(o.Attachments)))
+		} else {
+			b.WriteString("Photo order: image saved on phone / waiting to sync\n")
+		}
+	}
 	allRated := true
 	total := 0.0
 	for i, item := range o.Items {
@@ -284,6 +294,8 @@ func (s *Server) saveOrder(in SalesOrder) (SalesOrder, error) {
 		clean.CreatedAt = now
 		clean.UpdatedAt = now
 		clean.DispatchedAt = time.Time{}
+		// Attachments are accepted only through the authenticated photo upload endpoint.
+		clean.Attachments = nil
 		orders = append(orders, clean)
 	} else {
 		found := false
@@ -300,6 +312,8 @@ func (s *Server) saveOrder(in SalesOrder) (SalesOrder, error) {
 			clean.CreatedAt = orders[i].CreatedAt
 			clean.UpdatedAt = now
 			clean.DispatchedAt = time.Time{}
+			clean.Attachments = orders[i].Attachments
+			clean.PhotoOrder = clean.PhotoOrder || orders[i].PhotoOrder
 			orders[i] = clean
 			break
 		}
@@ -381,6 +395,14 @@ func (s *Server) handleOrders(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.handleOrderMasters(w, r)
+	case r.URL.Path == "/api/v1/mobile/orders/photo" || r.URL.Path == "/api/v1/admin/orders/photo":
+		s.handleOrderPhotoUpload(w, r)
+	case r.URL.Path == "/api/v1/mobile/orders/image" || r.URL.Path == "/api/v1/admin/orders/image":
+		if r.Method != "GET" {
+			jsonErr(w, 405, errors.New("GET required"))
+			return
+		}
+		s.serveOrderPhoto(w, r)
 	case r.URL.Path == "/api/v1/mobile/orders" || r.URL.Path == "/api/v1/admin/orders":
 		switch r.Method {
 		case "GET":
