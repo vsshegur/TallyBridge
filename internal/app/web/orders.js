@@ -23,14 +23,21 @@
   function orderWhen(v){if(!v||String(v).startsWith('0001'))return '—';return new Date(v).toLocaleString();}
   function orderQty(v){const n=Number(v||0);return Number.isInteger(n)?String(n):String(n.toFixed(2)).replace(/0+$/,'').replace(/\.$/,'')}
   function orderItems(o){return (o.items||[]).map((x,i)=>`<div class="list-row"><div><div class="title">${i+1}. ${esc(x.name)}</div><div class="sub">Qty ${esc(orderQty(x.quantity))}${x.unit?' '+esc(x.unit):''}${x.rate!=null?' • Rate '+money(x.rate):''}</div></div>${x.rate!=null?`<b>${money(Number(x.quantity||0)*Number(x.rate||0))}</b>`:''}</div>`).join('')}
+  function photoURL(o,a){return '/api/v1/admin/orders/image?order='+encodeURIComponent(o.id)+'&attachment='+encodeURIComponent(a.id)}
+  function orderPhotos(o){
+    const photos=o.attachments||[];
+    if(!o.photoOrder&&!photos.length)return '';
+    if(!photos.length)return `<div class="notice warn" style="margin-top:10px"><b>Photo order</b> • image is still waiting to sync from the phone.</div>`;
+    return `<div style="margin-top:12px"><div class="sub" style="margin-bottom:8px"><b>Customer order photo${photos.length>1?'s':''} • ${photos.length}</b> • click to open full size</div><div style="display:flex;gap:10px;flex-wrap:wrap">${photos.map((a,i)=>`<a href="${photoURL(o,a)}" target="_blank" rel="noopener" title="Open customer order photo ${i+1}"><img src="${photoURL(o,a)}" alt="Customer order photo ${i+1}" loading="lazy" style="width:124px;height:124px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:var(--surface)"></a>`).join('')}</div></div>`;
+  }
   function orderCard(o,pending){
     const details=o.buyerDetails||{},phone=details.MOBILENUMBER||details.MOBILE||details.PHONENUMBER||details.PHONE||'';
-    return `<div class="card" style="margin-bottom:14px"><div class="list-row"><div><div class="title">${esc(o.number||'Order')} • ${esc(o.buyer)}</div><div class="sub">${esc(o.company)} • ${pending?'Taken':'Dispatched'} ${orderWhen(pending?o.createdAt:o.dispatchedAt)}${phone?' • '+esc(phone):''}</div></div><span class="status-pill ${pending?'warn':'ok'}">${pending?'PENDING':'DISPATCHED'}</span></div>${orderItems(o)}${o.notes?`<div class="notice info" style="margin-top:10px"><b>Notes:</b> ${esc(o.notes)}</div>`:''}${pending?`<div class="toolbar" style="margin-top:14px"><button class="btn secondary" data-order-action="copy" data-order-id="${esc(o.id)}">Copy details</button><button class="btn" data-order-action="dispatch" data-order-id="${esc(o.id)}">Mark dispatched</button></div>`:`<div class="sub" style="margin-top:12px">This order is view-only and will be removed automatically 7 days after dispatch.</div>`}</div>`;
+    return `<div class="card" style="margin-bottom:14px"><div class="list-row"><div><div class="title">${esc(o.number||'Order')} • ${esc(o.buyer)}</div><div class="sub">${esc(o.company)} • ${pending?'Taken':'Dispatched'} ${orderWhen(pending?o.createdAt:o.dispatchedAt)}${phone?' • '+esc(phone):''}${o.photoOrder?' • Photo order':''}</div></div><span class="status-pill ${pending?'warn':'ok'}">${pending?'PENDING':'DISPATCHED'}</span></div>${orderPhotos(o)}${orderItems(o)}${o.notes?`<div class="notice info" style="margin-top:10px"><b>Notes:</b> ${esc(o.notes)}</div>`:''}${pending?`<div class="toolbar" style="margin-top:14px"><button class="btn secondary" data-order-action="copy" data-order-id="${esc(o.id)}">Copy details</button><button class="btn" data-order-action="dispatch" data-order-id="${esc(o.id)}">Mark dispatched</button></div>`:`<div class="sub" style="margin-top:12px">This order is view-only and will be removed automatically 7 days after dispatch, together with its saved photos.</div>`}</div>`;
   }
 
   function renderOrders(){
     const p=$('#page');if(!p)return;
-    p.innerHTML=head('Orders','Orders taken from your phone are stored on this PC. Pending orders stay until dispatched; dispatched orders are permanently removed after 7 days.')+
+    p.innerHTML=head('Orders','Typed and photo orders taken from your phone are stored on this PC. Pending orders stay until dispatched; dispatched orders and their photos are permanently removed after 7 days.')+
       `<div class="grid dashboard-grid"><div class="card span6"><div class="metric-label">Pending orders</div><div class="metric-value" id="orderPendingMetric">${orderData.pendingCount||0}</div><div class="metric-sub">Waiting for dispatch</div></div><div class="card span6"><div class="metric-label">Dispatched (7 days)</div><div class="metric-value" id="orderDispatchedMetric">${orderData.dispatchedCount||0}</div><div class="metric-sub">Automatically removed after 7 days</div></div></div>`+
       `<div class="toolbar" style="margin:18px 0"><button class="btn ${orderTab==='pending'?'':'secondary'}" data-order-tab="pending">Pending</button><button class="btn ${orderTab==='dispatched'?'':'secondary'}" data-order-tab="dispatched">Dispatched</button><button class="btn secondary" data-order-action="refresh">Refresh</button></div><div id="ordersDesktopBody"><div class="screen-loader"><span class="spinner"></span>Loading orders…</div></div>`;
     if(!orderLoading)loadOrdersDesktop();else paintOrders();
@@ -63,7 +70,7 @@
       return;
     }
     if(action==='dispatch'){
-      if(!confirm('Mark '+(o.number||'this order')+' for '+o.buyer+' as dispatched? It will stay visible for 7 days, then be permanently removed.'))return;
+      if(!confirm('Mark '+(o.number||'this order')+' for '+o.buyer+' as dispatched? It will stay visible for 7 days, then be permanently removed with any saved order photos.'))return;
       b.disabled=true;
       try{await api('/api/v1/admin/orders/dispatch',{method:'POST',body:JSON.stringify({id})});toast('Order marked dispatched');await loadOrdersDesktop()}catch(err){toast(err.message,true);b.disabled=false}
     }
