@@ -6,6 +6,7 @@ on:
     paths:
       - scripts/apply_operations_240.py
       - .github/workflows/operations-240-apply.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
