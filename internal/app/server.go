@@ -633,6 +633,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	if reason, retry, p := s.tally.Pending(); p {
 		var old VoucherDetail
 		if at, ok := s.cache.Get("voucher-detail-v6", c, key, &old); ok && old.TotalsVersion == 2 {
+			preserveOptionalHint(&old, hint)
 			old.Live = false
 			old.Source = "saved"
 			old.Stale = true
@@ -649,6 +650,7 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	if e != nil {
 		var old VoucherDetail
 		if at, ok := s.cache.Get("voucher-detail-v6", c, key, &old); ok && old.TotalsVersion == 2 {
+			preserveOptionalHint(&old, hint)
 			old.Live = false
 			old.Source = "saved"
 			old.Stale = true
@@ -683,6 +685,7 @@ func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
+	preserveOptionalHint(&x, hint)
 	if x.RegisterAmount != 0 && !x.AmountVerified {
 		jsonErr(w, 409, errors.New(x.VerificationNote))
 		return
@@ -1191,8 +1194,11 @@ func (s *Server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
 		if d.FetchedAt.After(latest) {
 			latest = d.FetchedAt
 		}
+		if hint, ok := s.cache.VoucherHint(c, v.MasterID); ok && hint.Optional {
+			v.Optional = true
+		}
 		if v.LRNumber != "" {
-			out = append(out, SearchResult{Kind: "invoice-detail", Title: firstNonBlank(v.InvoiceNumber, v.LRNumber), Subtitle: v.CustomerName + " • LR/RR " + v.LRNumber, MasterID: v.MasterID, Party: v.CustomerName, Number: v.InvoiceNumber, Date: v.InvoiceDate, LRNumber: v.LRNumber, Amount: v.TotalAmount, VoucherType: v.VoucherType})
+			out = append(out, SearchResult{Kind: "invoice-detail", Title: firstNonBlank(v.InvoiceNumber, v.LRNumber), Subtitle: v.CustomerName + " • LR/RR " + v.LRNumber, MasterID: v.MasterID, Party: v.CustomerName, Number: v.InvoiceNumber, Date: v.InvoiceDate, LRNumber: v.LRNumber, Amount: v.TotalAmount, VoucherType: v.VoucherType, Optional: v.Optional})
 		}
 	}
 	jsonOut(w, SearchIndexData{CommonData: CommonData{Live: false, Source: "saved", Stale: true, FetchedAt: latest}, Company: c, Results: out, Count: len(out)})
@@ -1609,6 +1615,9 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 			}
 			if hint.VoucherType == "" {
 				hint.VoucherType = cached.VoucherType
+			}
+			if cached.Optional {
+				hint.Optional = true
 			}
 		}
 	}
