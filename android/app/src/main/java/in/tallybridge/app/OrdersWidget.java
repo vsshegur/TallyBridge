@@ -4,6 +4,7 @@ import android.app.*;
 import android.appwidget.*;
 import android.content.*;
 import android.content.res.Configuration;
+import android.os.Bundle;
 import android.widget.RemoteViews;
 import org.json.*;
 import java.util.concurrent.*;
