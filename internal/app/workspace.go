@@ -36,22 +36,22 @@ type SmartAlert struct {
 }
 
 type DailyWorkspace struct {
-	Company             string           `json:"company"`
-	Date                string           `json:"date"`
-	PendingOrders       int              `json:"pendingOrders"`
-	DispatchedToday     int              `json:"dispatchedToday"`
-	OldPendingOrders    int              `json:"oldPendingOrders"`
-	FollowUpsDue        int              `json:"followUpsDue"`
-	FollowUpsOverdue    int              `json:"followUpsOverdue"`
-	SalesToday          float64          `json:"salesToday"`
-	SalesCount          int              `json:"salesCount"`
-	Receivable          float64          `json:"receivable"`
-	Payable             float64          `json:"payable"`
-	TallyOnline         bool             `json:"tallyOnline"`
-	LastSync            time.Time        `json:"lastSync,omitempty"`
-	Alerts              []SmartAlert     `json:"alerts"`
-	Health              CompanyHealth    `json:"health"`
-	Performance         TallyPerformance `json:"performance"`
+	Company          string           `json:"company"`
+	Date             string           `json:"date"`
+	PendingOrders    int              `json:"pendingOrders"`
+	DispatchedToday  int              `json:"dispatchedToday"`
+	OldPendingOrders int              `json:"oldPendingOrders"`
+	FollowUpsDue     int              `json:"followUpsDue"`
+	FollowUpsOverdue int              `json:"followUpsOverdue"`
+	SalesToday       float64          `json:"salesToday"`
+	SalesCount       int              `json:"salesCount"`
+	Receivable       float64          `json:"receivable"`
+	Payable          float64          `json:"payable"`
+	TallyOnline      bool             `json:"tallyOnline"`
+	LastSync         time.Time        `json:"lastSync,omitempty"`
+	Alerts           []SmartAlert     `json:"alerts"`
+	Health           CompanyHealth    `json:"health"`
+	Performance      TallyPerformance `json:"performance"`
 }
 
 type CustomerWorkspace struct {
@@ -212,6 +212,13 @@ func (s *Server) customerWorkspace(company, party string, refresh bool) (Custome
 }
 
 func searchText(parts ...string) string { return strings.ToLower(strings.Join(parts, " ")) }
+func detailSubtitle(v VoucherDetail) string {
+	parts:=[]string{}
+	if strings.TrimSpace(v.CustomerName)!="" { parts=append(parts,v.CustomerName) }
+	if strings.TrimSpace(v.LRNumber)!="" { parts=append(parts,"LR/RR "+v.LRNumber) }
+	if strings.TrimSpace(v.GSTIN)!="" { parts=append(parts,"GSTIN "+v.GSTIN) }
+	return strings.Join(parts," • ")
+}
 
 func (s *Server) buildGlobalSearch(company string) GlobalSearchData {
 	out := []GlobalSearchResult{}
@@ -220,7 +227,8 @@ func (s *Server) buildGlobalSearch(company string) GlobalSearchData {
 	if _, ok := s.cache.Get("ledgers", company, "", &ledgers); ok {
 		for _, l := range ledgers.Ledgers {
 			key := "ledger|"+strings.ToLower(l.Name)
-			if seen[key] { continue }; seen[key]=true
+			if seen[key] { continue }
+			seen[key]=true
 			out = append(out, GlobalSearchResult{Kind:"ledger", Title:l.Name, Subtitle:l.Parent, Ledger:l.Name, Party:l.Name, SearchText:searchText(l.Name,l.Parent)})
 		}
 	}
@@ -230,7 +238,8 @@ func (s *Server) buildGlobalSearch(company string) GlobalSearchData {
 			if _, ok := s.cache.Get(typ, company, period, &vd); !ok || !voucherCacheIsClassified(vd) { continue }
 			for _, v := range vd.Vouchers {
 				key := typ+"|"+v.MasterID+"|"+v.Number+"|"+v.Date
-				if seen[key] { continue }; seen[key]=true
+				if seen[key] { continue }
+				seen[key]=true
 				out = append(out, GlobalSearchResult{Kind:typ, ID:v.MasterID, Title:firstNonBlank(v.Number,v.Party), Subtitle:v.Party+" • "+displayDate(v.Date), Party:v.Party, Ledger:v.Party, Number:v.Number, Date:v.Date, MasterID:v.MasterID, VoucherType:v.VoucherType, Amount:v.Amount, Optional:v.Optional, SearchText:searchText(v.Number,v.Party,v.Date,v.VoucherType)})
 			}
 		}
@@ -240,25 +249,29 @@ func (s *Server) buildGlobalSearch(company string) GlobalSearchData {
 		if json.Unmarshal(d.Data,&v)!=nil { continue }
 		if v.LRNumber=="" && v.GSTIN=="" { continue }
 		key := "detail|"+v.MasterID+"|"+v.InvoiceNumber
-		if seen[key] { continue }; seen[key]=true
-		out = append(out, GlobalSearchResult{Kind:"invoice-detail", ID:v.MasterID, Title:firstNonBlank(v.InvoiceNumber,v.CustomerName), Subtitle:v.CustomerName+firstNonBlank(func() string { if v.LRNumber!="" { return " • LR/RR "+v.LRNumber }; return "" }()), Party:v.CustomerName, Ledger:v.CustomerName, Number:v.InvoiceNumber, Date:v.InvoiceDate, MasterID:v.MasterID, VoucherType:v.VoucherType, Amount:v.TotalAmount, Optional:v.Optional, SearchText:searchText(v.InvoiceNumber,v.CustomerName,v.LRNumber,v.GSTIN,v.CustomerCity,v.VehicleNumber,v.EWayBillNumber)})
+		if seen[key] { continue }
+		seen[key]=true
+		out = append(out, GlobalSearchResult{Kind:"invoice-detail", ID:v.MasterID, Title:firstNonBlank(v.InvoiceNumber,v.CustomerName), Subtitle:detailSubtitle(v), Party:v.CustomerName, Ledger:v.CustomerName, Number:v.InvoiceNumber, Date:v.InvoiceDate, MasterID:v.MasterID, VoucherType:v.VoucherType, Amount:v.TotalAmount, Optional:v.Optional, SearchText:searchText(v.InvoiceNumber,v.CustomerName,v.LRNumber,v.GSTIN,v.CustomerCity,v.VehicleNumber,v.EWayBillNumber)})
 	}
 	if orders, err := s.listOrders(company); err == nil {
 		addOrder := func(o SalesOrder) {
 			items := make([]string,0,len(o.Items)); for _,it:=range o.Items { items=append(items,it.Name) }
-			out = append(out, GlobalSearchResult{Kind:"order", ID:o.ID, Title:firstNonBlank(o.Number,o.Buyer), Subtitle:o.Buyer+" • "+strings.Title(o.Status), Party:o.Buyer, Number:o.Number, Status:o.Status, SearchText:searchText(o.Number,o.Buyer,o.DispatchedThrough,o.Notes,strings.Join(items," "))})
+			out = append(out, GlobalSearchResult{Kind:"order", ID:o.ID, Title:firstNonBlank(o.Number,o.Buyer), Subtitle:o.Buyer+" • "+strings.ToUpper(o.Status), Party:o.Buyer, Number:o.Number, Status:o.Status, SearchText:searchText(o.Number,o.Buyer,o.DispatchedThrough,o.Notes,strings.Join(items," "))})
 		}
-		for _,o:=range orders.Pending { addOrder(o) }; for _,o:=range orders.Dispatched { addOrder(o) }
+		for _,o:=range orders.Pending { addOrder(o) }
+		for _,o:=range orders.Dispatched { addOrder(o) }
 	}
 	if fs, err := s.listFollowUps(company, ""); err == nil {
-		for _,f:=range append(append([]FollowUp{},fs.Open...),fs.Completed...) {
-			out=append(out,GlobalSearchResult{Kind:"followup",ID:f.ID,Title:f.Party,Subtitle:firstNonBlank(f.PromiseDate,"No promise date")+" • "+strings.Title(f.Status),Party:f.Party,Date:f.PromiseDate,Status:f.Status,Amount:f.Amount,SearchText:searchText(f.Party,f.PromiseDate,f.Note,f.Status)})
+		all:=append([]FollowUp{},fs.Open...); all=append(all,fs.Completed...)
+		for _,f:=range all {
+			date:=firstNonBlank(f.PromiseDate,"No promise date")
+			out=append(out,GlobalSearchResult{Kind:"followup",ID:f.ID,Title:f.Party,Subtitle:date+" • "+strings.ToUpper(f.Status),Party:f.Party,Date:f.PromiseDate,Status:f.Status,Amount:f.Amount,SearchText:searchText(f.Party,f.PromiseDate,f.Note,f.Status)})
 		}
 	}
 	for _,d:=range s.cache.Matching("ledger-details",company) {
 		var x struct{Details map[string]string `json:"details"`}
 		if json.Unmarshal(d.Data,&x)!=nil || len(x.Details)==0 { continue }
-		name:=firstNonBlank(x.Details["NAME"],x.Details["LEDGERNAME"],d.Key)
+		name:=firstNonBlank(x.Details["NAME"],x.Details["LEDGERNAME"],d.Variant)
 		gst:=firstNonBlank(x.Details["GSTIN"],x.Details["PARTYGSTIN"])
 		phone:=firstNonBlank(x.Details["MOBILE"],x.Details["MOBILENO"],x.Details["PHONE"])
 		if gst=="" && phone=="" { continue }
@@ -266,8 +279,6 @@ func (s *Server) buildGlobalSearch(company string) GlobalSearchData {
 	}
 	return GlobalSearchData{Company:company,Results:out,Count:len(out)}
 }
-
-func firstNonBlankFunc(v string) string { return v }
 
 func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 	c:=strings.TrimSpace(r.URL.Query().Get("company")); if c=="" { jsonErr(w,400,errors.New("company required")); return }
