@@ -32,7 +32,7 @@
   }
   function orderCard(o,pending){
     const details=o.buyerDetails||{},phone=details.MOBILENUMBER||details.MOBILE||details.PHONENUMBER||details.PHONE||'';
-    return `<div class="card" style="margin-bottom:14px"><div class="list-row"><div><div class="title">${esc(o.number||'Order')} • ${esc(o.buyer)}</div><div class="sub">${esc(o.company)} • ${pending?'Taken':'Dispatched'} ${orderWhen(pending?o.createdAt:o.dispatchedAt)}${phone?' • '+esc(phone):''}${o.photoOrder?' • Photo order':''}</div></div><span class="status-pill ${pending?'warn':'ok'}">${pending?'PENDING':'DISPATCHED'}</span></div>${orderPhotos(o)}${orderItems(o)}${o.notes?`<div class="notice info" style="margin-top:10px"><b>Notes:</b> ${esc(o.notes)}</div>`:''}${pending?`<div class="toolbar" style="margin-top:14px"><button class="btn secondary" data-order-action="copy" data-order-id="${esc(o.id)}">Copy details</button><button class="btn" data-order-action="dispatch" data-order-id="${esc(o.id)}">Mark dispatched</button></div>`:`<div class="sub" style="margin-top:12px">This order is view-only and will be removed automatically 7 days after dispatch, together with its saved photos.</div>`}</div>`;
+    return `<div class="card" style="margin-bottom:14px"><div class="list-row"><div><div class="title">${esc(o.number||'Order')} • ${esc(o.buyer)}</div><div class="sub">${esc(o.company)} • ${pending?'Taken':'Dispatched'} ${orderWhen(pending?o.createdAt:o.dispatchedAt)}${phone?' • '+esc(phone):''}${o.photoOrder?' • Photo order':''}</div></div><span class="status-pill ${pending?'warn':'ok'}">${pending?'PENDING':'DISPATCHED'}</span></div>${orderPhotos(o)}${orderItems(o)}${o.dispatchedThrough?`<div class="notice info" style="margin-top:10px"><b>Dispatched through:</b> ${esc(o.dispatchedThrough)}</div>`:''}${o.notes?`<div class="notice info" style="margin-top:10px"><b>Notes:</b> ${esc(o.notes)}</div>`:''}${pending?`<div class="toolbar" style="margin-top:14px"><button class="btn secondary" data-order-action="copy" data-order-id="${esc(o.id)}">Copy details</button><button class="btn" data-order-action="dispatch" data-order-id="${esc(o.id)}">Mark dispatched</button></div>`:`<div class="sub" style="margin-top:12px">This order is view-only and will be removed automatically 7 days after dispatch, together with its saved photos.</div>`}</div>`;
   }
 
   function renderOrders(){
@@ -71,8 +71,9 @@
     }
     if(action==='dispatch'){
       if(!confirm('Mark '+(o.number||'this order')+' for '+o.buyer+' as dispatched? It will stay visible for 7 days, then be permanently removed with any saved order photos.'))return;
+      const dispatchedThrough=prompt('Dispatched through (optional) — transport, courier or person',o.dispatchedThrough||'');if(dispatchedThrough===null)return;
       b.disabled=true;
-      try{await api('/api/v1/admin/orders/dispatch',{method:'POST',body:JSON.stringify({id})});toast('Order marked dispatched');await loadOrdersDesktop()}catch(err){toast(err.message,true);b.disabled=false}
+      try{await api('/api/v1/admin/orders/dispatch',{method:'POST',body:JSON.stringify({id,dispatchedThrough:dispatchedThrough.trim()})});toast('Order marked dispatched');await loadOrdersDesktop()}catch(err){toast(err.message,true);b.disabled=false}
     }
   });
 

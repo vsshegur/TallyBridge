@@ -25,20 +25,21 @@ type OrderItem struct {
 }
 
 type SalesOrder struct {
-	ID           string            `json:"id"`
-	Number       string            `json:"number"`
-	Company      string            `json:"company"`
-	Buyer        string            `json:"buyer"`
-	BuyerDetails map[string]string `json:"buyerDetails,omitempty"`
-	Items        []OrderItem       `json:"items"`
-	PhotoOrder   bool              `json:"photoOrder,omitempty"`
-	Attachments  []OrderAttachment `json:"attachments,omitempty"`
-	Notes        string            `json:"notes,omitempty"`
-	Status       string            `json:"status"`
-	ShareText    string            `json:"shareText,omitempty"`
-	CreatedAt    time.Time         `json:"createdAt"`
-	UpdatedAt    time.Time         `json:"updatedAt"`
-	DispatchedAt time.Time         `json:"dispatchedAt,omitempty"`
+	ID                string            `json:"id"`
+	Number            string            `json:"number"`
+	Company           string            `json:"company"`
+	Buyer             string            `json:"buyer"`
+	BuyerDetails      map[string]string `json:"buyerDetails,omitempty"`
+	Items             []OrderItem       `json:"items"`
+	PhotoOrder        bool              `json:"photoOrder,omitempty"`
+	Attachments       []OrderAttachment `json:"attachments,omitempty"`
+	Notes             string            `json:"notes,omitempty"`
+	Status            string            `json:"status"`
+	ShareText         string            `json:"shareText,omitempty"`
+	CreatedAt         time.Time         `json:"createdAt"`
+	UpdatedAt         time.Time         `json:"updatedAt"`
+	DispatchedThrough string            `json:"dispatchedThrough,omitempty"`
+	DispatchedAt      time.Time         `json:"dispatchedAt,omitempty"`
 }
 
 type orderFile struct {
@@ -135,6 +136,7 @@ func validateOrder(in SalesOrder) (SalesOrder, error) {
 	in.Company = compactOrderText(in.Company, 160)
 	in.Buyer = compactOrderText(in.Buyer, 160)
 	in.Notes = strings.TrimSpace(in.Notes)
+	in.DispatchedThrough = compactOrderText(in.DispatchedThrough, 160)
 	if len(in.Notes) > 1000 {
 		return SalesOrder{}, errors.New("notes are too long")
 	}
@@ -209,8 +211,6 @@ func orderShareText(o SalesOrder) string {
 			b.WriteString("Photo order: image saved on phone / waiting to sync\n")
 		}
 	}
-	allRated := true
-	total := 0.0
 	for i, item := range o.Items {
 		qty := strconv.FormatFloat(item.Quantity, 'f', -1, 64)
 		line := fmt.Sprintf("%d. %s — Qty: %s", i+1, item.Name, qty)
@@ -218,16 +218,12 @@ func orderShareText(o SalesOrder) string {
 			line += " " + item.Unit
 		}
 		if item.Rate != nil {
-			amount := item.Quantity * *item.Rate
-			total += amount
-			line += fmt.Sprintf(" — Rate: ₹%.2f — Amount: ₹%.2f", *item.Rate, amount)
-		} else {
-			allRated = false
+			line += fmt.Sprintf(" — Rate: ₹%.2f", *item.Rate)
 		}
 		b.WriteString(line + "\n")
 	}
-	if allRated && len(o.Items) > 0 {
-		b.WriteString(fmt.Sprintf("\nOrder Total: ₹%.2f\n", total))
+	if o.DispatchedThrough != "" {
+		b.WriteString("\nDispatched Through: " + o.DispatchedThrough + "\n")
 	}
 	if o.Notes != "" {
 		b.WriteString("\nNotes: " + o.Notes + "\n")
@@ -327,8 +323,9 @@ func (s *Server) saveOrder(in SalesOrder) (SalesOrder, error) {
 	return withOrderPresentation(clean), nil
 }
 
-func (s *Server) dispatchOrder(id string) (SalesOrder, error) {
+func (s *Server) dispatchOrder(id, dispatchedThrough string) (SalesOrder, error) {
 	id = strings.TrimSpace(id)
+	dispatchedThrough = compactOrderText(dispatchedThrough, 160)
 	if id == "" {
 		return SalesOrder{}, errors.New("order id required")
 	}
@@ -342,6 +339,9 @@ func (s *Server) dispatchOrder(id string) (SalesOrder, error) {
 	for i := range orders {
 		if orders[i].ID != id {
 			continue
+		}
+		if dispatchedThrough != "" {
+			orders[i].DispatchedThrough = dispatchedThrough
 		}
 		if orders[i].Status != "dispatched" {
 			orders[i].Status = "dispatched"
@@ -433,13 +433,14 @@ func (s *Server) handleOrders(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var q struct {
-			ID string `json:"id"`
+			ID                string `json:"id"`
+			DispatchedThrough string `json:"dispatchedThrough"`
 		}
 		if readJSON(r, &q) != nil {
 			jsonErr(w, 400, errors.New("invalid dispatch request"))
 			return
 		}
-		o, err := s.dispatchOrder(q.ID)
+		o, err := s.dispatchOrder(q.ID, q.DispatchedThrough)
 		if err != nil {
 			jsonErr(w, 400, err)
 			return
