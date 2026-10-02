@@ -14,7 +14,7 @@ jobs:
         with:
           go-version: '1.23.12'
           cache: false
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -23,8 +23,8 @@ jobs:
           gradle-version: '8.11.1'
       - name: Apply guarded production patch
         run: |
-          python3 scripts/proforma-sales-separation-upgrade.py
-          gofmt -w internal/app/types.go internal/app/tally.go internal/app/server.go internal/app/voucher_classification.go internal/app/proforma_register_test.go
+          python3 scripts/run-proforma-sales-separation-upgrade.py
+          gofmt -w internal/app/types.go internal/app/tally.go internal/app/server.go internal/app/pdf.go internal/app/voucher_classification.go internal/app/proforma_register_test.go
       - name: Verify backend separation and PDF naming
         run: |
           go test ./internal/app
@@ -39,6 +39,7 @@ jobs:
           grep -q "versionName '2.3.3'" app/build.gradle
           grep -q 'Proforma invoices' app/src/main/java/in/tallybridge/app/MainActivity.java
           grep -q 'View Tally proforma invoices' app/src/main/java/in/tallybridge/app/MainActivity.java
+          grep -q 'Optional / Proforma' app/src/main/java/in/tallybridge/app/MainActivity.java
           if grep -q 'pdfPath,"Invoice-"+x.optString("invoiceNumber")' app/src/main/java/in/tallybridge/app/MainActivity.java; then
             echo 'Old Invoice- PDF prefix is still present' >&2
             exit 1
@@ -52,7 +53,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add internal/app/types.go internal/app/tally.go internal/app/server.go internal/app/voucher_classification.go internal/app/proforma_register_test.go android/app/build.gradle android/app/src/main/java/in/tallybridge/app/MainActivity.java
+          git add internal/app/types.go internal/app/tally.go internal/app/server.go internal/app/pdf.go internal/app/voucher_classification.go internal/app/proforma_register_test.go android/app/build.gradle android/app/src/main/java/in/tallybridge/app/MainActivity.java
           git diff --cached --check
           git commit -m "Separate optional proformas and fix invoice PDF names"
           git push origin HEAD:fix/proforma-sales-separation-pdf-name
