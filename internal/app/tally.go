@@ -272,10 +272,10 @@ func partyBalancesXML(company, group, id string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>%s</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="%s" ISMODIFY="No"><TYPE>Ledger</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>Parent</NATIVEMETHOD><NATIVEMETHOD>GUID</NATIVEMETHOD><NATIVEMETHOD>ClosingBalance</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, id, escXML(company), id, group))
 }
 func voucherListXML(company, vtype, from, to string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLiveVouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLiveVouchers" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><NATIVEMETHOD>Date</NATIVEMETHOD><NATIVEMETHOD>VoucherNumber</NATIVEMETHOD><NATIVEMETHOD>PartyLedgerName</NATIVEMETHOD><NATIVEMETHOD>VoucherTypeName</NATIVEMETHOD><NATIVEMETHOD>Amount</NATIVEMETHOD><NATIVEMETHOD>MasterID</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), from, to, escXML(vtype)))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLiveVouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLiveVouchers" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><NATIVEMETHOD>Date</NATIVEMETHOD><NATIVEMETHOD>VoucherNumber</NATIVEMETHOD><NATIVEMETHOD>PartyLedgerName</NATIVEMETHOD><NATIVEMETHOD>VoucherTypeName</NATIVEMETHOD><NATIVEMETHOD>IsOptional</NATIVEMETHOD><NATIVEMETHOD>Amount</NATIVEMETHOD><NATIVEMETHOD>MasterID</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), from, to, escXML(vtype)))
 }
 func voucherDetailCollectionXML(company, masterID string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetail</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetail" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherMasterIDFilter</FILTER><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetail</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetail" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherMasterIDFilter</FILTER><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,IsOptional,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
 }
 func voucherDetailObjectXML(company, masterID string) []byte {
 	// Do not use the fragile Voucher object identifier form (ID:'123'). Some
@@ -290,14 +290,18 @@ func voucherDetailHintXML(company string, hint VoucherRow) []byte {
 		return nil
 	}
 	vtype := strings.TrimSpace(hint.VoucherType)
-	if vtype == "" { vtype = "Sales" }
+	if vtype == "" {
+		vtype = "Sales"
+	}
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherByIdentity</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherByIdentity" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><FILTER>TBVoucherNumberFilter</FILTER><FETCH>*</FETCH><FETCH>AllInventoryEntries.*</FETCH><FETCH>AllLedgerEntries.*</FETCH><FETCH>LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherNumberFilter" ISMODIFY="No">$VoucherNumber = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), date, date, escXML(vtype), escXML(strings.TrimSpace(hint.Number))))
 }
 
 func voucherDayXML(company, date string) []byte {
 	d := strings.ReplaceAll(normISODate(date), "-", "")
-	if len(d) != 8 { return nil }
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDay</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDay" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), d, d))
+	if len(d) != 8 {
+		return nil
+	}
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDay</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDay" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,IsOptional,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), d, d))
 }
 
 func ledgerDetailXML(company, ledger string) []byte {
@@ -590,7 +594,7 @@ func parseVouchers(b []byte) []VoucherRow {
 		seen[k] = true
 		party := firstDeep(n, "PARTYLEDGERNAME", "PARTYNAME", "BASICBUYERNAME")
 		amount, _ := invoicePartyTotal(n, party)
-		out = append(out, VoucherRow{MasterID: mid, Date: date, Number: num, Party: party, Amount: abs(amount), VoucherType: firstDeep(n, "VOUCHERTYPENAME")})
+		out = append(out, VoucherRow{MasterID: mid, Date: date, Number: num, Party: party, Amount: abs(amount), VoucherType: firstDeep(n, "VOUCHERTYPENAME"), Optional: tallyYes(firstDeep(n, "ISOPTIONAL", "OPTIONAL"))})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Date == out[j].Date {
@@ -602,26 +606,41 @@ func parseVouchers(b []byte) []VoucherRow {
 }
 func parseLedgerDetails(b []byte) map[string]string {
 	r, e := parseTree(b)
-	if e != nil { return nil }
+	if e != nil {
+		return nil
+	}
 	var ledgers []*xnode
 	nodesByName(r, "LEDGER", &ledgers)
-	if len(ledgers) > 1 { return nil }
+	if len(ledgers) > 1 {
+		return nil
+	}
 	return parseLedgerDetailsFor(b, "")
 }
 func parseLedgerDetailsFor(b []byte, wanted string) map[string]string {
 	r, e := parseTree(b)
-	if e != nil { return nil }
+	if e != nil {
+		return nil
+	}
 	var ledgers []*xnode
 	nodesByName(r, "LEDGER", &ledgers)
 	if len(ledgers) > 0 {
 		chosen := (*xnode)(nil)
 		for _, candidate := range ledgers {
 			name := strings.TrimSpace(firstDeep(candidate, "NAME"))
-			if wanted != "" && strings.EqualFold(name, strings.TrimSpace(wanted)) { chosen = candidate; break }
+			if wanted != "" && strings.EqualFold(name, strings.TrimSpace(wanted)) {
+				chosen = candidate
+				break
+			}
 		}
-		if chosen == nil && len(ledgers) == 1 { chosen = ledgers[0] }
-		if chosen == nil && wanted == "" { chosen = ledgers[0] }
-		if chosen == nil { return nil }
+		if chosen == nil && len(ledgers) == 1 {
+			chosen = ledgers[0]
+		}
+		if chosen == nil && wanted == "" {
+			chosen = ledgers[0]
+		}
+		if chosen == nil {
+			return nil
+		}
 		r = chosen
 	}
 	fields := []string{"NAME", "MAILINGNAME", "PARENT", "PARTYGSTIN", "GSTIN", "GSTREGISTRATIONNUMBER", "INCOMETAXNUMBER", "LEDGERPHONE", "EMAIL", "CITY", "COUNTRYNAME", "STATENAME", "LEDSTATENAME", "PINCODE", "CLOSINGBALANCE", "BANKNAME", "BANKACCOUNTNUMBER", "BANKACCHOLDERNAME", "IFSCCODE", "BRANCHNAME", "UPIID"}
@@ -842,6 +861,7 @@ func parseVoucherDetailNode(r *xnode, company, masterID string, hint VoucherRow)
 		}))
 	}
 	x.VoucherType = firstDeep(r, "VOUCHERTYPENAME")
+	x.Optional = hint.Optional || tallyYes(firstDeep(r, "ISOPTIONAL", "OPTIONAL"))
 	x.CustomerName = firstNonBlank(firstDeep(r, "BASICBUYERNAME", "PARTYLEDGERNAME", "PARTYNAME", "BASICBASEPARTYNAME"), hint.Party)
 	x.CustomerCity = firstDeep(r, "BASICBUYERCITY", "CONSIGNEECITY", "CITY")
 	x.GSTIN = firstDeep(r, "PARTYGSTIN", "BUYERGSTIN", "CONSIGNEEGSTIN")
@@ -892,10 +912,14 @@ func parseVoucherDetailNode(r *xnode, company, masterID string, hint VoucherRow)
 }
 func parseVoucherDayDetail(b []byte, company, masterID string, hint VoucherRow) (VoucherDetail, bool) {
 	root, err := parseTree(b)
-	if err != nil || root == nil { return VoucherDetail{}, false }
+	if err != nil || root == nil {
+		return VoucherDetail{}, false
+	}
 	var vouchers []*xnode
 	nodesByName(root, "VOUCHER", &vouchers)
-	if len(vouchers) == 0 { return VoucherDetail{}, false }
+	if len(vouchers) == 0 {
+		return VoucherDetail{}, false
+	}
 	wantNum := strings.TrimSpace(hint.Number)
 	wantDate := normISODate(hint.Date)
 	wantType := strings.TrimSpace(hint.VoucherType)
@@ -907,19 +931,35 @@ func parseVoucherDayDetail(b []byte, company, masterID string, hint VoucherRow) 
 		date := normISODate(firstDeep(v, "DATE", "VOUCHERDATE"))
 		vMID := strings.TrimSpace(firstDeep(v, "MASTERID"))
 		idMatch := masterID != "" && vMID == masterID
-		if wantNum != "" && !strings.EqualFold(num, wantNum) && !idMatch { continue }
-		if wantDate != "" && date != "" && date != wantDate { continue }
-		score := 100
-		if idMatch { score += 100 }
-		if wantType != "" && strings.EqualFold(strings.TrimSpace(firstDeep(v, "VOUCHERTYPENAME")), wantType) { score += 30 }
-		party := strings.TrimSpace(firstDeep(v, "PARTYLEDGERNAME", "PARTYNAME", "BASICBUYERNAME"))
-		if wantParty != "" && strings.EqualFold(party, wantParty) { score += 20 }
-		if hint.Amount != 0 {
-			if total, ok := invoicePartyTotal(v, firstNonBlank(party, wantParty)); ok && abs(abs(total)-abs(hint.Amount)) <= invoiceVerificationTolerance+0.0000001 { score += 10 }
+		if wantNum != "" && !strings.EqualFold(num, wantNum) && !idMatch {
+			continue
 		}
-		if score > bestScore { bestScore, best = score, v }
+		if wantDate != "" && date != "" && date != wantDate {
+			continue
+		}
+		score := 100
+		if idMatch {
+			score += 100
+		}
+		if wantType != "" && strings.EqualFold(strings.TrimSpace(firstDeep(v, "VOUCHERTYPENAME")), wantType) {
+			score += 30
+		}
+		party := strings.TrimSpace(firstDeep(v, "PARTYLEDGERNAME", "PARTYNAME", "BASICBUYERNAME"))
+		if wantParty != "" && strings.EqualFold(party, wantParty) {
+			score += 20
+		}
+		if hint.Amount != 0 {
+			if total, ok := invoicePartyTotal(v, firstNonBlank(party, wantParty)); ok && abs(abs(total)-abs(hint.Amount)) <= invoiceVerificationTolerance+0.0000001 {
+				score += 10
+			}
+		}
+		if score > bestScore {
+			bestScore, best = score, v
+		}
 	}
-	if best == nil { return VoucherDetail{}, false }
+	if best == nil {
+		return VoucherDetail{}, false
+	}
 	return parseVoucherDetailNode(best, company, masterID, hint), true
 }
 
@@ -929,7 +969,11 @@ func dispatchShareText(x VoucherDetail) string {
 		customer += ", " + x.CustomerCity
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "Dispatch Details\n1. Firm Name - %s\n2. Customer Name - %s\n3. Invoice Number - %s\n4. Invoice Date - %s\n5. Dispatched Through - %s\n6. Bill of Lading / LR-RR No - %s\n\nProduct Details\n", dash(x.FirmName), dash(customer), dash(x.InvoiceNumber), dash(displayDate(x.InvoiceDate)), dash(x.DispatchedThrough), dash(x.LRNumber))
+	heading := "Dispatch Details"
+	if x.Optional {
+		heading = "Proforma Details"
+	}
+	fmt.Fprintf(&b, heading+"\n1. Firm Name - %s\n2. Customer Name - %s\n3. Invoice Number - %s\n4. Invoice Date - %s\n5. Dispatched Through - %s\n6. Bill of Lading / LR-RR No - %s\n\nProduct Details\n", dash(x.FirmName), dash(customer), dash(x.InvoiceNumber), dash(displayDate(x.InvoiceDate)), dash(x.DispatchedThrough), dash(x.LRNumber))
 	if len(x.Items) == 0 {
 		b.WriteString("No product details available\n")
 	} else {
