@@ -6,6 +6,7 @@ on:
     paths:
       - scripts/apply_operations_240.py
       - scripts/fix_operations_240.py
+      - scripts/fix_voice_regex_240.py
       - .github/workflows/operations-240-apply.yml
   workflow_dispatch:
 
@@ -35,6 +36,7 @@ jobs:
         run: |
           python3 scripts/apply_operations_240.py
           python3 scripts/fix_operations_240.py
+          python3 scripts/fix_voice_regex_240.py
       - name: Format Go
         run: gofmt -w internal/app/*.go
       - name: Backend tests and vet
