@@ -25,6 +25,7 @@ jobs:
       - name: Apply guarded Orders patch
         run: |
           python3 scripts/orders-234-fix.py
+          python3 scripts/orders-234-fix-v2.py
           gofmt -w internal/app/orders.go internal/app/orders_test.go internal/app/types.go
       - name: Verify backend and desktop
         run: |
