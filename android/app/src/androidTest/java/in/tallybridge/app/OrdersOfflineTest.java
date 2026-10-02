@@ -27,13 +27,16 @@ public class OrdersOfflineTest {
  @Test public void ordersRemainUsableOfflineAndDetailsPreviewRenders()throws Exception {
   Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();
   c.getSharedPreferences("identity",Context.MODE_PRIVATE).edit().clear().commit();
+  c.getSharedPreferences("appearance",Context.MODE_PRIVATE).edit().putString("mode","Light").commit();
   CryptoStore secure=new CryptoStore(c);secure.put("base","http://127.0.0.1:9");secure.put("device","offline-fixture");secure.put("company","Vijayalaxmi Textiles");
   OfflineOrdersStore local=new OfflineOrdersStore(secure);
   local.cacheBootstrap(new JSONObject().put("companies",new JSONArray().put(new JSONObject().put("name","Vijayalaxmi Textiles"))));
   local.cacheMasters("Vijayalaxmi Textiles",new JSONObject().put("parties",new JSONArray().put(new JSONObject().put("name","Mahesh Textiles")).put(new JSONObject().put("name","Raj Fabrics"))).put("stock",new JSONObject().put("items",new JSONArray().put(new JSONObject().put("name","Bath Towel 70x140").put("unit","PCS")).put(new JSONObject().put("name","Microfiber Napkin 14x21").put("unit","PCS")))));
   JSONObject first=local.saveLocal(order("Mahesh Textiles","9876543210","Pink + Chocolate. Dispatch tomorrow.",new JSONArray().put(item("Bath Towel 70x140",12,"PCS",185.0)).put(item("Microfiber Napkin 14x21",24,"PCS",null))),null);
   local.saveLocal(order("Raj Fabrics","9988776655","Assorted colours.",new JSONArray().put(item("Microfiber Napkin 14x21",48,"PCS",null))),null);
-  assertEquals(2,local.list().optInt("pendingCount"));
+  JSONObject old=local.saveLocal(order("Shree Stores","9765432100","Already sent.",new JSONArray().put(item("Bath Towel 70x140",6,"PCS",null))),null);
+  local.dispatchLocal(old);
+  assertEquals(2,local.list().optInt("pendingCount"));assertEquals(1,local.list().optInt("dispatchedCount"));
 
   rule.launchActivity(new Intent(c,OrdersActivity.class));
   ui(()->rule.getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE));
@@ -53,11 +56,23 @@ public class OrdersOfflineTest {
    OrdersActivity a=rule.getActivity();
    FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(232,237,242));
    View widget=a.getLayoutInflater().inflate(R.layout.orders_widget,stage,false);
-   ((TextView)widget.findViewById(R.id.widget_pending)).setText("Pending orders: 2 • Offline");
+   ((TextView)widget.findViewById(R.id.widget_pending)).setText("2 pending orders");
+   ((TextView)widget.findViewById(R.id.widget_mode)).setText("OFFLINE • PHONE COPY");
    ((TextView)widget.findViewById(R.id.widget_names)).setText("Raj Fabrics • Mahesh Textiles");
    int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(190*a.getResources().getDisplayMetrics().density);
    FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(w,h,Gravity.CENTER);stage.addView(widget,lp);a.setContentView(stage);
   });
   capture("21-orders-widget");
+
+  ui(()->rule.getActivity().finish());
+  c.getSharedPreferences("appearance",Context.MODE_PRIVATE).edit().putString("mode","Dark").commit();
+  rule.launchActivity(new Intent(c,OrdersActivity.class));
+  ui(()->rule.getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE));
+  capture("23-orders-dark");
+  ui(()->{try{java.lang.reflect.Field f=OrdersActivity.class.getDeclaredField("dispatchedTab");f.setAccessible(true);f.setBoolean(rule.getActivity(),true);Method m=OrdersActivity.class.getDeclaredMethod("paintOrders");m.setAccessible(true);m.invoke(rule.getActivity());}catch(Exception e){throw new RuntimeException(e);}});
+  capture("24-orders-dispatched-dark");
+  ui(()->{OrdersActivity a=rule.getActivity();assertEquals(R.layout.orders_widget_dark,OrdersWidget.previewLayout(a));FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(15,22,29));View widget=a.getLayoutInflater().inflate(R.layout.orders_widget_dark,stage,false);((TextView)widget.findViewById(R.id.widget_pending)).setText("2 pending orders");((TextView)widget.findViewById(R.id.widget_mode)).setText("OFFLINE • PHONE COPY");((TextView)widget.findViewById(R.id.widget_names)).setText("Raj Fabrics • Mahesh Textiles");int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(205*a.getResources().getDisplayMetrics().density);FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(w,h,Gravity.CENTER);stage.addView(widget,lp);a.setContentView(stage);});
+  capture("25-orders-widget-dark");
+  c.getSharedPreferences("appearance",Context.MODE_PRIVATE).edit().putString("mode","System").commit();
  }
 }
