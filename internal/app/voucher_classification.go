@@ -55,6 +55,12 @@ func voucherCacheIsClassified(x VoucherData) bool {
 	return x.ClassificationVersion == voucherClassificationVersion
 }
 
+func preserveOptionalHint(x *VoucherDetail, hint VoucherRow) {
+	if x != nil && hint.Optional {
+		x.Optional = true
+	}
+}
+
 func invoicePDFBaseName(x VoucherDetail) string {
 	number := sanitizeFileName(firstNonBlank(x.InvoiceNumber, "Voucher"))
 	if party := strings.TrimSpace(x.CustomerName); party != "" {

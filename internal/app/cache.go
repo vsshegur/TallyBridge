@@ -120,9 +120,9 @@ func (c *CacheStore) Companies() ([]Company, time.Time) {
 }
 func (c *CacheStore) VoucherHint(company, masterID string) (VoucherRow, bool) {
 	var vd VoucherData
-	for _, kind := range []string{"sales", "purchase"} {
+	for _, kind := range []string{"proforma", "sales", "purchase"} {
 		for _, period := range []string{"fy", "month"} {
-			if _, ok := c.Get(kind, company, period, &vd); !ok {
+			if _, ok := c.Get(kind, company, period, &vd); !ok || (kind != "purchase" && !voucherCacheIsClassified(vd)) {
 				continue
 			}
 			for _, v := range vd.Vouchers {
