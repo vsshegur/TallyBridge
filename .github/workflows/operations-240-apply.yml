@@ -5,6 +5,7 @@ on:
     branches: [feature/operations-center-2.4.0]
     paths:
       - scripts/apply_operations_240.py
+      - scripts/fix_operations_240.py
       - .github/workflows/operations-240-apply.yml
   workflow_dispatch:
 
@@ -23,7 +24,7 @@ jobs:
         with:
           go-version: '1.23.12'
           cache: false
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -31,7 +32,9 @@ jobs:
         with:
           gradle-version: '8.11.1'
       - name: Apply guarded source patch
-        run: python3 scripts/apply_operations_240.py
+        run: |
+          python3 scripts/apply_operations_240.py
+          python3 scripts/fix_operations_240.py
       - name: Format Go
         run: gofmt -w internal/app/*.go
       - name: Backend tests and vet
