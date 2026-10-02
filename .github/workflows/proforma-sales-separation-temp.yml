@@ -23,7 +23,7 @@ jobs:
           gradle-version: '8.11.1'
       - name: Apply guarded production patch
         run: |
-          python3 scripts/run-proforma-sales-separation-upgrade.py
+          python3 scripts/run-proforma-sales-separation-upgrade-v2.py
           gofmt -w internal/app/types.go internal/app/tally.go internal/app/server.go internal/app/pdf.go internal/app/voucher_classification.go internal/app/proforma_register_test.go
       - name: Verify backend separation and PDF naming
         run: |
