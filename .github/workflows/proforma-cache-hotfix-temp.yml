@@ -23,7 +23,7 @@ jobs:
           gradle-version: '8.11.1'
       - name: Apply guarded hotfix
         run: |
-          python3 scripts/proforma-offline-cache-hotfix.py
+          python3 scripts/proforma-offline-cache-hotfix-v2.py
           gofmt -w internal/app/cache.go internal/app/server.go internal/app/voucher_classification.go internal/app/proforma_cache_identity_test.go
       - name: Verify backend and Windows target
         run: |
