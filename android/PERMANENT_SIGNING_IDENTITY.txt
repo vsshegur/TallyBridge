@@ -1,0 +1,8 @@
+TallyBridge permanent Android signing identity
+
+Package: in.tallybridge.app
+Alias: tallybridge-release
+SHA-1: 55:CC:4A:6D:74:68:51:43:A7:E1:E9:14:B7:39:CF:C6:FF:4F:2A:BE
+SHA-256: 55:2C:7E:A3:B6:93:BE:84:19:59:24:83:CD:5A:26:1B:F3:AF:83:AD:5B:93:F7:EF:35:C4:17:27:64:B0:63:DF
+
+This file intentionally contains only the public signing identity. The private keystore and passwords must never be committed to the repository. Production Android releases must fail if the restored signing keystore does not match this SHA-1/SHA-256 identity.
