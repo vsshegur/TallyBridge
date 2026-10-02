@@ -1,0 +1,58 @@
+name: Verify proforma register separation
+on:
+  push:
+    branches: [fix/proforma-sales-separation-pdf-name]
+permissions:
+  contents: write
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.12'
+          cache: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Apply guarded production patch
+        run: |
+          python3 scripts/proforma-sales-separation-upgrade.py
+          gofmt -w internal/app/types.go internal/app/tally.go internal/app/server.go internal/app/voucher_classification.go internal/app/proforma_register_test.go
+      - name: Verify backend separation and PDF naming
+        run: |
+          go test ./internal/app
+          go vet ./internal/app ./cmd/tallybridge
+          GOOS=windows GOARCH=amd64 go build -o /tmp/tallybridge.exe ./cmd/tallybridge
+          test -s /tmp/tallybridge.exe
+      - name: Verify Android compile and UI wiring
+        working-directory: android
+        run: |
+          gradle --no-daemon assembleDebug lintDebug assembleDebugAndroidTest
+          grep -q "versionCode 20303" app/build.gradle
+          grep -q "versionName '2.3.3'" app/build.gradle
+          grep -q 'Proforma invoices' app/src/main/java/in/tallybridge/app/MainActivity.java
+          grep -q 'View Tally proforma invoices' app/src/main/java/in/tallybridge/app/MainActivity.java
+          if grep -q 'pdfPath,"Invoice-"+x.optString("invoiceNumber")' app/src/main/java/in/tallybridge/app/MainActivity.java; then
+            echo 'Old Invoice- PDF prefix is still present' >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TallyBridge-2.3.3-Android-Preview
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Commit verified production source only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add internal/app/types.go internal/app/tally.go internal/app/server.go internal/app/voucher_classification.go internal/app/proforma_register_test.go android/app/build.gradle android/app/src/main/java/in/tallybridge/app/MainActivity.java
+          git diff --cached --check
+          git commit -m "Separate optional proformas and fix invoice PDF names"
+          git push origin HEAD:fix/proforma-sales-separation-pdf-name
