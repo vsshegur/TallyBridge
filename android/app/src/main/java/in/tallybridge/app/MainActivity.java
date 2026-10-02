@@ -36,7 +36,7 @@ public final class MainActivity extends Activity {
  private void chooseAppearance(){
   String[] modes={"System","Light","Dark"};int selected=java.util.Arrays.asList(modes).indexOf(appearance());
   new AlertDialog.Builder(this).setTitle("Appearance").setSingleChoiceItems(modes,selected,(dialog,which)->{
-   getSharedPreferences("appearance",MODE_PRIVATE).edit().putString("mode",modes[which]).apply();dialog.dismiss();applyAppearance();more();
+   getSharedPreferences("appearance",MODE_PRIVATE).edit().putString("mode",modes[which]).apply();dialog.dismiss();applyAppearance();OrdersWidget.refreshAll(this);more();
   }).setNegativeButton("Cancel",null).show();
  }
  private final ExecutorService work=Executors.newSingleThreadExecutor();

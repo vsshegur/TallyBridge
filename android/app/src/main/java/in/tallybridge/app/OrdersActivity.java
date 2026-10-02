@@ -31,9 +31,10 @@ public final class OrdersActivity extends Activity {
  private final Map<String,String> unitByItem=new HashMap<>();
  private final List<ItemRow> itemRows=new ArrayList<>();
  private JSONObject buyerDetails=new JSONObject(); private String buyerDetailsFor="";
- private boolean dispatchedTab=false,destroyed=false,mastersLoading=false;
+ private boolean dispatchedTab=false,destroyed=false,mastersLoading=false,dark=false;
  private int ordersHeaderCount=0;
- private final int NAVY=0xff102d44,TEAL=0xff176b5b,MUTED=0xff596c79,BG=0xfff5f7fa,SURFACE=Color.WHITE,BORDER=0xffe4eaef,TINT=0xffe5f2ee,AMBER=0xff8a5a00;
+ private TextView pendingTabView,dispatchedTabView;
+ private int NAVY,TEAL,MUTED,BG,SURFACE,BORDER,TINT,AMBER,SECTION,PRIMARY_INK;
  private final NumberFormat currency=NumberFormat.getCurrencyInstance(new Locale("en","IN"));
 
  static final class ItemRow {
@@ -41,8 +42,18 @@ public final class OrdersActivity extends Activity {
   ItemRow(LinearLayout b,AutoCompleteTextView i,EditText q,EditText r,TextView u){box=b;item=i;qty=q;rate=r;unit=u;}
  }
 
+ private String appearance(){return getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","System");}
+ private void applyAppearance(){
+  String mode=appearance();dark=mode.equals("Dark")||(mode.equals("System")&&(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES);
+  setTheme(dark?R.style.AppThemeDark:R.style.AppThemeLight);
+  NAVY=dark?0xffe6edf3:0xff102d44;TEAL=dark?0xff7bd8bd:0xff176b5b;MUTED=dark?0xffa7b8c5:0xff596c79;
+  BG=dark?0xff101820:0xfff5f7fa;SURFACE=dark?0xff1b2732:Color.WHITE;BORDER=dark?0xff344552:0xffe4eaef;
+  TINT=dark?0xff203f3a:0xffe5f2ee;SECTION=dark?0xff253440:0xffeaf0f4;PRIMARY_INK=dark?0xff102d26:Color.WHITE;AMBER=dark?0xffffc857:0xff8a5a00;
+ }
+ private void styleWindow(){getWindow().getDecorView().setSystemUiVisibility(dark?0:(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(SURFACE);}
+
  @Override public void onCreate(Bundle state){
-  super.onCreate(state);getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);currency.setCurrency(Currency.getInstance("INR"));
+  applyAppearance();super.onCreate(state);styleWindow();getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);currency.setCurrency(Currency.getInstance("INR"));
   try{store=new CryptoStore(this);api=new BridgeApi(store);offline=new OfflineOrdersStore(store);}catch(Exception e){fatal(e);return;}
   if(store.get("base").isEmpty()||store.get("device").isEmpty()){needsMain("Connect and approve this phone in TallyBridge once. After that, Orders works even when the PC is offline.");return;}
   if(ACTION_NEW.equals(getIntent().getAction()))openForm(null);else showOrders();
@@ -54,13 +65,16 @@ public final class OrdersActivity extends Activity {
  private LinearLayout col(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
  private TextView txt(String s,int size,int color){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(color);v.setPadding(0,dp(4),0,dp(4));v.setLineSpacing(dp(2),1f);return v;}
  private void gap(LinearLayout l,int h){l.addView(new View(this),new LinearLayout.LayoutParams(1,dp(h)));}
- private Button btn(String s,View.OnClickListener c){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(15);b.setTextColor(TEAL);b.setBackground(shape(SURFACE,13));b.setMinHeight(dp(50));b.setOnClickListener(c);return b;}
- private Button primary(String s,View.OnClickListener c){Button b=btn(s,c);b.setTextColor(Color.WHITE);b.setBackground(shape(TEAL,13));return b;}
+ private Button btn(String s,View.OnClickListener c){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(15);b.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));b.setTextColor(TEAL);b.setBackground(shape(SURFACE,13));b.setMinHeight(dp(50));b.setOnClickListener(c);return b;}
+ private Button primary(String s,View.OnClickListener c){Button b=btn(s,c);b.setTextColor(PRIMARY_INK);b.setBackground(shape(TEAL,13));return b;}
+ private TextView action(String s,boolean filled,View.OnClickListener c){TextView v=txt(s,14,filled?PRIMARY_INK:TEAL);v.setGravity(Gravity.CENTER);v.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));v.setMinHeight(dp(48));v.setPadding(dp(12),dp(11),dp(12),dp(11));v.setBackground(shape(filled?TEAL:SURFACE,12));v.setOnClickListener(c);v.setFocusable(true);return v;}
+ private TextView tab(String s,boolean selected,View.OnClickListener c){TextView v=txt(s,13,selected?PRIMARY_INK:MUTED);v.setGravity(Gravity.CENTER);v.setTypeface(Typeface.DEFAULT_BOLD);v.setMinHeight(dp(52));v.setPadding(dp(10),dp(10),dp(10),dp(10));v.setBackground(shape(selected?TEAL:SURFACE,13));v.setOnClickListener(c);v.setFocusable(true);return v;}
+ private void styleTabs(){if(pendingTabView==null||dispatchedTabView==null)return;int p=orderData.optInt("pendingCount"),d=orderData.optInt("dispatchedCount");pendingTabView.setText("PENDING  •  "+p);dispatchedTabView.setText("DISPATCHED  •  "+d);pendingTabView.setTextColor(dispatchedTab?MUTED:PRIMARY_INK);pendingTabView.setBackground(shape(dispatchedTab?SURFACE:TEAL,13));dispatchedTabView.setTextColor(dispatchedTab?PRIMARY_INK:MUTED);dispatchedTabView.setBackground(shape(dispatchedTab?TEAL:SURFACE,13));}
  private EditText input(String hint,int type){EditText e=new EditText(this);e.setHint(hint);e.setTextSize(16);e.setTextColor(NAVY);e.setHintTextColor(MUTED);e.setInputType(type);e.setPadding(dp(14),dp(12),dp(14),dp(12));e.setBackground(shape(SURFACE,12));e.setMinHeight(dp(52));return e;}
  private AutoCompleteTextView auto(String hint){AutoCompleteTextView a=new AutoCompleteTextView(this);a.setHint(hint);a.setTextSize(16);a.setTextColor(NAVY);a.setHintTextColor(MUTED);a.setPadding(dp(14),dp(12),dp(14),dp(12));a.setBackground(shape(SURFACE,12));a.setThreshold(1);a.setSingleLine(true);return a;}
  private LinearLayout.LayoutParams full(int top){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(top),0,0);return p;}
- private void fatal(Exception e){TextView v=txt("Orders could not start.\n"+e.getMessage(),16,NAVY);v.setPadding(dp(24),dp(60),dp(24),dp(24));setContentView(v);}
- private void needsMain(String message){LinearLayout p=col();p.setPadding(dp(24),dp(60),dp(24),dp(24));p.addView(txt("TallyBridge Orders",28,NAVY));p.addView(txt(message,16,MUTED),full(16));p.addView(primary("Open TallyBridge",v->startActivity(new Intent(this,MainActivity.class))),full(24));setContentView(p);}
+ private void fatal(Exception e){TextView v=txt("Orders could not start.\n"+e.getMessage(),16,NAVY);v.setBackgroundColor(BG);v.setPadding(dp(24),dp(60),dp(24),dp(24));setContentView(v);}
+ private void needsMain(String message){LinearLayout p=col();p.setBackgroundColor(BG);p.setPadding(dp(24),dp(60),dp(24),dp(24));p.addView(txt("TallyBridge Orders",28,NAVY));p.addView(txt(message,16,MUTED),full(16));p.addView(primary("Open TallyBridge",v->startActivity(new Intent(this,MainActivity.class))),full(24));setContentView(p);}
  private void frame(String title,String subtitle){root=col();root.setBackgroundColor(BG);root.setPadding(dp(18),dp(18),dp(18),dp(18));LinearLayout h=new LinearLayout(this);h.setGravity(Gravity.CENTER_VERTICAL);LinearLayout titles=col();TextView t=txt(title,26,NAVY);t.setTypeface(Typeface.DEFAULT_BOLD);titles.addView(t);titles.addView(txt(subtitle,13,MUTED));h.addView(titles,new LinearLayout.LayoutParams(0,-2,1));Button close=btn("Back",v->finish());h.addView(close,new LinearLayout.LayoutParams(dp(84),-2));root.addView(h);progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setIndeterminate(true);progress.setVisibility(View.GONE);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(TEAL));root.addView(progress,new LinearLayout.LayoutParams(-1,dp(3)));ScrollView scroll=new ScrollView(this);body=col();body.setPadding(0,dp(14),0,dp(26));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);}
  private void busy(boolean yes){if(progress!=null)progress.setVisibility(yes?View.VISIBLE:View.GONE);}
  private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
@@ -69,11 +83,11 @@ public final class OrdersActivity extends Activity {
  private List<String> companyNames(){List<String> out=new ArrayList<>();for(int i=0;i<companies.length();i++){JSONObject x=companies.optJSONObject(i);String n=x==null?companies.optString(i):x.optString("name");if(!n.isEmpty()&&!out.contains(n))out.add(n);}return out;}
 
  private void showOrders(){
-  frame("Orders","Works offline • typed and photo orders sync to your PC automatically.");
+  frame("Orders","Fast order notebook • works offline and syncs automatically.");
   syncState=txt("Phone copy ready",12,TEAL);syncState.setTypeface(Typeface.DEFAULT_BOLD);body.addView(syncState);
-  body.addView(primary("+ Add order",v->openForm(null)),full(8));
-  LinearLayout tabs=new LinearLayout(this);tabs.setPadding(0,dp(12),0,dp(8));Button pending=btn("Pending",v->{dispatchedTab=false;paintOrders();}),dispatched=btn("Dispatched",v->{dispatchedTab=true;paintOrders();});tabs.addView(pending,new LinearLayout.LayoutParams(0,-2,1));tabs.addView(dispatched,new LinearLayout.LayoutParams(0,-2,1));body.addView(tabs);
-  body.addView(txt("Pending orders can be shared offline. Photo orders come from Android Share. Dispatched orders are removed after 7 days.",12,MUTED));
+  body.addView(primary("+ Add order",v->openForm(null)),full(10));
+  LinearLayout tabs=new LinearLayout(this);tabs.setPadding(0,dp(14),0,dp(8));pendingTabView=tab("PENDING",true,v->{dispatchedTab=false;paintOrders();});dispatchedTabView=tab("DISPATCHED",false,v->{dispatchedTab=true;paintOrders();});LinearLayout.LayoutParams left=new LinearLayout.LayoutParams(0,-2,1);left.setMargins(0,0,dp(5),0);LinearLayout.LayoutParams right=new LinearLayout.LayoutParams(0,-2,1);right.setMargins(dp(5),0,0,0);tabs.addView(pendingTabView,left);tabs.addView(dispatchedTabView,right);body.addView(tabs);
+  body.addView(txt("Pending orders can be edited or shared. Dispatched orders are view-only and automatically removed after 7 days.",12,MUTED));
   ordersHeaderCount=body.getChildCount();loadOrders();
  }
  private void loadOrders(){
@@ -84,18 +98,19 @@ public final class OrdersActivity extends Activity {
   busy(true);work.execute(()->{try{JSONObject synced=offline.sync(api);main.post(()->{if(destroyed)return;busy(false);orderData=synced;if(syncState!=null){syncState.setText("Synced with PC • offline copy is up to date");syncState.setTextColor(TEAL);}paintOrders();OrdersWidget.refreshAll(this);});}catch(Exception e){main.post(()->{if(destroyed)return;busy(false);try{orderData=offline.list();}catch(Exception ignored){}if(syncState!=null){syncState.setText("OFFLINE • saved on phone • will sync automatically");syncState.setTextColor(AMBER);}paintOrders();});}});
  }
  private void paintOrders(){
-  if(body==null)return;while(body.getChildCount()>ordersHeaderCount)body.removeViewAt(ordersHeaderCount);
-  int count=dispatchedTab?orderData.optInt("dispatchedCount"):orderData.optInt("pendingCount");TextView head=txt((dispatchedTab?"Dispatched":"Pending")+" • "+count,20,NAVY);head.setTypeface(Typeface.DEFAULT_BOLD);body.addView(head,full(10));
+  if(body==null)return;while(body.getChildCount()>ordersHeaderCount)body.removeViewAt(ordersHeaderCount);styleTabs();
+  int count=dispatchedTab?orderData.optInt("dispatchedCount"):orderData.optInt("pendingCount");
+  LinearLayout section=col();section.setPadding(dp(16),dp(13),dp(16),dp(13));section.setBackground(shape(dispatchedTab?SECTION:TINT,14));TextView eyebrow=txt(dispatchedTab?"DISPATCHED • VIEW ONLY":"PENDING • ACTION NEEDED",11,dispatchedTab?MUTED:TEAL);eyebrow.setTypeface(Typeface.DEFAULT_BOLD);section.addView(eyebrow);TextView head=txt(dispatchedTab?"Dispatched orders":"Pending orders",21,NAVY);head.setTypeface(Typeface.DEFAULT_BOLD);section.addView(head);section.addView(txt(dispatchedTab?(count+" order"+(count==1?"":"s")+" • no sharing • removed 7 days after dispatch"):(count+" order"+(count==1?"":"s")+" • edit, share details, or mark as dispatched"),12,MUTED));body.addView(section,full(12));
   JSONArray a=orderData.optJSONArray(dispatchedTab?"dispatched":"pending");if(a==null||a.length()==0){body.addView(txt(dispatchedTab?"No dispatched orders from the last 7 days.":"No pending orders. Tap + Add order or share a customer image to TallyBridge Orders.",15,MUTED),full(18));return;}
   for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null)body.addView(orderCard(o,!dispatchedTab),full(12));}
  }
  private View orderCard(JSONObject o,boolean pending){
-  LinearLayout card=col();card.setPadding(dp(16),dp(14),dp(16),dp(14));card.setBackground(shape(SURFACE,14));TextView title=txt(o.optString("number","Order")+" • "+o.optString("buyer"),18,NAVY);title.setTypeface(Typeface.DEFAULT_BOLD);card.addView(title);card.addView(txt(o.optString("company")+(pending?" • Pending":" • Dispatched "+dateTime(o.optString("dispatchedAt"))),12,MUTED));
+  LinearLayout card=col();card.setPadding(dp(16),dp(15),dp(16),dp(15));card.setBackground(shape(SURFACE,15));TextView state=txt(pending?"PENDING":"DISPATCHED",11,pending?TEAL:MUTED);state.setTypeface(Typeface.DEFAULT_BOLD);state.setPadding(dp(9),dp(3),dp(9),dp(3));state.setBackground(shape(pending?TINT:SECTION,20));LinearLayout stateRow=new LinearLayout(this);stateRow.addView(state);card.addView(stateRow);TextView title=txt(o.optString("number","Order")+" • "+o.optString("buyer"),18,NAVY);title.setTypeface(Typeface.DEFAULT_BOLD);card.addView(title,full(7));card.addView(txt(o.optString("company")+(pending?"":" • Dispatched "+dateTime(o.optString("dispatchedAt"))),12,MUTED));
   if(o.optBoolean("_localOnly")||o.optBoolean("_dirty")||o.optBoolean("_dispatchDirty")){TextView waiting=txt("● Saved on phone • waiting to sync",12,AMBER);waiting.setTypeface(Typeface.DEFAULT_BOLD);card.addView(waiting);}
   JSONArray photos=o.optJSONArray("attachments");boolean photoOrder=o.optBoolean("photoOrder");if(photoOrder){int n=photos==null?0:photos.length();TextView badge=txt("📷 Customer photo order • "+n+" image"+(n==1?"":"s"),13,TEAL);badge.setTypeface(Typeface.DEFAULT_BOLD);card.addView(badge,full(7));}
   JSONArray items=o.optJSONArray("items");if(items!=null){for(int j=0;j<items.length();j++){JSONObject x=items.optJSONObject(j);if(x==null)continue;String line=(j+1)+". "+x.optString("name")+" — Qty "+qty(x.optDouble("quantity"))+(x.optString("unit").isEmpty()?"":" "+x.optString("unit"));if(x.has("rate")&&!x.isNull("rate"))line+=" • "+currency.format(x.optDouble("rate"));card.addView(txt(line,14,NAVY),full(5));}}
   if(!o.optString("notes").isEmpty())card.addView(txt("Notes: "+o.optString("notes"),13,MUTED),full(8));
-  if(pending){LinearLayout actions=new LinearLayout(this);actions.setPadding(0,dp(12),0,0);actions.addView(btn("Details only",v->shareOrder(o)),new LinearLayout.LayoutParams(0,-2,1));if(photoOrder)actions.addView(btn("Photos",v->showPhotos(o)),new LinearLayout.LayoutParams(0,-2,1));else actions.addView(btn("Edit",v->openForm(o)),new LinearLayout.LayoutParams(0,-2,1));actions.addView(primary("Dispatched",v->dispatch(o)),new LinearLayout.LayoutParams(0,-2,1));card.addView(actions);}else{if(photoOrder)card.addView(btn("View photos",v->showPhotos(o)),full(10));card.addView(txt("View only • no sharing after dispatch",12,MUTED),full(8));}return card;
+  if(pending){LinearLayout row=new LinearLayout(this);row.setPadding(0,dp(13),0,0);LinearLayout.LayoutParams a=new LinearLayout.LayoutParams(0,-2,1);a.setMargins(0,0,dp(5),0);LinearLayout.LayoutParams b=new LinearLayout.LayoutParams(0,-2,1);b.setMargins(dp(5),0,0,0);row.addView(action("Details only",false,v->shareOrder(o)),a);row.addView(action(photoOrder?"View photos":"Edit order",false,v->{if(photoOrder)showPhotos(o);else openForm(o);}),b);card.addView(row);card.addView(action("Mark as dispatched",true,v->dispatch(o)),full(10));}else{if(photoOrder)card.addView(action("View customer photos",false,v->showPhotos(o)),full(12));TextView locked=txt("DISPATCHED • View only • No sharing • Auto-removes after 7 days",12,MUTED);locked.setTypeface(Typeface.DEFAULT_BOLD);locked.setPadding(dp(12),dp(9),dp(12),dp(9));locked.setBackground(shape(SECTION,12));card.addView(locked,full(10));}return card;
  }
  private String qty(double v){return Math.rint(v)==v?String.valueOf((long)v):String.valueOf(v);}
  private String dateTime(String v){try{return OffsetDateTime.parse(v).toLocalDateTime().format(DateTimeFormatter.ofPattern("dd-MM-yyyy hh:mm a"));}catch(Exception e){try{return Instant.parse(v).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd-MM-yyyy hh:mm a"));}catch(Exception ignored){return "";}}}

@@ -23,11 +23,15 @@ public final class PhotoOrderActivity extends Activity {
  private CryptoStore store; private BridgeApi api; private OfflineOrdersStore offline;
  private JSONArray companies=new JSONArray(); private final List<JSONObject> photos=new ArrayList<>();
  private Spinner companySpin; private AutoCompleteTextView buyer; private TextView buyerInfo,status; private EditText notes;
- private JSONObject buyerDetails=new JSONObject(); private String buyerDetailsFor=""; private boolean destroyed=false,saved=false; private int sharedUriCount=0;
- private final int NAVY=0xff102d44,TEAL=0xff176b5b,MUTED=0xff596c79,BG=0xfff5f7fa,SURFACE=Color.WHITE,BORDER=0xffe4eaef,AMBER=0xff8a5a00;
+ private JSONObject buyerDetails=new JSONObject(); private String buyerDetailsFor=""; private boolean destroyed=false,saved=false,dark=false; private int sharedUriCount=0;
+ private int NAVY,TEAL,MUTED,BG,SURFACE,BORDER,AMBER,PRIMARY_INK;
+
+ private String appearance(){return getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","System");}
+ private void applyAppearance(){String mode=appearance();dark=mode.equals("Dark")||(mode.equals("System")&&(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES);setTheme(dark?R.style.AppThemeDark:R.style.AppThemeLight);NAVY=dark?0xffe6edf3:0xff102d44;TEAL=dark?0xff7bd8bd:0xff176b5b;MUTED=dark?0xffa7b8c5:0xff596c79;BG=dark?0xff101820:0xfff5f7fa;SURFACE=dark?0xff1b2732:Color.WHITE;BORDER=dark?0xff344552:0xffe4eaef;AMBER=dark?0xffffc857:0xff8a5a00;PRIMARY_INK=dark?0xff102d26:Color.WHITE;}
+ private void styleWindow(){getWindow().getDecorView().setSystemUiVisibility(dark?0:(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(SURFACE);}
 
  @Override public void onCreate(Bundle state){
-  super.onCreate(state);getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+  applyAppearance();super.onCreate(state);styleWindow();getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
   try{store=new CryptoStore(this);api=new BridgeApi(store);offline=new OfflineOrdersStore(store);}catch(Exception e){fatal("Could not open TallyBridge Orders: "+e.getMessage());return;}
   if(store.get("base").isEmpty()||store.get("device").isEmpty()){fatal("Open TallyBridge once and pair this phone before saving photo orders.");return;}
   try{companies=offline.companies();}catch(Exception ignored){}
@@ -46,7 +50,7 @@ public final class PhotoOrderActivity extends Activity {
  private GradientDrawable shape(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));d.setStroke(dp(1),BORDER);return d;}
  private LinearLayout col(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
  private TextView txt(String s,int size,int color){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(color);v.setPadding(0,dp(4),0,dp(4));return v;}
- private Button primary(String s,View.OnClickListener c){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(15);b.setTextColor(Color.WHITE);b.setBackground(shape(TEAL,13));b.setMinHeight(dp(52));b.setOnClickListener(c);return b;}
+ private Button primary(String s,View.OnClickListener c){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(15);b.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));b.setTextColor(PRIMARY_INK);b.setBackground(shape(TEAL,13));b.setMinHeight(dp(52));b.setOnClickListener(c);return b;}
  private AutoCompleteTextView auto(String hint){AutoCompleteTextView a=new AutoCompleteTextView(this);a.setHint(hint);a.setTextSize(16);a.setTextColor(NAVY);a.setHintTextColor(MUTED);a.setPadding(dp(14),dp(12),dp(14),dp(12));a.setBackground(shape(SURFACE,12));a.setThreshold(1);a.setSingleLine(true);return a;}
  private EditText input(String hint){EditText e=new EditText(this);e.setHint(hint);e.setTextSize(16);e.setTextColor(NAVY);e.setHintTextColor(MUTED);e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);e.setPadding(dp(14),dp(12),dp(14),dp(12));e.setBackground(shape(SURFACE,12));e.setMinLines(2);return e;}
  private LinearLayout.LayoutParams full(int top){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(top),0,0);return p;}
