@@ -170,29 +170,35 @@ func TestLedgerOutstandingShareAndCache(t *testing.T) {
 	}
 }
 
-
 func TestInvoiceDetailOpensFromDayWithoutMasterIDObject(t *testing.T) {
 	var calls int32
 	s, ts := testServerWithTally(t, func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&calls, 1)
 		b, _ := io.ReadAll(r.Body)
 		q := string(b)
-		if strings.Contains(q, "TBVoucherNumberFilter") || strings.Contains(q, "<CHILDOF>") { t.Errorf("fragile filtered lookup used: %s", q) }
+		if strings.Contains(q, "TBVoucherNumberFilter") || strings.Contains(q, "<CHILDOF>") {
+			t.Errorf("fragile filtered lookup used: %s", q)
+		}
 		io.WriteString(w, `<ENVELOPE><VOUCHER><MASTERID>43795</MASTERID><DATE>20260927</DATE><VOUCHERNUMBER>INV-22</VOUCHERNUMBER><VOUCHERTYPENAME>GST Sales</VOUCHERTYPENAME><PARTYLEDGERNAME>ABC Buyer</PARTYLEDGERNAME><ALLINVENTORYENTRIES.LIST><STOCKITEMNAME>Towel</STOCKITEMNAME><BILLEDQTY>2 pcs</BILLEDQTY><RATE>100/pcs</RATE><AMOUNT>-200</AMOUNT></ALLINVENTORYENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>ABC Buyer</LEDGERNAME><ISPARTYLEDGER>Yes</ISPARTYLEDGER><AMOUNT>-200</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></ENVELOPE>`)
 	})
 	defer ts.Close()
-	x, err := s.fetchVoucherDetail("Demo Company", "43795", VoucherRow{Number:"INV-22",Date:"2026-09-27",Party:"ABC Buyer",VoucherType:"GST Sales",Amount:200})
-	if err != nil { t.Fatal(err) }
-	if atomic.LoadInt32(&calls)!=1 || x.InvoiceNumber!="INV-22" || x.TotalAmount!=200 { t.Fatalf("calls=%d detail=%+v",calls,x) }
+	x, err := s.fetchVoucherDetail("Demo Company", "43795", VoucherRow{Number: "INV-22", Date: "2026-09-27", Party: "ABC Buyer", VoucherType: "GST Sales", Amount: 200})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&calls) != 1 || x.InvoiceNumber != "INV-22" || x.TotalAmount != 200 {
+		t.Fatalf("calls=%d detail=%+v", calls, x)
+	}
 }
-
 
 func TestVoucherPresentationHasBankAndSupplierVariants(t *testing.T) {
 	s, ts := testServerWithTally(t, func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, `<ENVELOPE/>`) })
 	defer ts.Close()
-	_ = s.cache.Put("company-profile-v1","Demo","",CompanyProfile{Name:"Demo",GSTIN:"27ABCDE1234F1Z5",Address:"Market Road",Phone:"9876543210"},time.Now())
-	_ = s.store.SavePDFBank("Demo",BankDetails{Ledger:"Bank",BankName:"Demo Bank",AccountNumber:"1234",IFSC:"DEMO0001234",UPI:"demo@upi"})
-	x := VoucherDetail{Company:"Demo",InvoiceNumber:"INV-1",InvoiceDate:"2026-09-27",CustomerName:"Buyer",TotalAmount:100}
-	s.applyVoucherPresentation("Demo",&x)
-	if x.Supplier.GSTIN=="" || x.Bank.UPI!="demo@upi" || x.ShareText=="" || !strings.Contains(x.ShareTextWithBank,"demo@upi") || strings.Contains(x.ShareText,"demo@upi") { t.Fatalf("%+v",x) }
+	_ = s.cache.Put("company-profile-v1", "Demo", "", CompanyProfile{Name: "Demo", GSTIN: "27ABCDE1234F1Z5", Address: "Market Road", Phone: "9876543210"}, time.Now())
+	_ = s.store.SavePDFBank("Demo", BankDetails{Ledger: "Bank", BankName: "Demo Bank", AccountNumber: "1234", IFSC: "DEMO0001234", UPI: "demo@upi"})
+	x := VoucherDetail{Company: "Demo", InvoiceNumber: "INV-1", InvoiceDate: "2026-09-27", CustomerName: "Buyer", TotalAmount: 100}
+	s.applyVoucherPresentation("Demo", &x)
+	if x.Supplier.GSTIN == "" || x.Bank.UPI != "demo@upi" || x.ShareText == "" || !strings.Contains(x.ShareTextWithBank, "demo@upi") || strings.Contains(x.ShareText, "demo@upi") {
+		t.Fatalf("%+v", x)
+	}
 }

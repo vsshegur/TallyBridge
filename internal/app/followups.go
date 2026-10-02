@@ -26,13 +26,13 @@ type FollowUp struct {
 }
 
 type FollowUpList struct {
-	Open        []FollowUp `json:"open"`
-	DueToday    []FollowUp `json:"dueToday"`
-	Overdue     []FollowUp `json:"overdue"`
-	Completed   []FollowUp `json:"completed"`
-	OpenCount   int        `json:"openCount"`
-	DueCount    int        `json:"dueCount"`
-	OverdueCount int       `json:"overdueCount"`
+	Open         []FollowUp `json:"open"`
+	DueToday     []FollowUp `json:"dueToday"`
+	Overdue      []FollowUp `json:"overdue"`
+	Completed    []FollowUp `json:"completed"`
+	OpenCount    int        `json:"openCount"`
+	DueCount     int        `json:"dueCount"`
+	OverdueCount int        `json:"overdueCount"`
 }
 
 type followUpFile struct {
@@ -173,9 +173,15 @@ func (s *Server) listFollowUps(company, party string) (FollowUpList, error) {
 	}
 	sort.Slice(out.Open, func(i, j int) bool {
 		a, b := out.Open[i].PromiseDate, out.Open[j].PromiseDate
-		if a == "" && b != "" { return false }
-		if a != "" && b == "" { return true }
-		if a == b { return out.Open[i].UpdatedAt.After(out.Open[j].UpdatedAt) }
+		if a == "" && b != "" {
+			return false
+		}
+		if a != "" && b == "" {
+			return true
+		}
+		if a == b {
+			return out.Open[i].UpdatedAt.After(out.Open[j].UpdatedAt)
+		}
 		return a < b
 	})
 	sort.Slice(out.Completed, func(i, j int) bool { return out.Completed[i].UpdatedAt.After(out.Completed[j].UpdatedAt) })
@@ -192,13 +198,22 @@ func (s *Server) handleFollowUps(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		x, err := s.listFollowUps(r.URL.Query().Get("company"), r.URL.Query().Get("party"))
-		if err != nil { jsonErr(w, 500, err); return }
+		if err != nil {
+			jsonErr(w, 500, err)
+			return
+		}
 		jsonOut(w, x)
 	case http.MethodPost:
 		var in FollowUp
-		if readJSON(r, &in) != nil { jsonErr(w, 400, errors.New("invalid follow-up")); return }
+		if readJSON(r, &in) != nil {
+			jsonErr(w, 400, errors.New("invalid follow-up"))
+			return
+		}
 		x, err := s.saveFollowUp(in)
-		if err != nil { jsonErr(w, 400, err); return }
+		if err != nil {
+			jsonErr(w, 400, err)
+			return
+		}
 		jsonOut(w, x)
 	default:
 		jsonErr(w, 405, errors.New("GET or POST required"))

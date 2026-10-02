@@ -29,35 +29,35 @@ type ProformaItem struct {
 	Total          float64 `json:"total"`
 }
 type Proforma struct {
-	Company         string         `json:"company"`
-	Number          string         `json:"number"`
-	Date            string         `json:"date"`
-	SupplierGST     string         `json:"supplierGST"`
-	SupplierState   string         `json:"supplierState"`
-	SupplierAddress string         `json:"supplierAddress"`
-	SupplierPhone   string         `json:"supplierPhone,omitempty"`
-	SupplierEmail   string         `json:"supplierEmail,omitempty"`
-	Buyer           string         `json:"buyer"`
-	BuyerGST        string         `json:"buyerGST"`
-	City            string         `json:"city"`
-	Address         string         `json:"address"`
-	PlaceState      string         `json:"placeState"`
-	Dispatch        string         `json:"dispatch"`
-	LR              string         `json:"lr"`
-	Notes           string         `json:"notes"`
-	Items           []ProformaItem `json:"items"`
-	Gross           float64        `json:"gross"`
-	Discount        float64        `json:"discountAmount"`
-	Taxable         float64        `json:"taxable"`
-	CGST            float64        `json:"cgst"`
-	SGST            float64        `json:"sgst"`
-	IGST            float64        `json:"igst"`
-	RoundOff        float64        `json:"roundOff"`
-	Total           float64        `json:"total"`
-	ShareText       string         `json:"shareText"`
-	ShareTextWithBank string       `json:"shareTextWithBank,omitempty"`
-	Bank            BankDetails    `json:"bank"`
-	PDFTemplate     string         `json:"pdfTemplate,omitempty"`
+	Company           string         `json:"company"`
+	Number            string         `json:"number"`
+	Date              string         `json:"date"`
+	SupplierGST       string         `json:"supplierGST"`
+	SupplierState     string         `json:"supplierState"`
+	SupplierAddress   string         `json:"supplierAddress"`
+	SupplierPhone     string         `json:"supplierPhone,omitempty"`
+	SupplierEmail     string         `json:"supplierEmail,omitempty"`
+	Buyer             string         `json:"buyer"`
+	BuyerGST          string         `json:"buyerGST"`
+	City              string         `json:"city"`
+	Address           string         `json:"address"`
+	PlaceState        string         `json:"placeState"`
+	Dispatch          string         `json:"dispatch"`
+	LR                string         `json:"lr"`
+	Notes             string         `json:"notes"`
+	Items             []ProformaItem `json:"items"`
+	Gross             float64        `json:"gross"`
+	Discount          float64        `json:"discountAmount"`
+	Taxable           float64        `json:"taxable"`
+	CGST              float64        `json:"cgst"`
+	SGST              float64        `json:"sgst"`
+	IGST              float64        `json:"igst"`
+	RoundOff          float64        `json:"roundOff"`
+	Total             float64        `json:"total"`
+	ShareText         string         `json:"shareText"`
+	ShareTextWithBank string         `json:"shareTextWithBank,omitempty"`
+	Bank              BankDetails    `json:"bank"`
+	PDFTemplate       string         `json:"pdfTemplate,omitempty"`
 }
 
 var decimalInput = regexp.MustCompile(`^\d{1,10}(\.\d{1,4})?$`)
@@ -185,20 +185,33 @@ func proformaText(p Proforma, includeBank bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "*PROFORMA INVOICE*\nNot a tax invoice\n%s\nProforma no: %s\nDate: %s\nBuyer: %s\n", p.Company, p.Number, displayDate(p.Date), p.Buyer)
 	for _, f := range [][2]string{{"Supplier GSTIN", p.SupplierGST}, {"Supplier mobile", p.SupplierPhone}, {"Supplier address", p.SupplierAddress}, {"Buyer GSTIN", p.BuyerGST}, {"City", p.City}, {"Buyer address", p.Address}, {"Place of supply (state code)", p.PlaceState}, {"Dispatched through", p.Dispatch}, {"LR / RR no", p.LR}} {
-		if f[1] != "" { fmt.Fprintf(&b, "%s: %s\n", f[0], f[1]) }
+		if f[1] != "" {
+			fmt.Fprintf(&b, "%s: %s\n", f[0], f[1])
+		}
 	}
 	for i, r := range p.Items {
 		fmt.Fprintf(&b, "\n*%d. %s*\n", i+1, r.Name)
-		if r.Description != "" { b.WriteString(r.Description + "\n") }
+		if r.Description != "" {
+			b.WriteString(r.Description + "\n")
+		}
 		fmt.Fprintf(&b, "Qty: %s %s | Rate: ₹%s\nDiscount: %s%% | GST: %s%%\nNet: ₹%s | Including GST: ₹%s\n", r.Quantity, r.Unit, r.Rate, r.Discount, r.GST, indianNumber(r.Taxable), indianNumber(r.Total))
 	}
 	fmt.Fprintf(&b, "\nItems: ₹%s\nDiscount: ₹%s\nTaxable: ₹%s", indianNumber(p.Gross), indianNumber(p.Discount), indianNumber(p.Taxable))
-	for _, f := range []struct{ label string; value float64 }{{"CGST", p.CGST}, {"SGST", p.SGST}, {"IGST", p.IGST}} {
-		if f.value != 0 { fmt.Fprintf(&b, "\n%s: ₹%s", f.label, indianNumber(f.value)) }
+	for _, f := range []struct {
+		label string
+		value float64
+	}{{"CGST", p.CGST}, {"SGST", p.SGST}, {"IGST", p.IGST}} {
+		if f.value != 0 {
+			fmt.Fprintf(&b, "\n%s: ₹%s", f.label, indianNumber(f.value))
+		}
 	}
 	fmt.Fprintf(&b, "\nRound off: ₹%s\n*Total: ₹%s*", indianNumber(p.RoundOff), indianNumber(p.Total))
-	if p.Notes != "" { b.WriteString("\n\n" + p.Notes) }
-	if includeBank { b.WriteString(bankText(p.Bank)) }
+	if p.Notes != "" {
+		b.WriteString("\n\n" + p.Notes)
+	}
+	if includeBank {
+		b.WriteString(bankText(p.Bank))
+	}
 	return b.String()
 }
 func (s *Server) handleProforma(w http.ResponseWriter, r *http.Request) {
@@ -229,9 +242,15 @@ func (s *Server) handleProforma(w http.ResponseWriter, r *http.Request) {
 	}
 	profile := s.savedCompanyProfile(p.Company)
 	p.PDFTemplate = validPDFTemplate(s.store.Settings().PDFTemplate)
-	if profile.GSTIN != "" { p.SupplierGST = profile.GSTIN }
-	if address := companyProfileAddress(profile); address != "" { p.SupplierAddress = address }
-	if profile.StateCode != "" { p.SupplierState = profile.StateCode }
+	if profile.GSTIN != "" {
+		p.SupplierGST = profile.GSTIN
+	}
+	if address := companyProfileAddress(profile); address != "" {
+		p.SupplierAddress = address
+	}
+	if profile.StateCode != "" {
+		p.SupplierState = profile.StateCode
+	}
 	p.SupplierPhone = profile.Phone
 	p.SupplierEmail = profile.Email
 	p.Bank, _ = s.store.PDFBank(p.Company)
@@ -257,10 +276,18 @@ func proformaHTML(p Proforma) string {
 	var b strings.Builder
 	b.WriteString(`<div class="note"><b>PROFORMA • NOT A TAX INVOICE</b><br>Quotation/payment request only. No Tally voucher is created.</div>`)
 	fmt.Fprintf(&b, `<div class="grid"><section class="panel"><h3>Bill to</h3><p><b>%s</b></p>`, he(firstNonBlank(p.Buyer, "Buyer not selected")))
-	if p.Address != "" { fmt.Fprintf(&b, "<p>%s</p>", he(p.Address)) }
-	if p.City != "" { fmt.Fprintf(&b, "<p>%s</p>", he(p.City)) }
-	if p.BuyerGST != "" { fmt.Fprintf(&b, `<p><span class="label">GSTIN</span> %s</p>`, he(p.BuyerGST)) }
-	if p.PlaceState != "" { fmt.Fprintf(&b, `<p><span class="label">Place of supply</span> %s</p>`, he(p.PlaceState)) }
+	if p.Address != "" {
+		fmt.Fprintf(&b, "<p>%s</p>", he(p.Address))
+	}
+	if p.City != "" {
+		fmt.Fprintf(&b, "<p>%s</p>", he(p.City))
+	}
+	if p.BuyerGST != "" {
+		fmt.Fprintf(&b, `<p><span class="label">GSTIN</span> %s</p>`, he(p.BuyerGST))
+	}
+	if p.PlaceState != "" {
+		fmt.Fprintf(&b, `<p><span class="label">Place of supply</span> %s</p>`, he(p.PlaceState))
+	}
 	b.WriteString(`</section><section class="panel"><h3>Proforma details</h3><table class="kv">`)
 	for _, r := range [][2]string{{"Proforma number", dash(p.Number)}, {"Date", displayDate(p.Date)}} {
 		fmt.Fprintf(&b, "<tr><td>%s</td><td><b>%s</b></td></tr>", he(r[0]), he(r[1]))
@@ -268,26 +295,41 @@ func proformaHTML(p Proforma) string {
 	b.WriteString(`</table></section></div>`)
 	if p.Dispatch != "" || p.LR != "" {
 		b.WriteString(`<h3>Dispatch details</h3><table class="kv">`)
-		if p.Dispatch != "" { fmt.Fprintf(&b, "<tr><td>Dispatched through</td><td>%s</td></tr>", he(p.Dispatch)) }
-		if p.LR != "" { fmt.Fprintf(&b, "<tr><td>LR / RR number</td><td>%s</td></tr>", he(p.LR)) }
+		if p.Dispatch != "" {
+			fmt.Fprintf(&b, "<tr><td>Dispatched through</td><td>%s</td></tr>", he(p.Dispatch))
+		}
+		if p.LR != "" {
+			fmt.Fprintf(&b, "<tr><td>LR / RR number</td><td>%s</td></tr>", he(p.LR))
+		}
 		b.WriteString(`</table>`)
 	}
 	b.WriteString(`<table class="items"><colgroup><col style="width:5%"><col style="width:33%"><col style="width:11%"><col style="width:14%"><col style="width:16%"><col style="width:21%"></colgroup><thead><tr><th>#</th><th>Product</th><th>HSN</th><th class="num">Quantity</th><th class="num">Rate</th><th class="num">Amount (INR)</th></tr></thead><tbody>`)
 	for i, r := range p.Items {
 		detail := r.Description
 		extra := []string{}
-		if strings.TrimSpace(r.Discount) != "" && strings.TrimSpace(r.Discount) != "0" && strings.TrimSpace(r.Discount) != "0.0" { extra = append(extra, "Discount "+r.Discount+"%") }
-		if strings.TrimSpace(r.GST) != "" && strings.TrimSpace(r.GST) != "0" && strings.TrimSpace(r.GST) != "0.0" { extra = append(extra, "GST "+r.GST+"%") }
+		if strings.TrimSpace(r.Discount) != "" && strings.TrimSpace(r.Discount) != "0" && strings.TrimSpace(r.Discount) != "0.0" {
+			extra = append(extra, "Discount "+r.Discount+"%")
+		}
+		if strings.TrimSpace(r.GST) != "" && strings.TrimSpace(r.GST) != "0" && strings.TrimSpace(r.GST) != "0.0" {
+			extra = append(extra, "GST "+r.GST+"%")
+		}
 		if len(extra) > 0 {
-			if detail != "" { detail += " • " }
+			if detail != "" {
+				detail += " • "
+			}
 			detail += strings.Join(extra, " • ")
 		}
 		fmt.Fprintf(&b, `<tr><td>%d</td><td>%s</td><td>%s</td><td class="num">%s %s</td><td class="num">%s</td><td class="num">%s</td></tr>`,
 			i+1, he(r.Name)+descriptionHTML(detail), he(r.HSN), he(r.Quantity), he(r.Unit), he(r.Rate), he(indianNumber(r.Taxable)))
 	}
-	if len(p.Items)==0 { b.WriteString(`<tr><td colspan="6">No items added.</td></tr>`) }
+	if len(p.Items) == 0 {
+		b.WriteString(`<tr><td colspan="6">No items added.</td></tr>`)
+	}
 	b.WriteString(`</tbody></table><table class="totals">`)
-	for _, f := range []struct{ label string; value float64 }{
+	for _, f := range []struct {
+		label string
+		value float64
+	}{
 		{"Items subtotal", p.Gross},
 		{"Discount (deducted)", -p.Discount},
 		{"Taxable amount", p.Taxable},
@@ -296,15 +338,17 @@ func proformaHTML(p Proforma) string {
 		{"IGST", p.IGST},
 		{"Round off", p.RoundOff},
 	} {
-		if f.value != 0 || f.label=="Taxable amount" {
+		if f.value != 0 || f.label == "Taxable amount" {
 			fmt.Fprintf(&b, "<tr><td>%s</td><td>%s</td></tr>", he(f.label), he(inr(f.value)))
 		}
 	}
 	fmt.Fprintf(&b, `<tr class="grand"><td>Total amount</td><td>%s</td></tr></table>`, he(inr(p.Total)))
-	if p.Bank.AccountNumber!="" || p.Bank.UPI!="" || p.Bank.IFSC!="" {
-		b.WriteString(bankHTML([]BankDetails{p.Bank}, PaymentQR{Amount:p.Total, Reference:"Proforma "+p.Number, Payee:p.Company}))
+	if p.Bank.AccountNumber != "" || p.Bank.UPI != "" || p.Bank.IFSC != "" {
+		b.WriteString(bankHTML([]BankDetails{p.Bank}, PaymentQR{Amount: p.Total, Reference: "Proforma " + p.Number, Payee: p.Company}))
 	}
-	if p.Notes!="" { fmt.Fprintf(&b, `<div class="narration"><h3>Notes</h3>%s</div>`, he(p.Notes)) }
-	profile := CompanyProfile{Name:p.Company, GSTIN:p.SupplierGST, Address:p.SupplierAddress, Phone:p.SupplierPhone, Email:p.SupplierEmail, StateCode:p.SupplierState}
-	return pdfDocument(p.Company, "PROFORMA INVOICE", "Not a tax invoice", b.String(), profile)
+	if p.Notes != "" {
+		fmt.Fprintf(&b, `<div class="narration"><h3>Notes</h3>%s</div>`, he(p.Notes))
+	}
+	profile := CompanyProfile{Name: p.Company, GSTIN: p.SupplierGST, Address: p.SupplierAddress, Phone: p.SupplierPhone, Email: p.SupplierEmail, StateCode: p.SupplierState}
+	return adaptiveInvoiceHTML(pdfDocument(p.Company, "PROFORMA INVOICE", "Not a tax invoice", b.String(), profile), len(p.Items))
 }

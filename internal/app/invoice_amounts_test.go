@@ -64,7 +64,6 @@ func TestOldInvoiceCacheCannotBeSharedAsPDF(t *testing.T) {
 	}
 }
 
-
 func TestInvoiceDoesNotDoubleAliasLedgerAndInventoryRepresentations(t *testing.T) {
 	xml := []byte(`<VOUCHER>
 <PARTYLEDGERNAME>Buyer</PARTYLEDGERNAME><VOUCHERNUMBER>INV-DUP</VOUCHERNUMBER>
@@ -89,7 +88,7 @@ func TestInvoiceDoesNotDoubleAliasLedgerAndInventoryRepresentations(t *testing.T
 }
 
 func TestInvoiceDetailsShareShowsIGSTWhenApplicable(t *testing.T) {
-	x := VoucherDetail{FirmName:"Firm",CustomerName:"Buyer",InvoiceNumber:"INV-IGST",InvoiceDate:"2026-09-27",IGST:180,TotalAmount:1180}
+	x := VoucherDetail{FirmName: "Firm", CustomerName: "Buyer", InvoiceNumber: "INV-IGST", InvoiceDate: "2026-09-27", IGST: 180, TotalAmount: 1180}
 	text := dispatchShareText(x)
 	if !strings.Contains(text, "IGST Amount - ₹180.00") || strings.Contains(text, "CGST Amount") || strings.Contains(text, "SGST Amount") {
 		t.Fatal(text)

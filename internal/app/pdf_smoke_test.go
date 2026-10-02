@@ -37,12 +37,17 @@ func TestLedgerAndGroupPDFs(t *testing.T) {
 	}
 }
 
-
 func TestUPIPaymentURIAndSupplierHeader(t *testing.T) {
-	bank := BankDetails{Ledger:"SBI",AccountHolder:"Demo Textiles",UPI:"demo@upi"}
-	uri := upiPaymentURI(bank,PaymentQR{Amount:123.45,Reference:"INV-77",Payee:"Demo Textiles"})
-	if !strings.HasPrefix(uri,"upi://pay?") || !strings.Contains(uri,"pa=demo%40upi") || !strings.Contains(uri,"am=123.45") || !strings.Contains(uri,"tn=INV-77") { t.Fatal(uri) }
-	x := VoucherDetail{CommonData:CommonData{Supplier:CompanyProfile{Name:"Demo Textiles",GSTIN:"27ABCDE1234F1Z5",Address:"Market Road",Phone:"9876543210"}},Company:"Demo Textiles",FirmName:"Demo Textiles",InvoiceNumber:"INV-77",TotalAmount:123.45}
-	h := invoiceHTML(x,bank)
-	for _, want := range []string{"27ABCDE1234F1Z5","9876543210","Market Road","data:image/png;base64"} { if !strings.Contains(h,want) { t.Fatalf("missing %s",want) } }
+	bank := BankDetails{Ledger: "SBI", AccountHolder: "Demo Textiles", UPI: "demo@upi"}
+	uri := upiPaymentURI(bank, PaymentQR{Amount: 123.45, Reference: "INV-77", Payee: "Demo Textiles"})
+	if !strings.HasPrefix(uri, "upi://pay?") || !strings.Contains(uri, "pa=demo%40upi") || !strings.Contains(uri, "am=123.45") || !strings.Contains(uri, "tn=INV-77") {
+		t.Fatal(uri)
+	}
+	x := VoucherDetail{CommonData: CommonData{Supplier: CompanyProfile{Name: "Demo Textiles", GSTIN: "27ABCDE1234F1Z5", Address: "Market Road", Phone: "9876543210"}}, Company: "Demo Textiles", FirmName: "Demo Textiles", InvoiceNumber: "INV-77", TotalAmount: 123.45}
+	h := invoiceHTML(x, bank)
+	for _, want := range []string{"27ABCDE1234F1Z5", "9876543210", "Market Road", "data:image/png;base64"} {
+		if !strings.Contains(h, want) {
+			t.Fatalf("missing %s", want)
+		}
+	}
 }

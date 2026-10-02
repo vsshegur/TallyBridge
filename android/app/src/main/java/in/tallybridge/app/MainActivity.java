@@ -88,7 +88,7 @@ public final class MainActivity extends Activity {
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setIndeterminate(true);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(TEAL));progress.setVisibility(View.GONE);root.addView(progress,new LinearLayout.LayoutParams(-1,dp(3)));
   body=column();root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
   if(navigation){LinearLayout nav=new LinearLayout(this);nav.setPadding(dp(8),dp(7),dp(8),dp(7));nav.setBackgroundColor(SURFACE);
-   for(String label:new String[]{"Home","Reports","Proforma","Payments","More"}){boolean selected=tab.equals(label);LinearLayout item=column();item.setGravity(Gravity.CENTER);item.setBackground(touch(selected?TINT:SURFACE,16));item.setContentDescription(label+(selected?", selected":""));item.setSelected(selected);item.setFocusable(true);item.setOnClickListener(v->rootTab(label));item.addView(new UiIcon(this,label,selected?TEAL:MUTED),new LinearLayout.LayoutParams(dp(22),dp(22)));TextView caption=text(label,11,selected?TEAL:MUTED);caption.setGravity(Gravity.CENTER);if(selected)caption.setTypeface(null,Typeface.BOLD);item.addView(caption);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(58),1);lp.setMargins(dp(3),0,dp(3),0);nav.addView(item,lp);}root.addView(nav);}
+   for(String label:new String[]{"Home","Work","Orders","Reports","More"}){boolean selected=tab.equals(label);LinearLayout item=column();item.setGravity(Gravity.CENTER);item.setBackground(touch(selected?TINT:SURFACE,16));item.setContentDescription(label+(selected?", selected":""));item.setSelected(selected);item.setFocusable(true);item.setOnClickListener(v->rootTab(label));item.addView(new UiIcon(this,label,selected?TEAL:MUTED),new LinearLayout.LayoutParams(dp(22),dp(22)));TextView caption=text(label,11,selected?TEAL:MUTED);caption.setGravity(Gravity.CENTER);if(selected)caption.setTypeface(null,Typeface.BOLD);item.addView(caption);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(58),1);lp.setMargins(dp(3),0,dp(3),0);nav.addView(item,lp);}root.addView(nav);}
   setContentView(root);root.requestApplyInsets();
  }
  private LinearLayout formPanel(){ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);LinearLayout panel=column();panel.setPadding(dp(24),dp(24),dp(24),dp(28));scroll.addView(panel);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));return panel;}
@@ -118,7 +118,7 @@ public final class MainActivity extends Activity {
  private void chooseCompany(){JSONArray cs=array(boot,"companies");String[] names=new String[cs.length()];for(int i=0;i<cs.length();i++)names[i]=cs.optJSONObject(i).optString("name");if(names.length==0){toast("Open a company in Tally and use Refresh");return;}new AlertDialog.Builder(this).setTitle("Choose company").setItems(names,(d,i)->{company=names[i];store.put("company",company);cache.clear();cacheAt.clear();diagLedger=diagNumber=diagDate=diagMasterId=diagVoucherType="";rootTab("Home");}).show();}
  private void updateStatus(){if(statusView==null)return;JSONObject sync=object(boot,"autoSync");String state=sync.optBoolean("running")?"Syncing • "+sync.optString("step"):!sync.optString("lastError").isEmpty()?"Sync needs attention • tap for details":boot.optBoolean("tallyOnline")?"Connected • tap for sync status":"Tally unavailable • retrying";statusView.setText(state);statusView.setOnClickListener(v->open(this::syncStatus));statusView.setContentDescription(state);}
  private void syncStatus(){List<Row> data=new ArrayList<>();JSONObject sync=object(boot,"autoSync");data.add(heading(sync.optBoolean("running")?"Updating your accounts":boot.optBoolean("tallyOnline")?"PC connected":"Waiting for Tally",sync.optBoolean("running")?sync.optString("company")+" • "+sync.optString("step"):"Automatic updates every 3 minutes; failed cycles retry after cooldown."));data.add(row("Last complete sync",time(sync.optString("lastOk")),"",null));data.add(row("Last successful Tally read",time(boot.optString("lastSuccess")),"",null));if(!sync.optString("lastError").isEmpty())data.add(heading("What needs attention",sync.optString("lastError")));data.add(row("Sync now","Request a fresh background update","",this::syncNow));data.add(row("Test connection","Check the company is open in Tally","",this::probe));local("Sync status",this::syncStatus,data,false);syncScreenActive=true;}
- private void rootTab(String name){history.clear();tab=name;switch(name){case "Home":home();break;case "Reports":reports();break;case "Proforma":proforma();break;case "Payments":payments();break;default:more();}}
+ private void rootTab(String name){history.clear();tab=name;switch(name){case "Home":home();break;case "Work":startActivity(new Intent(this,WorkActivity.class));break;case "Orders":startActivity(new Intent(this,OrdersActivity.class));break;case "Reports":reports();break;case "Proforma":proforma();break;case "Payments":payments();break;default:more();}}
  private void open(Runnable next){if(current!=null)history.push(current);next.run();}
  private void goBack(){generation++;if(!history.isEmpty())history.pop().run();else rootTab("Home");}
  @Override public void onBackPressed(){if(unlocked&&!history.isEmpty())goBack();else super.onBackPressed();}
@@ -233,6 +233,7 @@ public final class MainActivity extends Activity {
  private void group(String name){load("Group balances",path("group-balances","group",name),()->group(name),x->{List<Row> data=withSource(x);data.add(row(name,"Debit "+money(x.optDouble("drTotal"))+" • Credit "+money(x.optDouble("crTotal")),money(x.optDouble("total")),null));shareRows(data,x.optString("shareText"),path("group-balances-pdf","group",name),"Group-"+name);JSONArray a=array(x,"ledgers");for(int i=0;i<a.length();i++){JSONObject v=a.optJSONObject(i);if(v==null)continue;String ledger=v.optString("ledger");data.add(row(ledger,v.optString("parent"),money(v.optDouble("balance"))+" "+v.optString("drCr"),()->open(()->ledger(ledger))));}rows("Group balances",data,true);});}
  private void reports(){List<Row> data=new ArrayList<>();
   data.add(heading("Sales & purchases","Registers and dispatch"));
+  data.add(row("Create proforma","Prepare a new proforma from Tally masters","",()->open(this::proforma)));
   data.add(row("Sales register","Posted sales invoices only","",()->open(()->register("sales"))));
   data.add(row("Proforma invoices","Tally Optional sales • separate from Sales Register","",()->open(()->register("proforma"))));
   data.add(row("Purchase register","Financial year → active months → voucher","",()->open(()->register("purchase"))));
@@ -282,6 +283,9 @@ public final class MainActivity extends Activity {
  private void renderDiagnostics(JSONObject x){List<Row> data=new ArrayList<>();
   data.add(heading("System status","TallyBridge "+x.optString("version")+" • "+(x.optBoolean("tallyOnline")?"Tally connected":"Tally unavailable")));
   data.add(row("Selected company",x.optString("company",company),"",null));
+  data.add(row("Android signing",AppIdentity.status(this),"",null));
+  data.add(row("SHA-1",AppIdentity.sha1(this),"",null));
+  data.add(row("SHA-256",AppIdentity.sha256(this),"",null));
   data.add(row("Last successful Tally read",time(x.optString("lastSuccess")),"",null));
   data.add(row("Request gate",x.optString("gateState")+" "+x.optString("busyReport"),"",null));
   JSONObject c=object(x,"cache");data.add(row("Saved cache",c.optInt("entries")+" entries",time(c.optString("latestAt")),null));
@@ -298,7 +302,7 @@ public final class MainActivity extends Activity {
   data.add(heading(x.optBoolean("available")?"Update available":"You're up to date","Current "+x.optString("current")+(x.optString("latest").isEmpty()?"":" • Latest "+x.optString("latest"))));
   if(!x.optString("notes").isEmpty())data.add(row("Release notes",x.optString("notes"),"",null));
   if(!x.optString("error").isEmpty())data.add(heading("Update check unavailable",x.optString("error")));
-  String release=x.optString("url");if(x.optBoolean("available")&&release.startsWith("https://github.com/vsshegur/TallyBridge/releases/"))data.add(row("Open release / download","Review the signed release before installing","",()->openExternal(release)));
+  String release=x.optString("url"),apk=x.optString("apkUrl");if(x.optBoolean("available")&&!apk.isEmpty())data.add(row("Install signed update","Downloads and verifies the permanent TallyBridge signature first","",()->UpdateInstaller.install(this,apk)));if(x.optBoolean("available")&&release.startsWith("https://github.com/vsshegur/TallyBridge/releases/"))data.add(row("Open release page","Review release notes and files","",()->openExternal(release)));
   data.add(row("Refresh","Check official TallyBridge releases again","",()->{forceNext=true;updateCheck();}));
   rows("Updates",data,false);});}
  private void openExternal(String url){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(Exception e){toast("Could not open the release page");}}
@@ -352,7 +356,7 @@ public final class MainActivity extends Activity {
   data.add(heading("Preferences","Appearance and documents"));
   data.add(row("Appearance",appearance()+" • System, Light or Dark","",this::chooseAppearance));
   data.add(row("PDF template",boot.optString("pdfTemplate","standard")+" • change on Windows TallyBridge","",null));
-  data.add(row("Payment settings",object(boot,"pdfBanks").optString(company.trim().toLowerCase(Locale.ROOT),"Not selected")+" • change on Windows","",()->rootTab("Payments")));
+  data.add(row("Payment settings",object(boot,"pdfBanks").optString(company.trim().toLowerCase(Locale.ROOT),"Not selected")+" • change on Windows","",()->open(this::payments)));
   data.add(heading("Security","Phone and account"));
   data.add(row("Lock app","Use fingerprint or phone screen lock to reopen","",()->{unlocked=false;showLock();}));
   data.add(row("Renew Google sign-in","Keeps your approved phone key","",this::connectScreen));
