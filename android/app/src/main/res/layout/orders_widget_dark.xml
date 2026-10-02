@@ -3,112 +3,25 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="12dp"
     android:background="@drawable/orders_widget_panel_dark">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical">
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-            <TextView
-                android:id="@+id/widget_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="TALLYBRIDGE"
-                android:textColor="#7BD8BD"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.12" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Orders"
-                android:textColor="#E6EDF3"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/widget_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TALLYBRIDGE" android:textColor="#7BD8BD" android:textSize="9sp" android:textStyle="bold" android:letterSpacing="0.12" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Orders" android:textColor="#E6EDF3" android:textSize="17sp" android:textStyle="bold" />
         </LinearLayout>
-        <TextView
-            android:id="@+id/widget_refresh"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:gravity="center"
-            android:background="@drawable/orders_widget_secondary_dark"
-            android:text="↻"
-            android:textColor="#7BD8BD"
-            android:textSize="19sp"
-            android:textStyle="bold"
-            android:contentDescription="Refresh pending orders" />
+        <TextView android:id="@+id/widget_refresh" android:layout_width="38dp" android:layout_height="38dp" android:gravity="center" android:background="@drawable/orders_widget_secondary_dark" android:text="↻" android:textColor="#7BD8BD" android:textSize="18sp" android:textStyle="bold" android:contentDescription="Refresh pending orders" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/widget_pending"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="0 pending orders"
-        android:textColor="#E6EDF3"
-        android:textSize="22sp"
-        android:textStyle="bold" />
+    <TextView android:id="@+id/widget_pending" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="0 pending orders" android:textColor="#E6EDF3" android:textSize="20sp" android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/widget_mode"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:paddingLeft="8dp"
-        android:paddingTop="3dp"
-        android:paddingRight="8dp"
-        android:paddingBottom="3dp"
-        android:background="@drawable/orders_widget_secondary_dark"
-        android:text="PHONE COPY"
-        android:textColor="#A7B8C5"
-        android:textSize="10sp"
-        android:textStyle="bold" />
+    <TextView android:id="@+id/widget_mode" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:paddingLeft="7dp" android:paddingTop="2dp" android:paddingRight="7dp" android:paddingBottom="2dp" android:background="@drawable/orders_widget_secondary_dark" android:text="PHONE COPY" android:textColor="#A7B8C5" android:textSize="9sp" android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/widget_names"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="7dp"
-        android:maxLines="2"
-        android:ellipsize="end"
-        android:text="No pending orders"
-        android:textColor="#A7B8C5"
-        android:textSize="13sp" />
+    <TextView android:id="@+id/widget_names" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:maxLines="1" android:ellipsize="end" android:text="No pending orders" android:textColor="#A7B8C5" android:textSize="12sp" />
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:orientation="horizontal">
-        <TextView
-            android:id="@+id/widget_add"
-            android:layout_width="0dp"
-            android:layout_height="46dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:background="@drawable/orders_widget_primary_dark"
-            android:text="+ Add order"
-            android:textColor="#102D26"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-        <TextView
-            android:id="@+id/widget_open"
-            android:layout_width="0dp"
-            android:layout_height="46dp"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:gravity="center"
-            android:background="@drawable/orders_widget_secondary_dark"
-            android:text="Open pending"
-            android:textColor="#7BD8BD"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
+        <TextView android:id="@+id/widget_add" android:layout_width="0dp" android:layout_height="42dp" android:layout_weight="1" android:gravity="center" android:background="@drawable/orders_widget_primary_dark" android:text="+ Add order" android:textColor="#102D26" android:textSize="12sp" android:textStyle="bold" />
+        <TextView android:id="@+id/widget_open" android:layout_width="0dp" android:layout_height="42dp" android:layout_weight="1" android:layout_marginStart="8dp" android:gravity="center" android:background="@drawable/orders_widget_secondary_dark" android:text="Open pending" android:textColor="#7BD8BD" android:textSize="12sp" android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>
