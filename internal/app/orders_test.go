@@ -62,8 +62,11 @@ func TestOrderRateIsOptionalButIncludedWhenProvided(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(o.ShareText, "Rate: ₹12.50") || !strings.Contains(o.ShareText, "Order Total: ₹125.00") {
-		t.Fatalf("priced order share text is incomplete: %s", o.ShareText)
+	if !strings.Contains(o.ShareText, "Rate: ₹12.50") {
+		t.Fatalf("priced order share text is missing rate: %s", o.ShareText)
+	}
+	if strings.Contains(o.ShareText, "Amount:") || strings.Contains(o.ShareText, "Order Total:") {
+		t.Fatalf("order sharing must show rate only, never calculated amounts: %s", o.ShareText)
 	}
 }
 
@@ -77,11 +80,11 @@ func TestDispatchedOrderHasNoShareTextAndIsRemovedAfterSevenDays(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatched, err := s.dispatchOrder(o.ID)
+	dispatched, err := s.dispatchOrder(o.ID, "VRL Logistics")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dispatched.Status != "dispatched" || dispatched.ShareText != "" || dispatched.DispatchedAt.IsZero() {
+	if dispatched.Status != "dispatched" || dispatched.ShareText != "" || dispatched.DispatchedAt.IsZero() || dispatched.DispatchedThrough != "VRL Logistics" {
 		t.Fatalf("unexpected dispatched order: %#v", dispatched)
 	}
 
@@ -121,7 +124,7 @@ func TestPendingOrderCanBeEditedButDispatchedCannot(t *testing.T) {
 	if updated.Items[0].Quantity != 9 || updated.Number != o.Number {
 		t.Fatalf("pending edit did not preserve identity: %#v", updated)
 	}
-	if _, err := s.dispatchOrder(o.ID); err != nil {
+	if _, err := s.dispatchOrder(o.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	updated.Items[0].Quantity = 10
@@ -183,7 +186,7 @@ func TestPhotoOrderCanBePhotoOnlyDeduplicatesAndDeletesPhotoAfterSevenDays(t *te
 	if list.PendingCount != 1 || len(list.Pending[0].Attachments) != 1 || !strings.Contains(list.Pending[0].ShareText, "Photo order: 1 image") {
 		t.Fatalf("photo order missing from list: %#v", list)
 	}
-	if _, err := s.dispatchOrder(o.ID); err != nil {
+	if _, err := s.dispatchOrder(o.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	orderMu.Lock()

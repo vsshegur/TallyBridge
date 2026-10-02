@@ -33,10 +33,11 @@ public class OrdersOfflineTest {
   local.cacheBootstrap(new JSONObject().put("companies",new JSONArray().put(new JSONObject().put("name","Vijayalaxmi Textiles"))));
   local.cacheMasters("Vijayalaxmi Textiles",new JSONObject().put("parties",new JSONArray().put(new JSONObject().put("name","Mahesh Textiles")).put(new JSONObject().put("name","Raj Fabrics"))).put("stock",new JSONObject().put("items",new JSONArray().put(new JSONObject().put("name","Bath Towel 70x140").put("unit","PCS")).put(new JSONObject().put("name","Microfiber Napkin 14x21").put("unit","PCS")))));
   JSONObject first=local.saveLocal(order("Mahesh Textiles","9876543210","Pink + Chocolate. Dispatch tomorrow.",new JSONArray().put(item("Bath Towel 70x140",12,"PCS",185.0)).put(item("Microfiber Napkin 14x21",24,"PCS",null))),null);
+  JSONObject staleFirst=new JSONObject(first.toString());JSONObject remoteFirst=new JSONObject(first.toString()).put("id","server-fixture-1").put("number","ORD-EDIT-001").put("_localOnly",false);remoteFirst.optJSONObject("buyerDetails").put("__PHONE_ORDER_ID",staleFirst.optString("id"));local.replaceWithRemote(new JSONObject().put("pending",new JSONArray().put(remoteFirst)).put("dispatched",new JSONArray()));JSONObject edited=local.saveLocal(order("Mahesh Textiles","9876543210","Edited once, not duplicated.",new JSONArray().put(item("Bath Towel 70x140",12,"PCS",185.0))),staleFirst);assertEquals("server-fixture-1",edited.optString("id"));assertEquals(1,local.list().optInt("pendingCount"));assertTrue(edited.optString("shareText").contains("Rate: ₹185.00"));assertFalse(edited.optString("shareText").contains("Amount:"));assertFalse(edited.optString("shareText").contains("Order Total:"));first=edited;
   local.saveLocal(order("Raj Fabrics","9988776655","Assorted colours.",new JSONArray().put(item("Microfiber Napkin 14x21",48,"PCS",null))),null);
   JSONObject old=local.saveLocal(order("Shree Stores","9765432100","Already sent.",new JSONArray().put(item("Bath Towel 70x140",6,"PCS",null))),null);
-  local.dispatchLocal(old);
-  assertEquals(2,local.list().optInt("pendingCount"));assertEquals(1,local.list().optInt("dispatchedCount"));
+  local.dispatchLocal(old,"VRL Logistics");
+  assertEquals(2,local.list().optInt("pendingCount"));assertEquals(1,local.list().optInt("dispatchedCount"));assertEquals("VRL Logistics",local.list().optJSONArray("dispatched").optJSONObject(0).optString("dispatchedThrough"));
 
   rule.launchActivity(new Intent(c,OrdersActivity.class));
   ui(()->rule.getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE));
