@@ -8,8 +8,8 @@ android {
         minSdk 28
         targetSdk 35
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-        versionCode 20302
-        versionName '2.3.2'
+        versionCode 20303
+        versionName '2.3.3'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     signingConfigs {

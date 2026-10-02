@@ -2,7 +2,7 @@ package app
 
 import "time"
 
-const Version = "2.3.2"
+const Version = "2.3.3"
 
 type Settings struct {
 	TallyURL    string `json:"tallyUrl"`
@@ -131,14 +131,16 @@ type VoucherRow struct {
 	Party       string   `json:"party"`
 	Amount      float64  `json:"amount"`
 	VoucherType string   `json:"voucherType,omitempty"`
+	Optional    bool     `json:"optional,omitempty"`
 }
 type VoucherData struct {
 	CommonData
-	Vouchers []VoucherRow `json:"vouchers"`
-	Total    float64      `json:"total"`
-	Count    int          `json:"count"`
-	Type     string       `json:"type,omitempty"`
-	Period   string       `json:"period,omitempty"`
+	Vouchers              []VoucherRow `json:"vouchers"`
+	Total                 float64      `json:"total"`
+	Count                 int          `json:"count"`
+	Type                  string       `json:"type,omitempty"`
+	Period                string       `json:"period,omitempty"`
+	ClassificationVersion int          `json:"classificationVersion,omitempty"`
 }
 
 type InvoiceItem struct {
@@ -159,6 +161,7 @@ type VoucherDetail struct {
 	InvoiceNumber     string        `json:"invoiceNumber"`
 	InvoiceDate       string        `json:"invoiceDate"`
 	VoucherType       string        `json:"voucherType"`
+	Optional          bool          `json:"optional,omitempty"`
 	CustomerName      string        `json:"customerName"`
 	CustomerCity      string        `json:"customerCity"`
 	CustomerAddress   []string      `json:"customerAddress,omitempty"`
@@ -246,11 +249,11 @@ type CommonData struct {
 	Live        bool           `json:"live"`
 	Supplier    CompanyProfile `json:"supplier,omitempty"`
 	PDFTemplate string         `json:"pdfTemplate,omitempty"`
-	Source     string    `json:"source,omitempty"`
-	Stale      bool      `json:"stale,omitempty"`
-	FetchedAt  time.Time `json:"fetchedAt"`
-	LiveError  string    `json:"liveError,omitempty"`
-	DurationMS int64     `json:"durationMs,omitempty"`
+	Source      string         `json:"source,omitempty"`
+	Stale       bool           `json:"stale,omitempty"`
+	FetchedAt   time.Time      `json:"fetchedAt"`
+	LiveError   string         `json:"liveError,omitempty"`
+	DurationMS  int64          `json:"durationMs,omitempty"`
 }
 
 type Summary struct {
@@ -296,6 +299,7 @@ type SearchResult struct {
 	LRNumber    string  `json:"lrNumber,omitempty"`
 	Amount      float64 `json:"amount,omitempty"`
 	VoucherType string  `json:"voucherType,omitempty"`
+	Optional    bool    `json:"optional,omitempty"`
 }
 
 type SearchIndexData struct {

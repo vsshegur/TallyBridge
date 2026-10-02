@@ -54,21 +54,35 @@ func pdfDataNote(x CommonData) string {
 	return label + ": " + x.FetchedAt.Local().Format("02 Jan 2006, 15:04")
 }
 func supplierHeaderHTML(p CompanyProfile) string {
-	if p.Name == "" && p.GSTIN == "" && p.Address == "" && p.Phone == "" && p.Email == "" { return "" }
+	if p.Name == "" && p.GSTIN == "" && p.Address == "" && p.Phone == "" && p.Email == "" {
+		return ""
+	}
 	var b strings.Builder
-	if address := companyProfileAddress(p); address != "" { fmt.Fprintf(&b, `<div class="supplier-line">%s</div>`, he(address)) }
+	if address := companyProfileAddress(p); address != "" {
+		fmt.Fprintf(&b, `<div class="supplier-line">%s</div>`, he(address))
+	}
 	bits := []string{}
-	if p.GSTIN != "" { bits = append(bits, "GSTIN: "+p.GSTIN) }
-	if p.Phone != "" { bits = append(bits, "Mobile: "+p.Phone) }
-	if p.Email != "" { bits = append(bits, "Email: "+p.Email) }
-	if len(bits) > 0 { fmt.Fprintf(&b, `<div class="supplier-line">%s</div>`, he(strings.Join(bits, "  |  "))) }
+	if p.GSTIN != "" {
+		bits = append(bits, "GSTIN: "+p.GSTIN)
+	}
+	if p.Phone != "" {
+		bits = append(bits, "Mobile: "+p.Phone)
+	}
+	if p.Email != "" {
+		bits = append(bits, "Email: "+p.Email)
+	}
+	if len(bits) > 0 {
+		fmt.Fprintf(&b, `<div class="supplier-line">%s</div>`, he(strings.Join(bits, "  |  ")))
+	}
 	return b.String()
 }
 func pdfDocument(company, title, subtitle, body string, profiles ...CompanyProfile) string {
 	profile := CompanyProfile{Name: company}
 	if len(profiles) > 0 {
 		profile = profiles[0]
-		if profile.Name == "" { profile.Name = company }
+		if profile.Name == "" {
+			profile.Name = company
+		}
 	}
 	return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:"><style>` + pdfFontCSS() + `
  @page{size:A4;margin:16mm 13mm 18mm;@bottom-left{content:"TallyBridge  |  READ ONLY";font:8pt Arial;color:#68758a;}@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt Arial;color:#68758a;}}
@@ -79,43 +93,65 @@ func pdfDocument(company, title, subtitle, body string, profiles ...CompanyProfi
  table.items{border-collapse:collapse;width:100%;table-layout:fixed;margin:3mm 0 5mm;font-size:8.5pt}.items thead{display:table-header-group}.items th{background:#173f62;color:white;font-size:8pt;font-weight:bold;padding:2.5mm 2mm;text-align:left}.items td{padding:2.5mm 2mm;border-bottom:1pt solid #dce4ed;vertical-align:top}.items tbody tr:nth-child(even){background:#f7f9fc}.items tr{break-inside:avoid}.items .num{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#65758a}.totals{width:62%;margin-left:auto;break-inside:avoid;border-collapse:collapse}.totals td{padding:1.8mm 2mm;vertical-align:top}.totals td:last-child{text-align:right;font-variant-numeric:tabular-nums;width:45%}.grand td{background:#eaf0f7;border-top:1.5pt solid #173f62;font-size:11pt;font-weight:bold;padding:3mm 2mm}.note{padding:3mm;margin:4mm 0;background:#fff7e5;border-left:2pt solid #d6a550;font-size:8pt;break-inside:avoid}.bank{margin-top:6mm;padding:4mm;background:#f3f6fa;border:1pt solid #dce4ed;break-inside:avoid}.bank .kv td{padding:.7mm 0}.bank-grid{display:table;width:100%;table-layout:fixed}.bank-details,.bank-qr{display:table-cell;vertical-align:middle}.bank-details{width:68%;padding-right:4mm}.bank-qr{width:32%;text-align:center}.bank-qr img{width:32mm;height:32mm}.bank-qr .caption{margin-top:1mm}.narration{margin-top:4mm;white-space:pre-wrap}.meta{margin-bottom:4mm;font-size:8pt;color:#65758a}
  </style></head><body><header class="heading"><h1>` + he(firstNonBlank(profile.Name, company)) + `</h1>` + supplierHeaderHTML(profile) + `<div class="title">` + he(title) + `</div><div class="subtitle">` + he(subtitle) + `</div></header>` + body + `</body></html>`
 }
+
 type PaymentQR struct {
 	Amount    float64
 	Reference string
 	Payee     string
 }
+
 func upiPaymentURI(bank BankDetails, payment PaymentQR) string {
 	upi := strings.TrimSpace(bank.UPI)
-	if upi == "" { return "" }
+	if upi == "" {
+		return ""
+	}
 	q := url.Values{}
 	q.Set("pa", upi)
-	if payee := firstNonBlank(strings.TrimSpace(payment.Payee), strings.TrimSpace(bank.AccountHolder)); payee != "" { q.Set("pn", payee) }
-	if payment.Amount > 0 { q.Set("am", fmt.Sprintf("%.2f", payment.Amount)) }
+	if payee := firstNonBlank(strings.TrimSpace(payment.Payee), strings.TrimSpace(bank.AccountHolder)); payee != "" {
+		q.Set("pn", payee)
+	}
+	if payment.Amount > 0 {
+		q.Set("am", fmt.Sprintf("%.2f", payment.Amount))
+	}
 	q.Set("cu", "INR")
-	if ref := strings.TrimSpace(payment.Reference); ref != "" { q.Set("tn", trimPDF(ref, 80)) }
+	if ref := strings.TrimSpace(payment.Reference); ref != "" {
+		q.Set("tn", trimPDF(ref, 80))
+	}
 	return "upi://pay?" + q.Encode()
 }
 func paymentQRDataURI(bank BankDetails, payment PaymentQR) string {
 	uri := upiPaymentURI(bank, payment)
-	if uri == "" { return "" }
+	if uri == "" {
+		return ""
+	}
 	png, err := qrcode.Encode(uri, qrcode.Medium, 256)
-	if err != nil { return "" }
+	if err != nil {
+		return ""
+	}
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
 }
 func bankHTML(banks []BankDetails, payments ...PaymentQR) string {
-	if len(banks) == 0 { return "" }
+	if len(banks) == 0 {
+		return ""
+	}
 	bank := banks[0]
-	if bank.AccountNumber == "" && bank.UPI == "" && bank.IFSC == "" { return "" }
+	if bank.AccountNumber == "" && bank.UPI == "" && bank.IFSC == "" {
+		return ""
+	}
 	payment := PaymentQR{}
-	if len(payments) > 0 { payment = payments[0] }
+	if len(payments) > 0 {
+		payment = payments[0]
+	}
 	var out strings.Builder
 	out.WriteString(`<section class="bank"><h3>Payment bank details</h3><div class="bank-grid"><div class="bank-details"><table class="kv">`)
 	for _, r := range [][2]string{{"Bank", firstNonBlank(bank.BankName, bank.Ledger)}, {"Account holder", bank.AccountHolder}, {"Account number", bank.AccountNumber}, {"IFSC", bank.IFSC}, {"Branch", bank.Branch}, {"UPI", bank.UPI}} {
-		if r[1] != "" { fmt.Fprintf(&out, "<tr><td>%s</td><td>%s</td></tr>", he(r[0]), he(r[1])) }
+		if r[1] != "" {
+			fmt.Fprintf(&out, "<tr><td>%s</td><td>%s</td></tr>", he(r[0]), he(r[1]))
+		}
 	}
 	out.WriteString(`</table></div>`)
 	if qr := paymentQRDataURI(bank, payment); qr != "" {
-		out.WriteString(`<div class="bank-qr"><img alt="UPI payment QR" src="`+he(qr)+`"><div class="caption">Scan to pay by UPI</div></div>`)
+		out.WriteString(`<div class="bank-qr"><img alt="UPI payment QR" src="` + he(qr) + `"><div class="caption">Scan to pay by UPI</div></div>`)
 	}
 	out.WriteString(`</div></section>`)
 	return out.String()
@@ -181,11 +217,15 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 		}
 	}
 	fmt.Fprintf(&b, `<tr class="grand"><td>Total amount</td><td>%s</td></tr></table>`, he(inr(x.TotalAmount)))
-	b.WriteString(bankHTML(bank, PaymentQR{Amount: x.TotalAmount, Reference: "Invoice "+x.InvoiceNumber, Payee: firstNonBlank(x.Supplier.Name, x.FirmName, x.Company)}))
+	b.WriteString(bankHTML(bank, PaymentQR{Amount: x.TotalAmount, Reference: "Invoice " + x.InvoiceNumber, Payee: firstNonBlank(x.Supplier.Name, x.FirmName, x.Company)}))
 	if x.Narration != "" {
 		fmt.Fprintf(&b, `<div class="narration"><h3>Narration</h3>%s</div>`, he(x.Narration))
 	}
-	return pdfDocument(firstNonBlank(x.FirmName, x.Company), "INVOICE DETAIL", "Read-only copy of data returned by TallyPrime", b.String(), x.Supplier)
+	title, subtitle := "INVOICE DETAIL", "Read-only copy of data returned by TallyPrime"
+	if x.Optional {
+		title, subtitle = "PROFORMA INVOICE", "Optional / non-posting voucher from TallyPrime"
+	}
+	return pdfDocument(firstNonBlank(x.FirmName, x.Company), title, subtitle, b.String(), x.Supplier)
 }
 func invoicePDF(x VoucherDetail, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(applyPDFTemplate(invoiceHTML(x, bank...), x.PDFTemplate))

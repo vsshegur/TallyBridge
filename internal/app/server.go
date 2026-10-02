@@ -245,11 +245,17 @@ func (s *Server) handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 	cc, at := s.cache.Companies()
 	st := s.stateSnapshot()
 	companies := st.Companies
-	if len(companies)==0 { companies=cc }
+	if len(companies) == 0 {
+		companies = cc
+	}
 	health := map[string]CompanyHealth{}
-	for _, c := range companies { health[c.Name]=s.companyHealth(c.Name,false) }
-	if cfg.AutoUpdate { s.maybeCheckUpdates() }
-	jsonOut(w, map[string]any{"version":Version,"live": st, "settings": cfg, "devices": devs, "logs": s.tally.Logs(), "cache": s.cache.Stats(), "cachedCompanies": cc, "cachedCompaniesAt": at, "autoSync": s.autoSyncSnapshot(), "health":health, "update":s.updateSnapshot()})
+	for _, c := range companies {
+		health[c.Name] = s.companyHealth(c.Name, false)
+	}
+	if cfg.AutoUpdate {
+		s.maybeCheckUpdates()
+	}
+	jsonOut(w, map[string]any{"version": Version, "live": st, "settings": cfg, "devices": devs, "logs": s.tally.Logs(), "cache": s.cache.Stats(), "cachedCompanies": cc, "cachedCompaniesAt": at, "autoSync": s.autoSyncSnapshot(), "health": health, "update": s.updateSnapshot()})
 }
 func (s *Server) handleAdminProbe(w http.ResponseWriter, r *http.Request) {
 	st, e := s.probeLive()
@@ -313,8 +319,12 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	cfg.TallyURL = q.TallyURL
 	cfg.TimeoutSec = q.TimeoutSec
 	cfg.CooldownSec = q.CooldownSec
-	if q.PDFTemplate != "" { cfg.PDFTemplate = validPDFTemplate(q.PDFTemplate) }
-	if q.AutoUpdate != nil { cfg.AutoUpdate = *q.AutoUpdate }
+	if q.PDFTemplate != "" {
+		cfg.PDFTemplate = validPDFTemplate(q.PDFTemplate)
+	}
+	if q.AutoUpdate != nil {
+		cfg.AutoUpdate = *q.AutoUpdate
+	}
 	if e := s.store.UpdateSettings(cfg); e != nil {
 		jsonErr(w, 500, e)
 		return
@@ -483,9 +493,13 @@ func (s *Server) bootstrapPayload() map[string]any {
 		cs = cc
 	}
 	health := map[string]CompanyHealth{}
-	for _, c := range cs { health[c.Name] = s.companyHealth(c.Name, false) }
+	for _, c := range cs {
+		health[c.Name] = s.companyHealth(c.Name, false)
+	}
 	cfg := s.store.Settings()
-	if cfg.AutoUpdate { s.maybeCheckUpdates() }
+	if cfg.AutoUpdate {
+		s.maybeCheckUpdates()
+	}
 	return map[string]any{"bridgeOnline": true, "tallyOnline": st.TallyOnline, "companies": cs, "lastSuccess": st.LastSuccess, "cacheLatestAt": s.cache.Stats().LatestAt, "summaries": s.summaries(cs), "autoSync": s.autoSyncSnapshot(), "version": Version, "pdfBanks": s.store.PDFBankNames(), "health": health, "pdfTemplate": validPDFTemplate(cfg.PDFTemplate), "autoUpdate": cfg.AutoUpdate, "update": s.updateSnapshot()}
 }
 func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
@@ -576,12 +590,13 @@ func (s *Server) handleMobileVouchers(w http.ResponseWriter, r *http.Request) {
 func voucherRequestHint(r *http.Request) (string, VoucherRow) {
 	mid := strings.TrimSpace(r.URL.Query().Get("masterId"))
 	return mid, VoucherRow{
-		MasterID: mid,
-		Number: strings.TrimSpace(r.URL.Query().Get("number")),
-		Date: normISODate(r.URL.Query().Get("date")),
-		Party: strings.TrimSpace(r.URL.Query().Get("party")),
-		Amount: parseAmount(r.URL.Query().Get("amount")),
+		MasterID:    mid,
+		Number:      strings.TrimSpace(r.URL.Query().Get("number")),
+		Date:        normISODate(r.URL.Query().Get("date")),
+		Party:       strings.TrimSpace(r.URL.Query().Get("party")),
+		Amount:      parseAmount(r.URL.Query().Get("amount")),
 		VoucherType: strings.TrimSpace(r.URL.Query().Get("voucherType")),
+		Optional:    strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("optional")), "true") || strings.TrimSpace(r.URL.Query().Get("optional")) == "1",
 	}
 }
 func voucherCacheKey(mid string, hint VoucherRow) string {
@@ -591,7 +606,9 @@ func voucherCacheKey(mid string, hint VoucherRow) string {
 	return "ref:" + strings.ToLower(strings.TrimSpace(hint.VoucherType)) + "|" + hint.Date + "|" + strings.TrimSpace(hint.Number)
 }
 func (s *Server) applyVoucherPresentation(company string, x *VoucherDetail) {
-	if x == nil { return }
+	if x == nil {
+		return
+	}
 	profile, _ := s.companyProfile(company, false)
 	x.Supplier = profile
 	x.PDFTemplate = validPDFTemplate(s.store.Settings().PDFTemplate)
@@ -616,10 +633,14 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	if reason, retry, p := s.tally.Pending(); p {
 		var old VoucherDetail
 		if at, ok := s.cache.Get("voucher-detail-v6", c, key, &old); ok && old.TotalsVersion == 2 {
-			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at
+			old.Live = false
+			old.Source = "saved"
+			old.Stale = true
+			old.FetchedAt = at
 			s.applyVoucherPresentation(c, &old)
-			s.setDiagnosticInvoiceContext(c,old)
-			jsonOut(w, old); return
+			s.setDiagnosticInvoiceContext(c, old)
+			jsonOut(w, old)
+			return
 		}
 		jsonOut(w, map[string]any{"pending": true, "reason": reason, "retryAfterMs": retry.Milliseconds()})
 		return
@@ -628,15 +649,21 @@ func (s *Server) handleMobileVoucherDetail(w http.ResponseWriter, r *http.Reques
 	if e != nil {
 		var old VoucherDetail
 		if at, ok := s.cache.Get("voucher-detail-v6", c, key, &old); ok && old.TotalsVersion == 2 {
-			old.Live = false; old.Source = "saved"; old.Stale = true; old.FetchedAt = at; old.LiveError = e.Error()
+			old.Live = false
+			old.Source = "saved"
+			old.Stale = true
+			old.FetchedAt = at
+			old.LiveError = e.Error()
 			s.applyVoucherPresentation(c, &old)
-			s.setDiagnosticInvoiceContext(c,old)
-			jsonOut(w, old); return
+			s.setDiagnosticInvoiceContext(c, old)
+			jsonOut(w, old)
+			return
 		}
-		jsonErr(w, 503, e); return
+		jsonErr(w, 503, e)
+		return
 	}
 	s.applyVoucherPresentation(c, &x)
-	s.setDiagnosticInvoiceContext(c,x)
+	s.setDiagnosticInvoiceContext(c, x)
 	jsonOut(w, x)
 }
 func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) {
@@ -651,7 +678,10 @@ func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) 
 	if _, ok := s.cache.Get("voucher-detail-v6", c, key, &x); !ok || x.TotalsVersion != 2 {
 		var e error
 		x, e = s.fetchVoucherDetail(c, mid, hint)
-		if e != nil { jsonErr(w, 503, e); return }
+		if e != nil {
+			jsonErr(w, 503, e)
+			return
+		}
 	}
 	if x.RegisterAmount != 0 && !x.AmountVerified {
 		jsonErr(w, 409, errors.New(x.VerificationNote))
@@ -661,12 +691,18 @@ func (s *Server) handleMobileVoucherPDF(w http.ResponseWriter, r *http.Request) 
 	x.Supplier = profile
 	x.PDFTemplate = validPDFTemplate(s.store.Settings().PDFTemplate)
 	bank, e := s.optionalBank(c, r.URL.Query().Get("bank"))
-	if e != nil { jsonErr(w, 503, e); return }
+	if e != nil {
+		jsonErr(w, 503, e)
+		return
+	}
 	data, pe := invoicePDF(x, bank...)
-	if pe != nil { jsonErr(w, 503, pe); return }
-	name := sanitizeFileName(firstNonBlank(x.InvoiceNumber, "Invoice"))
+	if pe != nil {
+		jsonErr(w, 503, pe)
+		return
+	}
+	name := invoicePDFBaseName(x)
 	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="Invoice-%s.pdf"`, name))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.pdf"`, name))
 	_, _ = w.Write(data)
 }
 func (s *Server) handleLedgerDetails(w http.ResponseWriter, r *http.Request) {
@@ -675,33 +711,53 @@ func (s *Server) handleLedgerDetails(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, 400, errors.New("company and ledger required"))
 		return
 	}
-	s.setDiagnosticLedgerContext(c,l)
+	s.setDiagnosticLedgerContext(c, l)
 	details := map[string]string{}
 	var duration int64
 	var liveErr error
 	if b, d, _, e := s.tally.request("Ledger details", c, ledgerDetailXML(c, l), 0); e == nil {
 		duration = d
 		for k, v := range parseLedgerDetailsFor(b, l) {
-			if strings.TrimSpace(v) != "" { details[k] = v }
+			if strings.TrimSpace(v) != "" {
+				details[k] = v
+			}
 		}
-	} else { liveErr = e }
+	} else {
+		liveErr = e
+	}
 	if details["PARTYGSTIN"] == "" || details["ADDRESS"] == "" || details["CITY"] == "" || details["STATENAME"] == "" {
 		if b, d, _, e := s.tally.request("Ledger details fallback", c, ledgerDetailCollectionXML(c, l), 0); e == nil {
-			if d > duration { duration = d }
+			if d > duration {
+				duration = d
+			}
 			for k, v := range parseLedgerDetailsFor(b, l) {
-				if strings.TrimSpace(v) != "" && details[k] == "" { details[k] = v }
+				if strings.TrimSpace(v) != "" && details[k] == "" {
+					details[k] = v
+				}
 			}
 			liveErr = nil
-		} else if liveErr == nil { liveErr = e }
+		} else if liveErr == nil {
+			liveErr = e
+		}
 	}
 	if len(details) == 0 {
 		var old map[string]any
 		if at, ok := s.cache.Get("ledger-details", c, l, &old); ok {
-			old["live"] = false; old["source"] = "saved"; old["stale"] = true; old["fetchedAt"] = at
-			if liveErr != nil { old["liveError"] = liveErr.Error() }
-			jsonOut(w, old); return
+			old["live"] = false
+			old["source"] = "saved"
+			old["stale"] = true
+			old["fetchedAt"] = at
+			if liveErr != nil {
+				old["liveError"] = liveErr.Error()
+			}
+			jsonOut(w, old)
+			return
 		}
-		if liveErr != nil { jsonErr(w, 503, liveErr) } else { jsonErr(w, 503, errors.New("Tally returned no recognized ledger details")) }
+		if liveErr != nil {
+			jsonErr(w, 503, liveErr)
+		} else {
+			jsonErr(w, 503, errors.New("Tally returned no recognized ledger details"))
+		}
 		return
 	}
 	x := map[string]any{"live": true, "source": "live", "fetchedAt": time.Now(), "durationMs": duration, "details": details}
@@ -1097,10 +1153,10 @@ func (s *Server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	seenVoucher := map[string]bool{}
-	for _, typ := range []string{"sales", "purchase"} {
+	for _, typ := range []string{"sales", "proforma", "purchase"} {
 		for _, period := range []string{"fy", "month"} {
 			var vd VoucherData
-			if at, ok := s.cache.Get(typ, c, period, &vd); ok {
+			if at, ok := s.cache.Get(typ, c, period, &vd); ok && voucherCacheIsClassified(vd) {
 				if at.After(latest) {
 					latest = at
 				}
@@ -1110,7 +1166,7 @@ func (s *Server) handleSearchIndex(w http.ResponseWriter, r *http.Request) {
 						continue
 					}
 					seenVoucher[key] = true
-					out = append(out, SearchResult{Kind: typ, Title: firstNonBlank(v.Number, v.Party), Subtitle: v.Party + " • " + displayDate(v.Date), MasterID: v.MasterID, Party: v.Party, Number: v.Number, Date: v.Date, Amount: v.Amount, VoucherType: v.VoucherType})
+					out = append(out, SearchResult{Kind: typ, Title: firstNonBlank(v.Number, v.Party), Subtitle: v.Party + " • " + displayDate(v.Date), MasterID: v.MasterID, Party: v.Party, Number: v.Number, Date: v.Date, Amount: v.Amount, VoucherType: v.VoucherType, Optional: v.Optional})
 				}
 			}
 		}
@@ -1235,7 +1291,7 @@ func (s *Server) buildCustomer360(c, ledger string, refresh bool) (Customer360Da
 		}
 	}
 	var sales VoucherData
-	if at, ok := s.cache.Get("sales", c, "fy", &sales); ok {
+	if at, ok := s.cache.Get("sales", c, "fy", &sales); ok && voucherCacheIsClassified(sales) {
 		if at.After(latest) {
 			latest = at
 		}
@@ -1463,7 +1519,7 @@ func (s *Server) getOutstanding(c, typ string, refresh bool) (OutstandingData, e
 	return x, osErrNotExist
 }
 func (s *Server) getVouchers(c, typ, period string, refresh bool) (VoucherData, error) {
-	if typ != "purchase" {
+	if typ != "purchase" && typ != "proforma" {
 		typ = "sales"
 	}
 	vtype := "Sales"
@@ -1492,17 +1548,24 @@ func (s *Server) getVouchers(c, typ, period string, refresh bool) (VoucherData, 
 			}
 		}
 		if e == nil {
-			vs := parseVouchers(b)
-			total := 0.0
-			for _, v := range vs {
-				total += abs(v.Amount)
-			}
-			x := VoucherData{CommonData: CommonData{Live: true, Source: "live", FetchedAt: time.Now(), DurationMS: d}, Vouchers: vs, Total: total, Count: len(vs), Type: typ, Period: period}
+			all := parseVouchers(b)
+			at := time.Now()
+			x := voucherDataFromRows(voucherRowsForRegister(all, typ), typ, period, d, at)
 			_ = s.cache.Put(kind, c, variant, x, x.FetchedAt)
+			// A Sales read already contains both posted and Optional vouchers. Cache the
+			// sibling register too so Sales/Proforma stay separated without a second Tally read.
+			if typ == "sales" || typ == "proforma" {
+				sibling := "proforma"
+				if typ == "proforma" {
+					sibling = "sales"
+				}
+				y := voucherDataFromRows(voucherRowsForRegister(all, sibling), sibling, period, d, at)
+				_ = s.cache.Put(sibling, c, variant, y, y.FetchedAt)
+			}
 			return x, nil
 		} else {
 			var old VoucherData
-			if at, ok := s.cache.Get(kind, c, variant, &old); ok {
+			if at, ok := s.cache.Get(kind, c, variant, &old); ok && voucherCacheIsClassified(old) {
 				old.Live = false
 				old.Source = "saved"
 				old.Stale = true
@@ -1514,7 +1577,7 @@ func (s *Server) getVouchers(c, typ, period string, refresh bool) (VoucherData, 
 		}
 	}
 	var x VoucherData
-	if at, ok := s.cache.Get(kind, c, variant, &x); ok {
+	if at, ok := s.cache.Get(kind, c, variant, &x); ok && voucherCacheIsClassified(x) {
 		x.Live = false
 		x.Source = "saved"
 		x.Stale = true
@@ -1532,11 +1595,21 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 	hint := supplied
 	if isNumericID {
 		if cached, ok := s.cache.VoucherHint(c, mid); ok {
-			if hint.Number == "" { hint.Number = cached.Number }
-			if hint.Date == "" { hint.Date = cached.Date }
-			if hint.Party == "" { hint.Party = cached.Party }
-			if hint.Amount == 0 { hint.Amount = cached.Amount }
-			if hint.VoucherType == "" { hint.VoucherType = cached.VoucherType }
+			if hint.Number == "" {
+				hint.Number = cached.Number
+			}
+			if hint.Date == "" {
+				hint.Date = cached.Date
+			}
+			if hint.Party == "" {
+				hint.Party = cached.Party
+			}
+			if hint.Amount == 0 {
+				hint.Amount = cached.Amount
+			}
+			if hint.VoucherType == "" {
+				hint.VoucherType = cached.VoucherType
+			}
 		}
 	}
 	hint.Date = normISODate(hint.Date)
@@ -1567,26 +1640,50 @@ func (s *Server) fetchVoucherDetail(c, mid string, supplied VoucherRow) (Voucher
 		b, d, _, e := s.tally.request("Invoice detail by master id", c, voucherDetailCollectionXML(c, mid), 12*time.Second)
 		if e == nil && hasXMLNode(b, "VOUCHER") {
 			x = mergeVoucherDetail(x, parseVoucherDetail(b, c, mid, hint))
-			if d > duration { duration = d }
-		} else if e != nil { lastErr = e }
+			if d > duration {
+				duration = d
+			}
+		} else if e != nil {
+			lastErr = e
+		}
 	}
 	needMore = x.TotalsVersion != 2 || x.InvoiceNumber == "" || len(x.Items) == 0
 	if needMore && isNumericID {
 		b, d, _, e := s.tally.request("Invoice detail enrich", c, voucherDetailObjectXML(c, mid), 12*time.Second)
 		if e == nil && hasXMLNode(b, "VOUCHER") {
 			x = mergeVoucherDetail(x, parseVoucherDetail(b, c, mid, hint))
-			if d > duration { duration = d }
-		} else if e != nil { lastErr = e }
+			if d > duration {
+				duration = d
+			}
+		} else if e != nil {
+			lastErr = e
+		}
 	}
-	if x.Company == "" { x.Company = c }
-	if x.FirmName == "" { x.FirmName = c }
-	if x.MasterID == "" { x.MasterID = mid }
-	if x.InvoiceNumber == "" { x.InvoiceNumber = hint.Number }
-	if x.InvoiceDate == "" { x.InvoiceDate = hint.Date }
-	if x.CustomerName == "" { x.CustomerName = hint.Party }
-	if x.VoucherType == "" { x.VoucherType = hint.VoucherType }
+	if x.Company == "" {
+		x.Company = c
+	}
+	if x.FirmName == "" {
+		x.FirmName = c
+	}
+	if x.MasterID == "" {
+		x.MasterID = mid
+	}
+	if x.InvoiceNumber == "" {
+		x.InvoiceNumber = hint.Number
+	}
+	if x.InvoiceDate == "" {
+		x.InvoiceDate = hint.Date
+	}
+	if x.CustomerName == "" {
+		x.CustomerName = hint.Party
+	}
+	if x.VoucherType == "" {
+		x.VoucherType = hint.VoucherType
+	}
 	if x.TotalsVersion != 2 {
-		if lastErr != nil { return VoucherDetail{}, lastErr }
+		if lastErr != nil {
+			return VoucherDetail{}, lastErr
+		}
 		return VoucherDetail{}, errors.New("Tally did not return a verified invoice total for this register row")
 	}
 	s.verifyInvoiceAmount(&x, hint)
@@ -1613,6 +1710,9 @@ func mergeVoucherDetail(a, b VoucherDetail) VoucherDetail {
 	}
 	if a.VoucherType == "" {
 		a.VoucherType = b.VoucherType
+	}
+	if b.Optional {
+		a.Optional = true
 	}
 	if a.CustomerName == "" {
 		a.CustomerName = b.CustomerName
@@ -1700,7 +1800,7 @@ func (s *Server) summaries(cs []Company) map[string]Summary {
 				latest = at
 			}
 		}
-		if at, ok := s.cache.Get("sales", name, "month", &v); ok {
+		if at, ok := s.cache.Get("sales", name, "month", &v); ok && voucherCacheIsClassified(v) {
 			sum.Sales = &v.Total
 			sum.SCount = &v.Count
 			sum.SFetchedAt = at
