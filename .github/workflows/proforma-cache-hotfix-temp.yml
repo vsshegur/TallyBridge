@@ -1,0 +1,44 @@
+name: Verify proforma offline cache identity
+on:
+  push:
+    branches: [fix/proforma-offline-cache-identity]
+permissions:
+  contents: write
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.12'
+          cache: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Apply guarded hotfix
+        run: |
+          python3 scripts/proforma-offline-cache-hotfix.py
+          gofmt -w internal/app/cache.go internal/app/server.go internal/app/voucher_classification.go internal/app/proforma_cache_identity_test.go
+      - name: Verify backend and Windows target
+        run: |
+          go test ./internal/app
+          go vet ./internal/app ./cmd/tallybridge
+          GOOS=windows GOARCH=amd64 go build -o /tmp/tallybridge.exe ./cmd/tallybridge
+          test -s /tmp/tallybridge.exe
+      - name: Verify Android remains compatible
+        working-directory: android
+        run: gradle --no-daemon assembleDebug lintDebug
+      - name: Commit verified production source only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add internal/app/cache.go internal/app/server.go internal/app/voucher_classification.go internal/app/proforma_cache_identity_test.go
+          git diff --cached --check
+          git commit -m "Preserve proforma identity in offline caches"
+          git push origin HEAD:fix/proforma-offline-cache-identity
