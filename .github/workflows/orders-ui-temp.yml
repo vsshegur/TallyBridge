@@ -20,8 +20,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Apply guarded Orders UI patch
-        run: python3 scripts/orders-dark-mode-upgrade.py
+      - name: Apply guarded Orders UI patch when needed
+        run: |
+          if grep -q 'const Version = "2.3.1"' internal/app/types.go; then
+            python3 scripts/orders-dark-mode-upgrade.py
+          else
+            echo "Orders UI source already upgraded"
+          fi
       - name: Build and lint Android
         working-directory: android
         run: gradle --no-daemon test assembleDebug assembleDebugAndroidTest lintDebug
@@ -78,6 +83,10 @@ jobs:
                   android/app/src/main/java/in/tallybridge/app/MainActivity.java \
                   android/app/src/androidTest/java/in/tallybridge/app/OrdersOfflineTest.java \
                   internal/app/types.go
-          git diff --cached --check
-          git commit -m "Redesign Orders and widget for light and dark mode"
-          git push origin HEAD:ui/orders-dark-mode-widget
+          if git diff --cached --quiet; then
+            echo "Verified source already committed"
+          else
+            git diff --cached --check
+            git commit -m "Redesign Orders and widget for light and dark mode"
+            git push origin HEAD:ui/orders-dark-mode-widget
+          fi
