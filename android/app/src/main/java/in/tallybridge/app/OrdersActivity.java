@@ -22,7 +22,7 @@ import java.util.concurrent.*;
 
 /** Fast native order notebook. Orders remain usable offline and sync to the Windows bridge later. */
 public final class OrdersActivity extends Activity {
- static final String ACTION_NEW="in.tallybridge.app.ORDER_NEW";
+ static final String ACTION_NEW="in.tallybridge.app.ORDER_NEW", ACTION_QUICK="in.tallybridge.app.ORDER_QUICK";
  private final ExecutorService work=Executors.newSingleThreadExecutor();
  private final Handler main=new Handler(Looper.getMainLooper());
  private CryptoStore store; private BridgeApi api; private OfflineOrdersStore offline;
@@ -32,7 +32,7 @@ public final class OrdersActivity extends Activity {
  private final Map<String,String> unitByItem=new HashMap<>();
  private final List<ItemRow> itemRows=new ArrayList<>();
  private JSONObject buyerDetails=new JSONObject(); private String buyerDetailsFor="";
- private boolean dispatchedTab=false,destroyed=false,mastersLoading=false,dark=false;
+ private boolean dispatchedTab=false,destroyed=false,mastersLoading=false,dark=false,quickMode=false;
  private int ordersHeaderCount=0;
  private TextView pendingTabView,dispatchedTabView;
  private static final int VOICE_ORDER=840; private AutoCompleteTextView voiceBuyer; private EditText voiceNotes; private LinearLayout voiceItemsBox;
@@ -58,7 +58,7 @@ public final class OrdersActivity extends Activity {
   applyAppearance();super.onCreate(state);styleWindow();getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);currency.setCurrency(Currency.getInstance("INR"));
   try{store=new CryptoStore(this);api=new BridgeApi(store);offline=new OfflineOrdersStore(store);}catch(Exception e){fatal(e);return;}
   if(store.get("base").isEmpty()||store.get("device").isEmpty()){needsMain("Connect and approve this phone in TallyBridge once. After that, Orders works even when the PC is offline.");return;}
-  if(ACTION_NEW.equals(getIntent().getAction()))openForm(null);else showOrders();
+  String action=getIntent().getAction();quickMode=ACTION_QUICK.equals(action);if(ACTION_NEW.equals(action)||quickMode)openForm(null);else showOrders();
  }
  @Override protected void onDestroy(){destroyed=true;work.shutdownNow();main.removeCallbacksAndMessages(null);super.onDestroy();}
 
@@ -141,22 +141,28 @@ public final class OrdersActivity extends Activity {
   try{startActivityForResult(i,VOICE_ORDER);}catch(Exception e){toast("Voice recognition is not available on this phone");}
  }
  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=VOICE_ORDER||result!=RESULT_OK||data==null)return;ArrayList<String> xs=data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);if(xs==null||xs.isEmpty())return;applyVoiceOrder(xs.get(0));}
+ private double voiceQty(String lower,String item){
+  String q=java.util.regex.Pattern.quote(item.toLowerCase(Locale.ROOT));
+  java.util.regex.Pattern[] ps=new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("([0-9]+(?:[.][0-9]+)?)\\s*(?:dozen|dz|pcs?|pieces?)?\\s+(?:of\\s+)?"+q),java.util.regex.Pattern.compile(q+"\\s*[-,:]?\\s*([0-9]+(?:[.][0-9]+)?)\\s*(?:dozen|dz|pcs?|pieces?)?")};
+  for(java.util.regex.Pattern p:ps){java.util.regex.Matcher m=p.matcher(lower);if(m.find())try{return Double.parseDouble(m.group(1));}catch(Exception ignored){}}
+  return 1;
+ }
  private void applyVoiceOrder(String spoken){
-  if(voiceNotes!=null)voiceNotes.setText(spoken);String lower=spoken.toLowerCase(Locale.ROOT);
+  if(voiceNotes!=null&&!quickMode)voiceNotes.setText(spoken);String lower=spoken.toLowerCase(Locale.ROOT);
   if(voiceBuyer!=null&&parties!=null){String best="";for(int i=0;i<parties.length();i++){JSONObject p=parties.optJSONObject(i);String n=p==null?parties.optString(i):p.optString("name");if(!n.isEmpty()&&lower.contains(n.toLowerCase(Locale.ROOT))&&n.length()>best.length())best=n;}if(!best.isEmpty())voiceBuyer.setText(best,false);}
-  JSONObject matched=null;String matchedName="";if(stock!=null){for(int i=0;i<stock.length();i++){JSONObject x=stock.optJSONObject(i);String n=x==null?"":x.optString("name");if(!n.isEmpty()&&lower.contains(n.toLowerCase(Locale.ROOT))&&n.length()>matchedName.length()){matched=x;matchedName=n;}}}
-  if(matched!=null){double q=1;java.util.regex.Matcher m=java.util.regex.Pattern.compile("([0-9]+(?:[.][0-9]+)?) +(dozen +|pcs? +|pieces? +)?"+java.util.regex.Pattern.quote(matchedName.toLowerCase(Locale.ROOT))).matcher(lower);if(m.find())try{q=Double.parseDouble(m.group(1));}catch(Exception ignored){}JSONObject existing=new JSONObject();try{existing.put("name",matchedName).put("quantity",q).put("unit",matched.optString("unit"));}catch(Exception ignored){}if(itemRows.size()==1&&itemRows.get(0).item.getText().toString().trim().isEmpty()){ItemRow r=itemRows.get(0);r.item.setText(matchedName,false);r.qty.setText(qty(q));r.unit.setText(matched.optString("unit"));}else if(voiceItemsBox!=null)addItemRow(voiceItemsBox,existing);}
-  toast("Voice order captured • review before saving");
+  List<JSONObject> matches=new ArrayList<>();Set<String> used=new HashSet<>();if(stock!=null){List<JSONObject> candidates=new ArrayList<>();for(int i=0;i<stock.length();i++){JSONObject x=stock.optJSONObject(i);if(x!=null&&!x.optString("name").isEmpty()&&lower.contains(x.optString("name").toLowerCase(Locale.ROOT)))candidates.add(x);}candidates.sort((x,y)->Integer.compare(y.optString("name").length(),x.optString("name").length()));for(JSONObject x:candidates){String name=x.optString("name");if(used.add(name.toLowerCase(Locale.ROOT)))matches.add(x);}}
+  int added=0;for(JSONObject matched:matches){String name=matched.optString("name");double q=voiceQty(lower,name);JSONObject existing=new JSONObject();try{existing.put("name",name).put("quantity",q).put("unit",matched.optString("unit"));}catch(Exception ignored){}if(added==0&&itemRows.size()==1&&itemRows.get(0).item.getText().toString().trim().isEmpty()){ItemRow r=itemRows.get(0);r.item.setText(name,false);r.qty.setText(qty(q));r.unit.setText(matched.optString("unit"));}else if(voiceItemsBox!=null)addItemRow(voiceItemsBox,existing);added++;}
+  toast(added>0?("Voice order captured • "+added+" item"+(added==1?"":"s")+" found • review before saving"):"Voice captured • choose item and quantity before saving");
  }
  private void refreshBootstrapSilently(){work.execute(()->{try{JSONObject x=api.get("/api/v1/mobile/bootstrap");offline.cacheBootstrap(x);}catch(Exception ignored){}});}
  private void buildForm(JSONObject order){
-  frame(order==null?"Add order":"Edit order","Offline-ready • saved buyer/item lists from Tally • rate is optional.");itemRows.clear();buyerDetails=order==null?new JSONObject():order.optJSONObject("buyerDetails");if(buyerDetails==null)buyerDetails=new JSONObject();buyerDetailsFor=order==null?"":order.optString("buyer");List<String> names=companyNames();if(names.isEmpty()){body.addView(txt("No saved company is available yet.",16,AMBER));return;}
+  frame(order==null?(quickMode?"Quick order":"Add order"):"Edit order",quickMode&&order==null?"Party • items • quantity • dispatch • save. Works offline.":"Offline-ready • saved buyer/item lists from Tally • rate is optional.");itemRows.clear();buyerDetails=order==null?new JSONObject():order.optJSONObject("buyerDetails");if(buyerDetails==null)buyerDetails=new JSONObject();buyerDetailsFor=order==null?"":order.optString("buyer");List<String> names=companyNames();if(names.isEmpty()){body.addView(txt("No saved company is available yet.",16,AMBER));return;}
   TextView offlineNote=txt("Changes save immediately on this phone. PC connection is not required.",12,TEAL);offlineNote.setTypeface(Typeface.DEFAULT_BOLD);body.addView(offlineNote);
   body.addView(txt("COMPANY",11,MUTED),full(10));Spinner companySpin=new Spinner(this);companySpin.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));String wanted=order==null?store.get("company"):order.optString("company");companySpin.setSelection(Math.max(0,names.indexOf(wanted)));body.addView(companySpin,full(6));
   body.addView(txt("BUYER",11,MUTED),full(14));AutoCompleteTextView buyer=auto("Search saved Tally buyer or type name");if(order!=null)buyer.setText(order.optString("buyer"),false);body.addView(buyer,full(6));TextView buyerInfo=txt(buyerSummary(buyerDetails),12,MUTED);body.addView(buyerInfo);
   LinearLayout itemsBox=col();body.addView(txt("ITEMS",11,MUTED),full(16));body.addView(itemsBox);JSONArray existing=order==null?null:order.optJSONArray("items");if(existing!=null&&existing.length()>0){for(int i=0;i<existing.length();i++)addItemRow(itemsBox,existing.optJSONObject(i));}else addItemRow(itemsBox,null);body.addView(btn("+ Add another item",v->addItemRow(itemsBox,null)),full(8));
   body.addView(txt("DISPATCHED THROUGH",11,MUTED),full(16));EditText dispatchedThrough=input("Transport / courier / person (optional)",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_WORDS);if(order!=null)dispatchedThrough.setText(order.optString("dispatchedThrough"));body.addView(dispatchedThrough,full(6));
-  body.addView(txt("NOTES",11,MUTED),full(16));EditText notes=input("Colours, packing, delivery instructions…",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);notes.setMinLines(2);if(order!=null)notes.setText(order.optString("notes"));body.addView(notes,full(6));if(order==null)body.addView(btn("🎙 Speak order",v->startVoiceOrder(buyer,notes,itemsBox)),full(8));body.addView(primary(order==null?"Save pending order":"Update pending order",v->saveForm(order,companySpin,buyer,dispatchedThrough,notes)),full(18));
+  EditText notes=input("Colours, packing, delivery instructions…",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);notes.setMinLines(2);if(order!=null)notes.setText(order.optString("notes"));if(!quickMode||order!=null){body.addView(txt("NOTES",11,MUTED),full(16));body.addView(notes,full(6));}if(order==null)body.addView(btn("🎙 Speak order",v->startVoiceOrder(buyer,notes,itemsBox)),full(8));body.addView(primary(order==null?(quickMode?"Save quick order":"Save pending order"):"Update pending order",v->saveForm(order,companySpin,buyer,dispatchedThrough,notes)),full(18));
   final String[] loadedCompany={""};companySpin.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){String c=names.get(pos);store.put("company",c);if(!c.equals(loadedCompany[0])){if(!loadedCompany[0].isEmpty()){buyer.setText("",false);buyerDetails=new JSONObject();buyerDetailsFor="";buyerInfo.setText(buyerSummary(buyerDetails));}loadedCompany[0]=c;loadMasters(c,buyer,buyerInfo);}}});
   buyer.setOnItemClickListener((p,v,pos,id)->fetchBuyer(String.valueOf(companySpin.getSelectedItem()),buyer.getText().toString(),buyerInfo));buyer.setOnFocusChangeListener((v,has)->{if(!has&&!buyer.getText().toString().trim().isEmpty())fetchBuyer(String.valueOf(companySpin.getSelectedItem()),buyer.getText().toString(),buyerInfo);});
  }

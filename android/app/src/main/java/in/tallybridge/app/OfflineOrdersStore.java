@@ -84,4 +84,5 @@ final class OfflineOrdersStore {
  JSONObject buyer(String company,String buyer)throws Exception {JSONObject c=read(BUYERS).optJSONObject(company);return clone(c==null?null:c.optJSONObject(buyer));}
 
  int waitingCount()throws Exception {JSONObject s=state();JSONArray a=s.getJSONArray("orders");int n=0;for(int i=0;i<a.length();i++){if(hasLocalMutation(a.optJSONObject(i)))n++;}return n;}
+ int pendingPhotoUploadCount()throws Exception {JSONObject s=state();JSONArray a=s.getJSONArray("orders");int n=0;for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||!hasLocalMutation(o))continue;JSONArray photos=o.optJSONArray("attachments");if(photos==null)continue;for(int j=0;j<photos.length();j++){JSONObject p=photos.optJSONObject(j);if(p!=null&&!p.optString("localPath").isEmpty())n++;}}return n;}
 }
