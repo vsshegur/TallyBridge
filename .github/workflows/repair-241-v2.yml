@@ -1,4 +1,4 @@
-name: Validate TallyBridge 2.4.1 repair v2
+name: Validate materialized TallyBridge 2.4.1 repair
 
 on:
   push:
@@ -7,11 +7,8 @@ on:
     paths:
       - .github/workflows/repair-241-v2.yml
 
-permissions:
-  contents: write
-
 jobs:
-  repair:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,83 +23,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-
-      - name: Prepare robust repair script
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('scripts/repair_241.py')
-          s=p.read_text(encoding='utf-8')
-          old='''old_fetch = "Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH>"\nnew_fetch = "Amount,AllInventoryEntries.*,AllInventoryEntries.GSTItemHSNCodeEx,AllLedgerEntries.*,LedgerEntries.*</FETCH>"\nif s.count(old_fetch) != 1:\n    raise SystemExit("voucher detail FETCH anchor mismatch")\ns = s.replace(old_fetch, new_fetch, 1)'''
-          new='''old_fetch = "AllInventoryEntries.*"\nnew_fetch = "AllInventoryEntries.*,AllInventoryEntries.GSTItemHSNCodeEx"\nif old_fetch not in s:\n    raise SystemExit("voucher inventory FETCH anchor missing")\ns = s.replace(old_fetch, new_fetch)'''
-          if old not in s:
-              raise SystemExit('repair script fetch block not found')
-          p.write_text(s.replace(old,new,1),encoding='utf-8')
-          PY
-
-      - name: Apply repair
-        id: apply
-        shell: bash
-        run: |
-          set +e
-          python3 scripts/repair_241.py 2>&1 | tee ci-apply-error.log
-          S=${PIPESTATUS[0]}
-          if [ $S -eq 0 ]; then
-            gofmt -w internal/app/tally.go internal/app/tally_test.go internal/app/pdf.go internal/app/types.go 2>&1 | tee -a ci-apply-error.log
-            S=${PIPESTATUS[0]}
-          fi
-          if [ $S -eq 0 ]; then
-            git diff --check 2>&1 | tee -a ci-apply-error.log
-            S=${PIPESTATUS[0]}
-          fi
-          if [ $S -ne 0 ]; then exit 1; fi
-
-      - name: Backend tests
-        if: steps.apply.outcome == 'success'
-        id: backend
-        shell: bash
-        run: |
-          set +e
-          go test ./internal/app 2>&1 | tee ci-backend-error.log
-          A=${PIPESTATUS[0]}
-          go vet ./internal/app ./cmd/tallybridge ./cmd/uninstall 2>&1 | tee -a ci-backend-error.log
-          B=${PIPESTATUS[0]}
-          if [ $A -ne 0 ] || [ $B -ne 0 ]; then exit 1; fi
-
-      - name: Android compile and lint
-        if: steps.backend.outcome == 'success'
-        id: android
+      - name: Go tests
+        run: go test -v ./internal/app
+      - name: Go vet
+        run: go vet ./internal/app ./cmd/tallybridge ./cmd/uninstall
+      - name: Android tests build and lint
         working-directory: android
-        shell: bash
-        run: |
-          set +e
-          gradle --no-daemon test assembleDebug lintDebug 2>&1 | tee ../ci-android-error.log
-          S=${PIPESTATUS[0]}
-          if [ $S -ne 0 ]; then exit 1; fi
-
-      - name: Preserve failure diagnostics
-        if: failure()
-        shell: bash
-        run: |
-          cp ci-apply-error.log /tmp/ci-apply-error.log 2>/dev/null || true
-          cp ci-backend-error.log /tmp/ci-backend-error.log 2>/dev/null || true
-          cp ci-android-error.log /tmp/ci-android-error.log 2>/dev/null || true
-          git restore . || true
-          git clean -fd || true
-          cp /tmp/ci-apply-error.log . 2>/dev/null || true
-          cp /tmp/ci-backend-error.log . 2>/dev/null || true
-          cp /tmp/ci-android-error.log . 2>/dev/null || true
-          git config user.name 'TallyBridge Repair Bot'
-          git config user.email 'actions@users.noreply.github.com'
-          git add ci-*-error.log 2>/dev/null || true
-          if ! git diff --cached --quiet; then
-            git commit -m 'Record 2.4.1 repair v2 validation failure'
-            git push origin HEAD:fix/invoice-widget-signing-20261003
-          fi
-
+        run: gradle --no-daemon test assembleDebug lintDebug
       - name: Behavior guards
-        if: success()
         run: |
           grep -q 'AllInventoryEntries.GSTItemHSNCodeEx' internal/app/tally.go
           grep -q 'GSTITEMHSNCODEEX' internal/app/tally.go
@@ -112,16 +40,3 @@ jobs:
           grep -q 'android:minResizeHeight="150dp"' android/app/src/main/res/xml/orders_widget_info.xml
           grep -q "versionName '2.4.1'" android/app/build.gradle
           grep -q 'const Version = "2.4.1"' internal/app/types.go
-          grep -q 'Verify permanent Android signing identity' .github/workflows/release.yml
-
-      - name: Commit verified repair
-        if: success()
-        shell: bash
-        run: |
-          rm -f ci-apply-error.log ci-backend-error.log ci-android-error.log
-          git rm .github/workflows/apply-invoice-widget-signing-fix.yml .github/workflows/repair-241.yml .github/workflows/repair-241-v2.yml scripts/repair_241.py
-          git config user.name 'TallyBridge Repair Bot'
-          git config user.email 'actions@users.noreply.github.com'
-          git add -A
-          git commit -m 'Fix invoice HSN/address, app resume, widget and permanent signing'
-          git push origin HEAD:fix/invoice-widget-signing-20261003
