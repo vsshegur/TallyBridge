@@ -41,7 +41,11 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          GOFLAGS="-mod=mod" go vet ./internal/app ./cmd/tallybridge ./cmd/uninstall 2>&1 | tee go-vet.log
+          GOFLAGS="-mod=mod" go vet ./internal/app ./cmd/tallybridge 2>&1 | tee go-vet.log
+          A=${PIPESTATUS[0]}
+          GOFLAGS="-mod=mod" GOOS=windows GOARCH=amd64 go vet ./cmd/uninstall 2>&1 | tee -a go-vet.log
+          B=${PIPESTATUS[0]}
+          test $A -eq 0 -a $B -eq 0
 
       - name: Windows desktop compile
         id: desktop
@@ -80,6 +84,7 @@ jobs:
             grep -q 'android:minResizeHeight="150dp"' android/app/src/main/res/xml/orders_widget_info.xml
             grep -q "versionName '2.4.1'" android/app/build.gradle
             grep -q 'const Version = "2.4.1"' internal/app/types.go
+            grep -q 'Optional / non-posting' internal/app/pdf.go
           } 2>&1 | tee behavior-guards.log
 
       - name: Upload validation diagnostics
