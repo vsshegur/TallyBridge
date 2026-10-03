@@ -32,12 +32,25 @@ jobs:
           python3 scripts/apply_241_core.py
           gofmt -w internal/app/*.go
       - name: Backend desktop and Windows regression
+        shell: bash
         run: |
-          go test ./internal/app
+          set +e
+          go test ./internal/app > /tmp/backend-241.log 2>&1
+          status=$?
+          cat /tmp/backend-241.log
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          set -e
           go vet ./internal/app
           node --check internal/app/web/admin.js
           GOOS=windows GOARCH=amd64 go build ./cmd/tallybridge
           GOOS=windows GOARCH=amd64 go build ./cmd/uninstall
+      - name: Upload backend diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TallyBridge-2.4.1-Backend-Diagnostic
+          path: /tmp/backend-241.log
+          if-no-files-found: ignore
       - name: Android build lint and test APK
         working-directory: android
         run: |
@@ -83,7 +96,7 @@ jobs:
         if: success()
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "4189823+github-actions[bot]@users.noreply.github.com"
           git add -A
           git reset -- scripts/apply_241_core.py scripts/fix_241_guard.py .github/workflows/verify-241.yml android/241-screenshots || true
           if ! git diff --cached --quiet; then
