@@ -137,21 +137,22 @@ public final class OrdersActivity extends Activity {
  }
  private void startVoiceOrder(AutoCompleteTextView buyer,EditText notes,LinearLayout itemsBox){
   voiceBuyer=buyer;voiceNotes=notes;voiceItemsBox=itemsBox;
-  Intent i=new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);i.putExtra(RecognizerIntent.EXTRA_PROMPT,"Say party, item and quantity");
+  Intent i=new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);i.putExtra(RecognizerIntent.EXTRA_PROMPT,"Say party, items and quantities");
   try{startActivityForResult(i,VOICE_ORDER);}catch(Exception e){toast("Voice recognition is not available on this phone");}
  }
  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=VOICE_ORDER||result!=RESULT_OK||data==null)return;ArrayList<String> xs=data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);if(xs==null||xs.isEmpty())return;applyVoiceOrder(xs.get(0));}
- private double voiceQty(String lower,String item){
+ private static final class VoiceAmount { final double quantity; final String unit; VoiceAmount(double q,String u){quantity=q;unit=u;} }
+ private VoiceAmount voiceAmount(String lower,String item,String defaultUnit){
   String q=java.util.regex.Pattern.quote(item.toLowerCase(Locale.ROOT));
-  java.util.regex.Pattern[] ps=new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("([0-9]+(?:[.][0-9]+)?)\\s*(?:dozen|dz|pcs?|pieces?)?\\s+(?:of\\s+)?"+q),java.util.regex.Pattern.compile(q+"\\s*[-,:]?\\s*([0-9]+(?:[.][0-9]+)?)\\s*(?:dozen|dz|pcs?|pieces?)?")};
-  for(java.util.regex.Pattern p:ps){java.util.regex.Matcher m=p.matcher(lower);if(m.find())try{return Double.parseDouble(m.group(1));}catch(Exception ignored){}}
-  return 1;
+  java.util.regex.Pattern[] ps=new java.util.regex.Pattern[]{java.util.regex.Pattern.compile("([0-9]+(?:[.][0-9]+)?)\\s*(dozen|dz|pcs?|pieces?)?\\s+(?:of\\s+)?"+q),java.util.regex.Pattern.compile(q+"\\s*[-,:]?\\s*([0-9]+(?:[.][0-9]+)?)\\s*(dozen|dz|pcs?|pieces?)?")};
+  for(java.util.regex.Pattern p:ps){java.util.regex.Matcher m=p.matcher(lower);if(m.find())try{double n=Double.parseDouble(m.group(1));String u=m.group(2);if(u==null||u.trim().isEmpty())u=defaultUnit;else{u=u.toLowerCase(Locale.ROOT);if(u.equals("dz")||u.startsWith("dozen"))u="dozen";else if(u.startsWith("pc")||u.startsWith("piece"))u="pcs";}return new VoiceAmount(n,u==null?"":u);}catch(Exception ignored){}}
+  return new VoiceAmount(1,defaultUnit==null?"":defaultUnit);
  }
  private void applyVoiceOrder(String spoken){
   if(voiceNotes!=null&&!quickMode)voiceNotes.setText(spoken);String lower=spoken.toLowerCase(Locale.ROOT);
   if(voiceBuyer!=null&&parties!=null){String best="";for(int i=0;i<parties.length();i++){JSONObject p=parties.optJSONObject(i);String n=p==null?parties.optString(i):p.optString("name");if(!n.isEmpty()&&lower.contains(n.toLowerCase(Locale.ROOT))&&n.length()>best.length())best=n;}if(!best.isEmpty())voiceBuyer.setText(best,false);}
-  List<JSONObject> matches=new ArrayList<>();Set<String> used=new HashSet<>();if(stock!=null){List<JSONObject> candidates=new ArrayList<>();for(int i=0;i<stock.length();i++){JSONObject x=stock.optJSONObject(i);if(x!=null&&!x.optString("name").isEmpty()&&lower.contains(x.optString("name").toLowerCase(Locale.ROOT)))candidates.add(x);}candidates.sort((x,y)->Integer.compare(y.optString("name").length(),x.optString("name").length()));for(JSONObject x:candidates){String name=x.optString("name");if(used.add(name.toLowerCase(Locale.ROOT)))matches.add(x);}}
-  int added=0;for(JSONObject matched:matches){String name=matched.optString("name");double q=voiceQty(lower,name);JSONObject existing=new JSONObject();try{existing.put("name",name).put("quantity",q).put("unit",matched.optString("unit"));}catch(Exception ignored){}if(added==0&&itemRows.size()==1&&itemRows.get(0).item.getText().toString().trim().isEmpty()){ItemRow r=itemRows.get(0);r.item.setText(name,false);r.qty.setText(qty(q));r.unit.setText(matched.optString("unit"));}else if(voiceItemsBox!=null)addItemRow(voiceItemsBox,existing);added++;}
+  List<JSONObject> matches=new ArrayList<>();if(stock!=null){List<JSONObject> candidates=new ArrayList<>();for(int i=0;i<stock.length();i++){JSONObject x=stock.optJSONObject(i);if(x!=null&&!x.optString("name").isEmpty()&&lower.contains(x.optString("name").toLowerCase(Locale.ROOT)))candidates.add(x);}candidates.sort((x,y)->Integer.compare(y.optString("name").length(),x.optString("name").length()));String remaining=lower;for(JSONObject x:candidates){String n=x.optString("name").toLowerCase(Locale.ROOT);int at=remaining.indexOf(n);if(at<0)continue;matches.add(x);remaining=remaining.substring(0,at)+String.join("",Collections.nCopies(n.length()," "))+remaining.substring(at+n.length());}}
+  int added=0;for(JSONObject matched:matches){String name=matched.optString("name"),defaultUnit=matched.optString("unit");VoiceAmount va=voiceAmount(lower,name,defaultUnit);JSONObject existing=new JSONObject();try{existing.put("name",name).put("quantity",va.quantity).put("unit",va.unit);}catch(Exception ignored){}if(added==0&&itemRows.size()==1&&itemRows.get(0).item.getText().toString().trim().isEmpty()){ItemRow r=itemRows.get(0);r.item.setText(name,false);r.qty.setText(qty(va.quantity));r.unit.setText(va.unit);}else if(voiceItemsBox!=null)addItemRow(voiceItemsBox,existing);added++;}
   toast(added>0?("Voice order captured • "+added+" item"+(added==1?"":"s")+" found • review before saving"):"Voice captured • choose item and quantity before saving");
  }
  private void refreshBootstrapSilently(){work.execute(()->{try{JSONObject x=api.get("/api/v1/mobile/bootstrap");offline.cacheBootstrap(x);}catch(Exception ignored){}});}
