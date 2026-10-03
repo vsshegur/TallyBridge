@@ -60,29 +60,39 @@ func hsnFromNode(n *xnode, asOf string) string {
 }
 func supplierDetailsFromXML(raw []byte) map[string]string {
 	root, _ := parseTree(raw)
-	if root == nil { return map[string]string{} }
+	if root == nil {
+		return map[string]string{}
+	}
 	details := map[string]string{}
-	if v := firstDeep(root, "MAILINGNAME", "NAME"); v != "" { details["name"] = strings.TrimSpace(v) }
+	if v := firstDeep(root, "MAILINGNAME", "NAME"); v != "" {
+		details["name"] = strings.TrimSpace(v)
+	}
 	if v := firstNonBlank(firstDeep(root, "GSTREGNUMBER", "GSTREGISTRATIONNUMBER", "GSTIN", "CMPGSTIN"), firstDeepTagMatch(root, func(tag string) bool { return strings.Contains(tag, "GST") && strings.HasSuffix(tag, "IN") })); v != "" {
 		details["gstin"] = strings.ToUpper(strings.TrimSpace(v))
 	}
 	if a := allDeep(root, "ADDRESS"); len(a) > 0 {
 		clean, seen := []string{}, map[string]bool{}
 		for _, line := range a {
-			line = strings.TrimSpace(line); key := strings.ToLower(line)
-			if line != "" && !seen[key] { seen[key] = true; clean = append(clean, line) }
+			line = strings.TrimSpace(line)
+			key := strings.ToLower(line)
+			if line != "" && !seen[key] {
+				seen[key] = true
+				clean = append(clean, line)
+			}
 		}
 		details["address"] = strings.Join(clean, ", ")
 	}
 	for key, tags := range map[string][]string{
-		"city": {"CITY", "PLACENAME", "LOCATION"},
-		"state": {"STATENAME", "STATE"},
+		"city":    {"CITY", "PLACENAME", "LOCATION"},
+		"state":   {"STATENAME", "STATE"},
 		"country": {"COUNTRYNAME", "COUNTRY"},
 		"pincode": {"PINCODE", "PIN"},
-		"phone": {"MOBILENUMBER", "PHONENUMBER", "MOBILE", "PHONE", "CMPMOBILENO", "CMPPHONENUMBER"},
-		"email": {"EMAIL", "EMAILID", "CMPEMAIL"},
+		"phone":   {"MOBILENUMBER", "PHONENUMBER", "MOBILE", "PHONE", "CMPMOBILENO", "CMPPHONENUMBER"},
+		"email":   {"EMAIL", "EMAILID", "CMPEMAIL"},
 	} {
-		if v := firstDeep(root, tags...); v != "" { details[key] = strings.TrimSpace(v) }
+		if v := firstDeep(root, tags...); v != "" {
+			details[key] = strings.TrimSpace(v)
+		}
 	}
 	if details["phone"] == "" {
 		details["phone"] = firstDeepTagMatch(root, func(tag string) bool {
@@ -92,7 +102,9 @@ func supplierDetailsFromXML(raw []byte) map[string]string {
 	if details["email"] == "" {
 		details["email"] = firstDeepTagMatch(root, func(tag string) bool { return strings.Contains(tag, "EMAIL") })
 	}
-	if len(details["gstin"]) >= 2 { details["stateCode"] = details["gstin"][:2] }
+	if len(details["gstin"]) >= 2 {
+		details["stateCode"] = details["gstin"][:2]
+	}
 	return details
 }
 func mergeSupplierDetails(dst, src map[string]string) {

@@ -156,6 +156,16 @@ func bankHTML(banks []BankDetails, payments ...PaymentQR) string {
 	out.WriteString(`</div></section>`)
 	return out.String()
 }
+func adaptiveInvoiceHTML(doc string, itemCount int) string {
+	if itemCount > 7 {
+		return doc
+	}
+	css := `@page{margin:10mm 10mm 12mm!important}.heading{padding-bottom:2.2mm!important;margin-bottom:2.8mm!important}h1{font-size:18pt!important}.supplier-line{font-size:7.6pt!important}.grid{margin-bottom:2.5mm!important}.panel{padding:2.2mm!important}.panel p{margin-bottom:.8mm!important}.kv td{padding:.55mm 0!important}table.items{margin:1.8mm 0 2.5mm!important;font-size:7.9pt!important}.items th{padding:1.6mm 1.4mm!important}.items td{padding:1.55mm 1.4mm!important}.totals{width:58%!important}.totals td{padding:.9mm 1.4mm!important}.grand td{padding:1.8mm 1.4mm!important;font-size:10pt!important}.bank{margin-top:2.8mm!important;padding:2.4mm!important}.bank .kv td{padding:.35mm 0!important}.bank-qr img{width:25mm!important;height:25mm!important}.note{padding:2mm!important;margin:2mm 0!important}.narration{margin-top:2mm!important}`
+	if itemCount <= 3 {
+		css += `body{font-size:8.4pt!important}.caption,.label{font-size:7.4pt!important}`
+	}
+	return strings.Replace(doc, "</style>", css+"</style>", 1)
+}
 func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, `<div class="meta">%s</div><div class="grid"><section class="panel"><h3>Bill to</h3><p><b>%s</b></p>`, he(pdfDataNote(x.CommonData)), he(firstNonBlank(x.CustomerName, "Customer not returned")))
@@ -225,7 +235,7 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	if x.Optional {
 		title, subtitle = "PROFORMA INVOICE", "Optional / non-posting voucher from TallyPrime"
 	}
-	return pdfDocument(firstNonBlank(x.FirmName, x.Company), title, subtitle, b.String(), x.Supplier)
+	return adaptiveInvoiceHTML(pdfDocument(firstNonBlank(x.FirmName, x.Company), title, subtitle, b.String(), x.Supplier), len(x.Items))
 }
 func invoicePDF(x VoucherDetail, bank ...BankDetails) ([]byte, error) {
 	return renderPDF(applyPDFTemplate(invoiceHTML(x, bank...), x.PDFTemplate))
