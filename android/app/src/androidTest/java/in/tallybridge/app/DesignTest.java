@@ -22,6 +22,12 @@ public class DesignTest {
  private void call(String name)throws Exception {Method m=MainActivity.class.getDeclaredMethod(name);m.setAccessible(true);m.invoke(rule.getActivity());}
  private void field(String name,Object value)throws Exception {Field f=MainActivity.class.getDeclaredField(name);f.setAccessible(true);f.set(rule.getActivity(),value);}
  private void ui(Runnable r){InstrumentationRegistry.getInstrumentation().runOnMainSync(r);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
+ private void pressBack()throws Exception {
+  android.os.ParcelFileDescriptor command=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("input keyevent KEYCODE_BACK");
+  if(command!=null)command.close();
+  Thread.sleep(300);
+  InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+ }
  private void capture(String name)throws Exception {
   Thread.sleep(400);
   Bitmap b=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(b);
@@ -65,8 +71,7 @@ public class DesignTest {
   capture("11-sync");
   ui(()->{try{field("tab","More");call("more");call("chooseAppearance");}catch(Exception e){throw new RuntimeException(e);}});
   capture("08-dark-appearance");
-  InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-  InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+  pressBack();
   ui(()->{try{
    rule.getActivity().getSharedPreferences("appearance",0).edit().putString("mode","Light").commit();call("applyAppearance");
    field("tab","Payments");field("company","Vijayalaxmi Textiles • Solapur");
