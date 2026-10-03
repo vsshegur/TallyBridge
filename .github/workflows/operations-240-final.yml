@@ -1,0 +1,113 @@
+name: Final Verify Operations Center 2.4.0
+
+on:
+  push:
+    branches: [feature/operations-center-2.4.0]
+    paths:
+      - scripts/finalize_workspace_240.py
+      - scripts/finalize_android_240.py
+      - scripts/finalize_desktop_240.py
+      - scripts/finalize_tests_240.py
+      - .github/workflows/operations-240-final.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  final-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/operations-center-2.4.0
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.12'
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Apply final guarded patches
+        run: |
+          python3 scripts/finalize_workspace_240.py
+          python3 scripts/finalize_android_240.py
+          python3 scripts/finalize_desktop_240.py
+          python3 scripts/finalize_tests_240.py
+          gofmt -w internal/app/*.go
+      - name: Backend tests vet and Windows target build
+        run: |
+          go test ./internal/app
+          go vet ./internal/app ./cmd/tallybridge
+          GOOS=windows GOARCH=amd64 go build ./cmd/tallybridge
+      - name: Desktop JavaScript syntax
+        run: |
+          node --check internal/app/web/admin.js
+          node --check internal/app/web/orders.js
+          node --check internal/app/web/operations.js
+      - name: Android compile lint and test APK
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest
+      - name: Run full Android emulator regression
+        timeout-minutes: 12
+        run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/tallybridge-android"
+          export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          trap 'cat /tmp/emulator.log || true' EXIT
+          sudo apt-get update -qq
+          sudo apt-get install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0
+          sudo chmod 666 /dev/kvm
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "system-images;android-30;google_apis;x86_64" "emulator" "platform-tools"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n opsfinal -k "system-images;android-30;google_apis;x86_64" --force
+          "$ANDROID_HOME/emulator/emulator" -avd opsfinal -skin 1080x1920 -no-window -no-audio -no-boot-anim -gpu swiftshader -no-snapshot > /tmp/emulator.log 2>&1 &
+          timeout 90 adb wait-for-device
+          timeout 240 bash -c 'until adb shell getprop sys.boot_completed | tr -d "\r" | grep -q 1; do sleep 3; done'
+          adb shell wm size 1080x1920
+          adb shell wm density 420
+          adb shell input keyevent 82
+          adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+          adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell am instrument -w in.tallybridge.app.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/ops-results.txt
+          grep -q 'OK (10 tests)' /tmp/ops-results.txt
+          mkdir -p android/ops-screenshots
+          for screen in 26-work-today 27-customer-360 28-work-system; do
+            adb exec-out run-as in.tallybridge.app cat "files/ui/$screen.png" > "android/ops-screenshots/$screen.png"
+            test -s "android/ops-screenshots/$screen.png"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Operations-Center-2.4.0-Screenshots
+          path: android/ops-screenshots/*.png
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: TallyBridge-2.4.0-Verified-Android-Preview
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Commit verified production and test source
+        if: success()
+        run: |
+          git config user.name 'TallyBridge CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add internal android
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No source changes to commit'
+          else
+            git commit -m 'Finalize Operations Center 2.4.0 [ops-final]'
+            git push origin HEAD:feature/operations-center-2.4.0
+          fi
