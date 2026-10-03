@@ -8,6 +8,8 @@ on:
         required: true
         default: v2.1.0
   push:
+    branches:
+      - fix/invoice-widget-signing-20261003
     tags:
       - 'v*'
 
@@ -56,7 +58,7 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee app/build/outputs/apk/release/TallyBridge-Android-APK-SIGNATURE.txt
           grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" app/build/outputs/apk/release/TallyBridge-Android-APK-SIGNATURE.txt
           sha256sum "$APK" > app/build/outputs/apk/release/TallyBridge-Android-SHA256SUMS.txt
-          keytool -list -v -keystore "$TB_KEYSTORE" -storepass "$TB_STORE_PASSWORD" -alias "$TB_KEY_ALIAS"             | sed -n '/Alias name:/p;/SHA1:/p;/SHA256:/p' > app/build/outputs/apk/release/TallyBridge-Android-SIGNING-IDENTITY.txt
+          keytool -list -v -keystore "$TB_KEYSTORE" -storepass "$TB_STORE_PASSWORD" -alias "$TB_KEY_ALIAS" | sed -n '/Alias name:/p;/SHA1:/p;/SHA256:/p' > app/build/outputs/apk/release/TallyBridge-Android-SIGNING-IDENTITY.txt
       - uses: actions/upload-artifact@v4
         with:
           name: TallyBridge-Android-Release
