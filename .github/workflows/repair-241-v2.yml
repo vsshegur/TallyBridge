@@ -6,6 +6,9 @@ on:
       - fix/invoice-widget-signing-20261003
     paths:
       - .github/workflows/repair-241-v2.yml
+      - internal/app/**
+      - cmd/**
+      - android/**
 
 jobs:
   validate:
@@ -23,20 +26,86 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+
       - name: Go tests
-        run: go test -v ./internal/app
-      - name: Go vet
-        run: go vet ./internal/app ./cmd/tallybridge ./cmd/uninstall
-      - name: Android tests build and lint
-        working-directory: android
-        run: gradle --no-daemon test assembleDebug lintDebug
-      - name: Behavior guards
+        id: gotests
+        continue-on-error: true
+        shell: bash
         run: |
-          grep -q 'AllInventoryEntries.GSTItemHSNCodeEx' internal/app/tally.go
-          grep -q 'GSTITEMHSNCODEEX' internal/app/tally.go
-          grep -q 'customerAddressLines(r)' internal/app/tally.go
-          ! grep -q 'Read-only copy of data returned by TallyPrime' internal/app/pdf.go
-          grep -q 'onStop(){super.onStop();visible=false;}' android/app/src/main/java/in/tallybridge/app/MainActivity.java
-          grep -q 'android:minResizeHeight="150dp"' android/app/src/main/res/xml/orders_widget_info.xml
-          grep -q "versionName '2.4.1'" android/app/build.gradle
-          grep -q 'const Version = "2.4.1"' internal/app/types.go
+          set -o pipefail
+          GOFLAGS="-mod=mod" go test -v ./internal/app 2>&1 | tee go-test.log
+
+      - name: Go vet
+        id: govet
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          GOFLAGS="-mod=mod" go vet ./internal/app ./cmd/tallybridge ./cmd/uninstall 2>&1 | tee go-vet.log
+
+      - name: Windows desktop compile
+        id: desktop
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci-build
+          GOFLAGS="-mod=mod" GOOS=windows GOARCH=amd64 go build -o ci-build/TallyBridge.exe ./cmd/tallybridge 2>&1 | tee desktop-build.log
+          A=${PIPESTATUS[0]}
+          GOFLAGS="-mod=mod" GOOS=windows GOARCH=amd64 go build -o ci-build/TallyBridge-Uninstall.exe ./cmd/uninstall 2>&1 | tee -a desktop-build.log
+          B=${PIPESTATUS[0]}
+          test $A -eq 0 -a $B -eq 0
+
+      - name: Android tests build and lint
+        id: android
+        continue-on-error: true
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon test assembleDebug lintDebug 2>&1 | tee ../android-build.log
+
+      - name: Behavior guards
+        id: guards
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            grep -q 'AllInventoryEntries.GSTItemHSNCodeEx' internal/app/tally.go
+            grep -q 'GSTITEMHSNCODEEX' internal/app/tally.go
+            grep -q 'customerAddressLines(r)' internal/app/tally.go
+            ! grep -q 'Read-only copy of data returned by TallyPrime' internal/app/pdf.go
+            grep -q 'onStop(){super.onStop();visible=false;}' android/app/src/main/java/in/tallybridge/app/MainActivity.java
+            grep -q 'android:minResizeHeight="150dp"' android/app/src/main/res/xml/orders_widget_info.xml
+            grep -q "versionName '2.4.1'" android/app/build.gradle
+            grep -q 'const Version = "2.4.1"' internal/app/types.go
+          } 2>&1 | tee behavior-guards.log
+
+      - name: Upload validation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-241-validation-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            go-test.log
+            go-vet.log
+            desktop-build.log
+            android-build.log
+            behavior-guards.log
+
+      - name: Final validation gate
+        if: always()
+        shell: bash
+        run: |
+          echo "Go tests: ${{ steps.gotests.outcome }}"
+          echo "Go vet: ${{ steps.govet.outcome }}"
+          echo "Desktop compile: ${{ steps.desktop.outcome }}"
+          echo "Android: ${{ steps.android.outcome }}"
+          echo "Behavior guards: ${{ steps.guards.outcome }}"
+          test "${{ steps.gotests.outcome }}" = success
+          test "${{ steps.govet.outcome }}" = success
+          test "${{ steps.desktop.outcome }}" = success
+          test "${{ steps.android.outcome }}" = success
+          test "${{ steps.guards.outcome }}" = success
