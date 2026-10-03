@@ -233,7 +233,7 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	}
 	title, subtitle := "INVOICE", ""
 	if x.Optional {
-		title, subtitle = "PROFORMA INVOICE", ""
+		title, subtitle = "PROFORMA INVOICE", "Optional / non-posting"
 	}
 	return adaptiveInvoiceHTML(pdfDocument(firstNonBlank(x.FirmName, x.Company), title, subtitle, b.String(), x.Supplier), len(x.Items))
 }
