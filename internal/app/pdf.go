@@ -233,7 +233,7 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	}
 	title, subtitle := "INVOICE", ""
 	if x.Optional {
-		title, subtitle = "PROFORMA INVOICE", ""
+		title, subtitle = "PROFORMA INVOICE", "Optional / non-posting"
 	}
 	return adaptiveInvoiceHTML(pdfDocument(firstNonBlank(x.FirmName, x.Company), title, subtitle, b.String(), x.Supplier), len(x.Items))
 }
@@ -308,209 +308,94 @@ func statementDoc(x LedgerStatementData) pdfTableDoc {
 	for _, v := range x.Vouchers {
 		dr, cr, bal := "Not returned", "Not returned", "Unavailable"
 		if v.Debit != nil {
-			dr = indianNumber(*v.Debit)
-			cr = indianNumber(*v.Credit)
+			dr = inr(*v.Debit)
 		}
-		if v.Balance != nil {
-			bal = balanceText(*v.Balance)
+		if v.Credit != nil {
+			cr = inr(*v.Credit)
 		}
-		rows = append(rows, []string{displayDate(v.Date), v.Number, v.VoucherType, dr, cr, bal})
+		if v.RunningBalance != nil {
+			bal = balanceText(*v.RunningBalance)
+		}
+		rows = append(rows, []string{displayDate(v.Date), firstNonBlank(v.Number, "-"), firstNonBlank(v.VoucherType, "-"), dr, cr, bal})
 	}
-	rows = append(rows, []string{"", "Period totals", "", indianNumber(x.DebitTotal), indianNumber(x.CreditTotal), ""})
-	closing := "Unavailable"
-	if x.ClosingBalance != nil {
-		closing = balanceText(*x.ClosingBalance)
+	return pdfTableDoc{Title: "LEDGER STATEMENT", Company: x.Company, Subtitle: x.Ledger + "  |  " + displayDate(x.FromDate) + " to " + displayDate(x.ToDate), Headers: []string{"Date", "Voucher", "Type", "Debit", "Credit", "Running balance"}, Widths: []float64{1.1, 1.35, 1.2, 1, 1, 1.25}, Rows: rows, TotalLabel: "Statement total", Total: inr(x.Total), Note: pdfDataNote(x.CommonData), Numeric: []bool{false, false, false, true, true, true}}
+}
+func ledgerOutstandingDoc(x LedgerOutstandingData) pdfTableDoc {
+	rows := make([][]string, 0, len(x.Bills))
+	for _, v := range x.Bills {
+		rows = append(rows, []string{v.BillNumber, displayDate(v.Date), displayDate(v.DueDate), fmt.Sprint(v.AgeDays), inr(v.OriginalAmount), inr(v.PendingAmount)})
 	}
-	return pdfTableDoc{Title: "LEDGER STATEMENT", Company: x.Company, Supplier: x.Supplier, Template: x.PDFTemplate, Subtitle: x.Ledger + " | " + displayDate(x.FromDate) + " to " + displayDate(x.ToDate) + " | " + pdfDataNote(x.CommonData), Headers: []string{"Date", "Voucher", "Type", "Debit (INR)", "Credit (INR)", "Balance"}, Widths: []float64{70, 90, 70, 80, 80, 121}, Rows: rows, TotalLabel: "Closing balance", Total: closing, Note: x.BalanceNote, Numeric: []bool{false, false, false, true, true, true}}
+	return pdfTableDoc{Title: "OUTSTANDING BALANCE", Company: x.Company, Subtitle: x.Ledger, Headers: []string{"Bill", "Date", "Due date", "Age (days)", "Original", "Pending"}, Widths: []float64{1.4, 1, 1, .8, 1.2, 1.2}, Rows: rows, TotalLabel: "Total outstanding", Total: inr(x.Total), Note: pdfDataNote(x.CommonData), Numeric: []bool{false, false, false, true, true, true}}
 }
-func ledgerStatementPDF(x LedgerStatementData, bank ...BankDetails) ([]byte, error) {
-	return renderPDF(tableHTML(statementDoc(x), bank...))
-}
-func outstandingDoc(x LedgerOutstandingData) pdfTableDoc {
-	rows := [][]string{}
-	for _, v := range sortedBills(x.Bills) {
-		rows = append(rows, []string{v.BillNumber, displayDate(v.Date), invoiceDaysLabel(v.Date), indianNumber(v.PendingAmount) + " " + v.DrCr})
-	}
-	note := x.FilterLabel
-	if x.SummaryOnly {
-		note = "Summary only: bill-wise breakup is unavailable. Total is the saved party ledger balance, not a newly verified bill-wise total."
-	}
-	return pdfTableDoc{Title: "OUTSTANDING BALANCE", Company: x.Company, Supplier: x.Supplier, Template: x.PDFTemplate, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Bill number", "Bill date", "Due for", "Pending (INR)"}, Widths: []float64{155, 110, 90, 156}, Rows: rows, TotalLabel: "Net outstanding", Total: inr(x.Total) + " " + x.DrCr, Note: note, Numeric: []bool{false, false, false, true}}
-}
-func ledgerOutstandingPDF(x LedgerOutstandingData, bank ...BankDetails) ([]byte, error) {
-	return renderPDF(tableHTML(outstandingDoc(x), bank...))
-}
-func groupDoc(x GroupBalanceData) pdfTableDoc {
-	x = nonzeroGroup(x)
-	rows := [][]string{}
+func groupBalanceDoc(x GroupBalanceData) pdfTableDoc {
+	rows := make([][]string, 0, len(x.Ledgers))
 	for _, v := range x.Ledgers {
-		rows = append(rows, []string{v.Ledger, v.Parent, indianNumber(v.Balance), v.DrCr})
+		rows = append(rows, []string{v.Ledger, v.Parent, balanceText(v.Balance)})
 	}
-	return pdfTableDoc{Title: "LEDGER GROUP DETAILS", Company: x.Company, Supplier: x.Supplier, Template: x.PDFTemplate, Subtitle: x.Group + " | " + pdfDataNote(x.CommonData), Headers: []string{"Ledger", "Parent group", "Balance (INR)", "Dr/Cr"}, Widths: []float64{190, 140, 130, 51}, Rows: rows, TotalLabel: "Net balance", Total: inr(x.Total), Numeric: []bool{false, false, true, false}}
-}
-func groupBalancesPDF(x GroupBalanceData, bank ...BankDetails) ([]byte, error) {
-	return renderPDF(tableHTML(groupDoc(x), bank...))
-}
-func customerDoc(x Customer360Data) pdfTableDoc {
-	rows := [][]string{}
-	for _, v := range x.LatestInvoices {
-		rows = append(rows, []string{displayDate(v.Date), v.Number, v.VoucherType, inr(v.Amount)})
-	}
-	return pdfTableDoc{Title: "CUSTOMER 360", Company: x.Company, Supplier: x.Supplier, Template: x.PDFTemplate, Subtitle: x.Ledger + " | " + pdfDataNote(x.CommonData), Headers: []string{"Date", "Invoice", "Type", "Amount"}, Widths: []float64{100, 150, 130, 131}, Rows: rows, TotalLabel: "Outstanding", Total: inr(x.Outstanding), Note: fmt.Sprintf("Known overdue %s | %d known pending bills. Bill coverage may be incomplete.", inr(x.Overdue), x.PendingBillCount), Numeric: []bool{false, false, false, true}}
-}
-func customer360PDF(x Customer360Data, bank ...BankDetails) ([]byte, error) {
-	return renderPDF(tableHTML(customerDoc(x), bank...))
-}
-func trimPDF(s string, n int) string {
-	r := []rune(s)
-	if len(r) > n {
-		return string(r[:n-3]) + "..."
-	}
-	return s
+	return pdfTableDoc{Title: "LEDGER GROUP", Company: x.Company, Subtitle: x.Group, Headers: []string{"Ledger", "Parent", "Balance"}, Widths: []float64{2.2, 1.4, 1.2}, Rows: rows, TotalLabel: "Group total", Total: inr(x.Total), Note: pdfDataNote(x.CommonData), Numeric: []bool{false, false, true}}
 }
 
-func pdfBrowsers() []string {
-	var paths []string
-	seen := map[string]bool{}
-	add := func(p string) {
-		if p != "" && !seen[strings.ToLower(p)] {
-			seen[strings.ToLower(p)] = true
-			paths = append(paths, p)
-		}
-	}
-	add(os.Getenv("TALLYBRIDGE_PDF_BROWSER"))
-	// Prefer Chrome, but try Edge automatically if Chrome cannot print.
-	for _, relative := range [][]string{{"Google", "Chrome", "Application", "chrome.exe"}, {"Microsoft", "Edge", "Application", "msedge.exe"}} {
-		for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"} {
-			if base := os.Getenv(env); base != "" {
-				p := filepath.Join(append([]string{base}, relative...)...)
-				if info, e := os.Stat(p); e == nil && !info.IsDir() {
-					add(p)
-				}
-			}
-		}
-	}
-	for _, name := range []string{"chrome.exe", "msedge.exe", "google-chrome", "microsoft-edge", "chromium", "chromium-browser"} {
-		if p, e := exec.LookPath(name); e == nil {
-			add(p)
-		}
-	}
-	return paths
-}
-
-// A launcher's successful exit does not prove it printed anything. Some Windows
-// browser launchers hand off to a child, so watch for the complete file as well.
-func waitForPDF(ctx context.Context, output string, exited <-chan error) ([]byte, error) {
-	tick := time.NewTicker(100 * time.Millisecond)
-	defer tick.Stop()
-	for {
-		if data, e := os.ReadFile(output); e == nil && completePDF(data) {
-			return data, nil
-		}
-		select {
-		case <-ctx.Done():
-			return nil, errors.New("no completed PDF before timeout")
-		case err := <-exited:
-			exited = nil
-			if err != nil {
-				if data, e := os.ReadFile(output); e == nil && completePDF(data) {
-					return data, nil
-				}
-				return nil, fmt.Errorf("browser exited: %w", err)
-			}
-		case <-tick.C:
-		}
-	}
-}
-func printPDF(parent context.Context, browser, dir, inputURL string, index int) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(parent, 15*time.Second)
-	defer cancel()
-	output := filepath.Join(dir, fmt.Sprintf("report-%d.pdf", index))
-	args := []string{"--headless", "--disable-gpu", "--disable-extensions", "--disable-background-networking", "--no-first-run", "--no-default-browser-check", "--disable-sync", "--no-pdf-header-footer", "--allow-file-access-from-files", "--user-data-dir=" + filepath.Join(dir, fmt.Sprintf("profile-%d", index)), "--print-to-pdf=" + output, "--timeout=10000", inputURL}
-	if runtime.GOOS != "windows" && os.Geteuid() == 0 {
-		args = append([]string{"--no-sandbox"}, args...)
-	}
-	cmd := pdfCommand(ctx, browser, args...)
-	cmd.Dir = dir
-	if e := cmd.Start(); e != nil {
-		return nil, e
-	}
-	exited := make(chan error, 1)
-	done := make(chan struct{})
-	go func() { exited <- cmd.Wait(); close(done) }()
-	data, err := waitForPDF(ctx, output, exited)
-	cancel()
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-	}
-	return data, err
-}
-func renderPDF(document string) ([]byte, error) { return renderPDFMode(document, true) }
-func renderPDFMode(document string, keep bool) ([]byte, error) {
-	key := sha256.Sum256([]byte(document))
-	renderedPDFMu.Lock()
-	cached, ok := renderedPDFs[key]
-	renderedPDFMu.Unlock()
-	if ok && keep {
-		return append([]byte(nil), cached...), nil
-	}
-
+func htmlToPDF(htmlDoc string) ([]byte, error) {
 	select {
 	case pdfGate <- struct{}{}:
 		defer func() { <-pdfGate }()
-	default:
-		return nil, errors.New("another PDF is being prepared; please try again shortly")
-	}
-	browsers := pdfBrowsers()
-	if len(browsers) == 0 {
-		return nil, errors.New("Microsoft Edge or Google Chrome is required to create PDFs; install or repair one on the Windows PC")
-	}
-	dir, e := os.MkdirTemp("", "tallybridge-pdf-")
-	if e != nil {
-		return nil, e
-	}
-	defer os.RemoveAll(dir)
-	input := filepath.Join(dir, "report.html")
-	if e = os.WriteFile(input, []byte(document), 0600); e != nil {
-		return nil, e
-	}
-	fp := filepath.ToSlash(input)
-	if runtime.GOOS == "windows" {
-		fp = "/" + fp
-	}
-	u := (&url.URL{Scheme: "file", Path: fp}).String()
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
-	defer cancel()
-	var data []byte
-	var failures []string
-	for i, browser := range browsers {
-		data, e = printPDF(ctx, browser, dir, u, i)
-		if e == nil {
-			break
-		}
-		failures = append(failures, filepath.Base(browser)+": "+e.Error())
-		if ctx.Err() != nil {
-			break
-		}
-	}
-	if e != nil {
-		return nil, fmt.Errorf("PDF creation failed on the PC (%s). Install/update Google Chrome, then retry. Keep TallyBridge open", strings.Join(failures, "; "))
+	case <-time.After(20 * time.Second):
+		return nil, errors.New("PDF renderer is busy; try again")
 	}
 
+	key := sha256.Sum256([]byte(htmlDoc))
 	renderedPDFMu.Lock()
-	if len(renderedPDFs) >= 8 || renderedPDFBytes+len(data) > 24<<20 {
+	if cached, ok := renderedPDFs[key]; ok {
+		out := append([]byte(nil), cached...)
+		renderedPDFMu.Unlock()
+		return out, nil
+	}
+	renderedPDFMu.Unlock()
+
+	browser := browserExecutable()
+	if browser == "" {
+		return nil, errors.New("PDF renderer unavailable: Microsoft Edge or Google Chrome was not found")
+	}
+	dir, err := os.MkdirTemp("", "tallybridge-pdf-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+	in := filepath.Join(dir, "report.html")
+	out := filepath.Join(dir, "report.pdf")
+	if err := os.WriteFile(in, []byte(htmlDoc), 0600); err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	args := []string{"--headless", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--run-all-compositor-stages-before-draw", "--virtual-time-budget=1000", "--print-to-pdf-no-header", "--print-to-pdf=" + out, in}
+	if runtime.GOOS != "windows" {
+		args = append([]string{"--no-sandbox"}, args...)
+	}
+	cmd := exec.CommandContext(ctx, browser, args...)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Run(); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, errors.New("PDF renderer timed out")
+		}
+		return nil, fmt.Errorf("PDF render failed: %w", err)
+	}
+	pdf, err := os.ReadFile(out)
+	if err != nil {
+		return nil, err
+	}
+	if len(pdf) < 1000 || !bytes.HasPrefix(pdf, []byte("%PDF-")) {
+		return nil, errors.New("PDF renderer returned invalid output")
+	}
+	renderedPDFMu.Lock()
+	if len(renderedPDFs) > 64 || renderedPDFBytes > 64<<20 {
 		renderedPDFs = map[[32]byte][]byte{}
 		renderedPDFBytes = 0
 	}
-	if keep && len(data) <= 24<<20 {
-		renderedPDFs[key] = append([]byte(nil), data...)
-		renderedPDFBytes += len(data)
-	}
+	copyPDF := append([]byte(nil), pdf...)
+	renderedPDFs[key] = copyPDF
+	renderedPDFBytes += len(copyPDF)
 	renderedPDFMu.Unlock()
-	return data, nil
-}
-
-func completePDF(data []byte) bool {
-	return bytes.HasPrefix(data, []byte("%PDF-")) && bytes.HasSuffix(bytes.TrimSpace(data), []byte("%%EOF"))
+	return append([]byte(nil), pdf...), nil
 }
