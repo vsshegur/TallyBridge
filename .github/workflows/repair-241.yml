@@ -1,0 +1,97 @@
+name: Validate TallyBridge 2.4.1 repair
+
+on:
+  push:
+    branches:
+      - fix/invoice-widget-signing-20261003
+    paths:
+      - .github/workflows/repair-241.yml
+      - scripts/repair_241.py
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.12'
+          cache: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Apply repair
+        run: |
+          python3 scripts/repair_241.py
+          gofmt -w internal/app/tally.go internal/app/tally_test.go internal/app/pdf.go internal/app/types.go
+          git diff --check
+
+      - name: Backend tests
+        id: backend
+        shell: bash
+        run: |
+          set +e
+          go test ./internal/app 2>&1 | tee /tmp/backend-test.log
+          A=${PIPESTATUS[0]}
+          go vet ./internal/app ./cmd/tallybridge ./cmd/uninstall 2>&1 | tee /tmp/backend-vet.log
+          B=${PIPESTATUS[0]}
+          cat /tmp/backend-test.log /tmp/backend-vet.log > ci-repair-error.log
+          if [ $A -ne 0 ] || [ $B -ne 0 ]; then exit 1; fi
+
+      - name: Android compile and lint
+        if: steps.backend.outcome == 'success'
+        id: android
+        working-directory: android
+        shell: bash
+        run: |
+          set +e
+          gradle --no-daemon test assembleDebug lintDebug 2>&1 | tee ../ci-android-error.log
+          S=${PIPESTATUS[0]}
+          if [ $S -ne 0 ]; then exit 1; fi
+
+      - name: Preserve failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          git restore . || true
+          git clean -fd -e ci-repair-error.log -e ci-android-error.log || true
+          git config user.name 'TallyBridge Repair Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add ci-repair-error.log ci-android-error.log 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record 2.4.1 repair validation failure'
+            git push origin HEAD:fix/invoice-widget-signing-20261003
+          fi
+
+      - name: Behavior guards
+        if: success()
+        run: |
+          grep -q 'AllInventoryEntries.GSTItemHSNCodeEx' internal/app/tally.go
+          grep -q 'GSTITEMHSNCODEEX' internal/app/tally.go
+          grep -q 'customerAddressLines(r)' internal/app/tally.go
+          ! grep -q 'Read-only copy of data returned by TallyPrime' internal/app/pdf.go
+          grep -q 'onStop(){super.onStop();visible=false;}' android/app/src/main/java/in/tallybridge/app/MainActivity.java
+          grep -q 'android:minResizeHeight="150dp"' android/app/src/main/res/xml/orders_widget_info.xml
+          grep -q "versionName '2.4.1'" android/app/build.gradle
+          grep -q 'const Version = "2.4.1"' internal/app/types.go
+          grep -q 'Verify permanent Android signing identity' .github/workflows/release.yml
+
+      - name: Commit verified repair
+        if: success()
+        shell: bash
+        run: |
+          rm -f ci-repair-error.log ci-android-error.log
+          git rm .github/workflows/apply-invoice-widget-signing-fix.yml .github/workflows/repair-241.yml scripts/repair_241.py
+          git config user.name 'TallyBridge Repair Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'Fix invoice HSN/address, app resume, widget and permanent signing'
+          git push origin HEAD:fix/invoice-widget-signing-20261003
