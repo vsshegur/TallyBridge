@@ -90,7 +90,7 @@ func pdfDocument(company, title, subtitle, body string, profiles ...CompanyProfi
  h1{font-size:22pt;line-height:1.25;letter-spacing:-.4pt;margin:0 0 2mm;color:#132c49}h2{font-size:12pt;margin:0 0 3mm}h3{font-size:9pt;margin:0 0 2mm;text-transform:uppercase;letter-spacing:.5pt;color:#52677f}
  .heading{border-bottom:2pt solid #193f62;padding-bottom:4mm;margin-bottom:5mm}.caption{font-size:8pt;color:#65758a}.title{font-size:10pt;letter-spacing:1pt;font-weight:bold;color:#204e74;margin-top:2mm}.subtitle{margin-top:1mm}.supplier-line{font-size:8.2pt;color:#40536b;margin-top:.7mm}
  .grid{display:table;width:100%;table-layout:fixed;margin-bottom:5mm}.panel{display:table-cell;vertical-align:top;padding:3.5mm;background:#f3f6fa;border:1pt solid #e0e7ef}.panel+.panel{border-left:5mm solid white}.panel p{margin:0 0 1.5mm}.label{color:#65758a;font-size:8pt}.kv{width:100%;border-collapse:collapse}.kv td{padding:1mm 0;vertical-align:top}.kv td:first-child{width:39%;color:#65758a;padding-right:3mm}
- table.items{border-collapse:collapse;width:100%;table-layout:fixed;margin:3mm 0 5mm;font-size:8.5pt}.items thead{display:table-header-group}.items th{background:#173f62;color:white;font-size:8pt;font-weight:bold;padding:2.5mm 2mm;text-align:left}.items td{padding:2.5mm 2mm;border-bottom:1pt solid #dce4ed;vertical-align:top}.items tbody tr:nth-child(even){background:#f7f9fc}.items tr{break-inside:avoid}.items .num{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#65758a}.totals{width:62%;margin-left:auto;break-inside:avoid;border-collapse:collapse}.totals td{padding:1.8mm 2mm;vertical-align:top}.totals td:last-child{text-align:right;font-variant-numeric:tabular-nums;width:45%}.grand td{background:#eaf0f7;border-top:1.5pt solid #173f62;font-size:11pt;font-weight:bold;padding:3mm 2mm}.note{padding:3mm;margin:4mm 0;background:#fff7e5;border-left:2pt solid #d6a550;font-size:8pt;break-inside:avoid}.bank{margin-top:6mm;padding:4mm;background:#f3f6fa;border:1pt solid #dce4ed;break-inside:avoid}.bank .kv td{padding:.7mm 0}.bank-grid{display:table;width:100%;table-layout:fixed}.bank-details,.bank-qr{display:table-cell;vertical-align:middle}.bank-details{width:68%;padding-right:4mm}.bank-qr{width:32%;text-align:center}.bank-qr img{width:32mm;height:32mm}.bank-qr .caption{margin-top:1mm}.narration{margin-top:4mm;white-space:pre-wrap}.meta{margin-bottom:4mm;font-size:8pt;color:#65758a}
+ table.items{border-collapse:collapse;width:100%;table-layout:fixed;margin:3mm 0 5mm;font-size:8.5pt}.items thead{display:table-header-group}.items th{background:#173f62;color:white;font-size:8pt;font-weight:bold;padding:2.5mm 2mm;text-align:left}.items td{padding:2.5mm 2mm;border-bottom:1pt solid #dce4ed;vertical-align:top}.items tbody tr:nth-child(even){background:#f7f9fc}.items tr{break-inside:avoid}.items .num{text-align:right;font-variant-numeric:tabular-nums}.muted{color:#65758a}.totals{width:62%;margin-left:auto;break-inside:avoid;border-collapse:collapse}.totals td{padding:1.8mm 2mm;vertical-align:top}.totals td:last-child{text-align:right;font-variant-numeric:tabular-nums;width:45%}.grand td{background:#eaf0f7;border-top:1.5pt solid #173f62;font-size:11pt;font-weight:bold;padding:3mm 2mm}.note{padding:3mm;margin:4mm 0;background:#fff7e5;border-left:2pt solid #d6a550;font-size:8pt;break-inside:avoid}.bank{margin-top:6mm;padding:4mm;background:#f3f6fa;border:1pt solid #dce4ed;break-inside:avoid}.bank .kv td{padding:.7mm 0}.bank-grid{display:table;width:100%;table-layout:fixed}.bank-details,.bank-qr{display:table-cell;vertical-align:middle}.bank-details{width:68%;padding-right:4mm}.bank-qr{width:32%;text-align:center}.bank-qr img{width:32mm;height:32mm}.bank-qr .caption{margin-top:1mm}.narration{margin-top:4mm;white-space:pre-wrap}.meta{margin-bottom:4mm;font-size:8pt;color:#65758a}.invoice-hero{display:grid;grid-template-columns:1.15fr .85fr;gap:4mm;margin:1mm 0 4mm}.invoice-card{border:1px solid #dbe5ee;background:#f8fafc;padding:4mm;border-radius:2mm}.invoice-label{font-size:7.4pt;letter-spacing:.9pt;font-weight:700;color:#65798c;margin-bottom:1.5mm}.invoice-party{font-size:12.5pt;font-weight:700;color:#12324b;margin-bottom:1.5mm}.invoice-card p{margin:.7mm 0}.invoice-card .kv td{padding:.65mm 0}.invoice-card .kv td:last-child{color:#12324b}.invoice-card .kv tr:first-child td:last-child{font-size:13pt;font-weight:700}.dispatch-box{border:1px solid #e0e8ef;padding:3mm 4mm;margin:0 0 4mm;background:#fff}
  </style></head><body><header class="heading"><h1>` + he(firstNonBlank(profile.Name, company)) + `</h1>` + supplierHeaderHTML(profile) + `<div class="title">` + he(title) + `</div><div class="subtitle">` + he(subtitle) + `</div></header>` + body + `</body></html>`
 }
 
@@ -168,7 +168,7 @@ func adaptiveInvoiceHTML(doc string, itemCount int) string {
 }
 func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, `<div class="meta">%s</div><div class="grid"><section class="panel"><h3>Bill to</h3><p><b>%s</b></p>`, he(pdfDataNote(x.CommonData)), he(firstNonBlank(x.CustomerName, "Customer not returned")))
+	fmt.Fprintf(&b, `<div class="invoice-hero"><section class="invoice-card"><div class="invoice-label">BILL TO</div><div class="invoice-party">%s</div>`, he(firstNonBlank(x.CustomerName, "Customer not returned")))
 	for _, a := range x.CustomerAddress {
 		if a != "" {
 			fmt.Fprintf(&b, "<p>%s</p>", he(a))
@@ -180,7 +180,7 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	if x.GSTIN != "" {
 		fmt.Fprintf(&b, `<p><span class="label">GSTIN</span> %s</p>`, he(x.GSTIN))
 	}
-	b.WriteString(`</section><section class="panel"><h3>Invoice details</h3><table class="kv">`)
+	b.WriteString(`</section><section class="invoice-card"><div class="invoice-label">INVOICE DETAILS</div><table class="kv">`)
 	for _, r := range [][2]string{{"Invoice number", dash(x.InvoiceNumber)}, {"Invoice date", displayDate(x.InvoiceDate)}, {"Voucher type", x.VoucherType}} {
 		if r[1] != "" {
 			fmt.Fprintf(&b, "<tr><td>%s</td><td><b>%s</b></td></tr>", he(r[0]), he(r[1]))
@@ -195,13 +195,13 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 		}
 	}
 	if has {
-		b.WriteString(`<h3>Dispatch details</h3><table class="kv">`)
+		b.WriteString(`<section class="dispatch-box"><h3>Dispatch details</h3><table class="kv">`)
 		for _, r := range dispatch {
 			if r[1] != "" && r[1] != "-" {
 				fmt.Fprintf(&b, "<tr><td>%s</td><td>%s</td></tr>", he(r[0]), he(r[1]))
 			}
 		}
-		b.WriteString(`</table>`)
+		b.WriteString(`</table></section>`)
 	}
 	b.WriteString(`<table class="items"><colgroup><col style="width:5%"><col style="width:33%"><col style="width:11%"><col style="width:14%"><col style="width:16%"><col style="width:21%"></colgroup><thead><tr><th>#</th><th>Product</th><th>HSN</th><th class="num">Quantity</th><th class="num">Rate</th><th class="num">Amount (INR)</th></tr></thead><tbody>`)
 	for i, it := range x.Items {
@@ -231,9 +231,9 @@ func invoiceHTML(x VoucherDetail, bank ...BankDetails) string {
 	if x.Narration != "" {
 		fmt.Fprintf(&b, `<div class="narration"><h3>Narration</h3>%s</div>`, he(x.Narration))
 	}
-	title, subtitle := "INVOICE DETAIL", "Read-only copy of data returned by TallyPrime"
+	title, subtitle := "INVOICE", ""
 	if x.Optional {
-		title, subtitle = "PROFORMA INVOICE", "Optional / non-posting voucher from TallyPrime"
+		title, subtitle = "PROFORMA INVOICE", ""
 	}
 	return adaptiveInvoiceHTML(pdfDocument(firstNonBlank(x.FirmName, x.Company), title, subtitle, b.String(), x.Supplier), len(x.Items))
 }

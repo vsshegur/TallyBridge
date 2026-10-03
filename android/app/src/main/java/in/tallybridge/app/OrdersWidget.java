@@ -27,9 +27,12 @@ public final class OrdersWidget extends AppWidgetProvider {
   android.content.SharedPreferences p=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
   RemoteViews v=new RemoteViews(c.getPackageName(),previewLayout(c));
   int count=p.getInt("pending",0);String names=p.getString("names","");boolean offline=p.getBoolean("offline",false);
+  Bundle options=m.getAppWidgetOptions(id);int height=options==null?0:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,0);boolean compact=height>0&&height<175;
   v.setTextViewText(R.id.widget_pending,count+" pending order"+(count==1?"":"s"));
   v.setTextViewText(R.id.widget_mode,offline?"OFFLINE • PHONE COPY":"SYNCED WITH PC");
   v.setTextViewText(R.id.widget_names,names.isEmpty()?(count==0?"No pending orders. Add one when a customer calls.":"Tap Open pending to review orders."):names);
+  v.setViewVisibility(R.id.widget_mode,compact?android.view.View.GONE:android.view.View.VISIBLE);
+  v.setViewVisibility(R.id.widget_names,compact?android.view.View.GONE:android.view.View.VISIBLE);
   v.setOnClickPendingIntent(R.id.widget_add,activity(c,OrdersActivity.ACTION_NEW,31));
   v.setOnClickPendingIntent(R.id.widget_open,activity(c,null,32));
   v.setOnClickPendingIntent(R.id.widget_refresh,refresh(c));

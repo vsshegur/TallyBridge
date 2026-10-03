@@ -275,14 +275,14 @@ func voucherListXML(company, vtype, from, to string) []byte {
 	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBLiveVouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBLiveVouchers" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><NATIVEMETHOD>Date</NATIVEMETHOD><NATIVEMETHOD>VoucherNumber</NATIVEMETHOD><NATIVEMETHOD>PartyLedgerName</NATIVEMETHOD><NATIVEMETHOD>VoucherTypeName</NATIVEMETHOD><NATIVEMETHOD>IsOptional</NATIVEMETHOD><NATIVEMETHOD>Amount</NATIVEMETHOD><NATIVEMETHOD>MasterID</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), from, to, escXML(vtype)))
 }
 func voucherDetailCollectionXML(company, masterID string) []byte {
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetail</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetail" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherMasterIDFilter</FILTER><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,IsOptional,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetail</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetail" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherMasterIDFilter</FILTER><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,IsOptional,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllInventoryEntries.GSTItemHSNCodeEx,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
 }
 func voucherDetailObjectXML(company, masterID string) []byte {
 	// Do not use the fragile Voucher object identifier form (ID:'123'). Some
 	// TallyPrime builds reject a valid register MasterID as "Could not find
 	// Voucher:ID:'123'". A one-voucher filtered collection returns the same
 	// object data without changing or writing anything in Tally.
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetailFull</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetailFull" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherFullMasterIDFilter</FILTER><FETCH>*</FETCH><FETCH>AllInventoryEntries.*</FETCH><FETCH>AllLedgerEntries.*</FETCH><FETCH>LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherFullMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDetailFull</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDetailFull" ISMODIFY="No"><TYPE>Voucher</TYPE><FILTER>TBVoucherFullMasterIDFilter</FILTER><FETCH>*</FETCH><FETCH>AllInventoryEntries.*,AllInventoryEntries.GSTItemHSNCodeEx</FETCH><FETCH>AllLedgerEntries.*</FETCH><FETCH>LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherFullMasterIDFilter" ISMODIFY="No">$MasterID = %s</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), masterID))
 }
 func voucherDetailHintXML(company string, hint VoucherRow) []byte {
 	date := strings.ReplaceAll(normISODate(hint.Date), "-", "")
@@ -293,7 +293,7 @@ func voucherDetailHintXML(company string, hint VoucherRow) []byte {
 	if vtype == "" {
 		vtype = "Sales"
 	}
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherByIdentity</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherByIdentity" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><FILTER>TBVoucherNumberFilter</FILTER><FETCH>*</FETCH><FETCH>AllInventoryEntries.*</FETCH><FETCH>AllLedgerEntries.*</FETCH><FETCH>LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherNumberFilter" ISMODIFY="No">$VoucherNumber = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), date, date, escXML(vtype), escXML(strings.TrimSpace(hint.Number))))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherByIdentity</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherByIdentity" ISMODIFY="No"><TYPE>Vouchers : VoucherType</TYPE><CHILDOF>%s</CHILDOF><BELONGSTO>Yes</BELONGSTO><FILTER>TBVoucherNumberFilter</FILTER><FETCH>*</FETCH><FETCH>AllInventoryEntries.*,AllInventoryEntries.GSTItemHSNCodeEx</FETCH><FETCH>AllLedgerEntries.*</FETCH><FETCH>LedgerEntries.*</FETCH></COLLECTION><SYSTEM TYPE="Formulae" NAME="TBVoucherNumberFilter" ISMODIFY="No">$VoucherNumber = &quot;%s&quot;</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), date, date, escXML(vtype), escXML(strings.TrimSpace(hint.Number))))
 }
 
 func voucherDayXML(company, date string) []byte {
@@ -301,7 +301,7 @@ func voucherDayXML(company, date string) []byte {
 	if len(d) != 8 {
 		return nil
 	}
-	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDay</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDay" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,IsOptional,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), d, d))
+	return []byte(fmt.Sprintf(`<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>TBVoucherDay</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">%s</SVFROMDATE><SVTODATE TYPE="Date">%s</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="TBVoucherDay" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>MasterID,Date,VoucherNumber,VoucherTypeName,IsOptional,PartyLedgerName,PartyName,Narration,BasicBuyerName,BasicBuyerAddress.*,BasicBuyerCity,PartyGSTIN,ConsigneeGSTIN,BasicShippedBy,BasicShipDocumentNo,BasicShipDocumentDate,BasicFinalDestination,BasicShipVesselNo,BillOfLadingNo,BillOfLadingDate,EWayBillNo,Amount,AllInventoryEntries.*,AllInventoryEntries.GSTItemHSNCodeEx,AllLedgerEntries.*,LedgerEntries.*</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`, escXML(company), d, d))
 }
 
 func ledgerDetailXML(company, ledger string) []byte {
@@ -838,6 +838,90 @@ func parseGenericRows(b []byte) []map[string]string {
 	}
 	return out
 }
+func cleanInvoiceAddressLines(lines []string) []string {
+	out := make([]string, 0, len(lines))
+	seen := map[string]bool{}
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		key := strings.ToLower(strings.Join(strings.Fields(line), " "))
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+func customerAddressLines(r *xnode) []string {
+	if r == nil {
+		return nil
+	}
+	var lines []string
+	for _, tag := range []string{"BASICBUYERADDRESS", "BUYERADDRESS", "CONSIGNEEADDRESS"} {
+		lines = append(lines, allDeep(r, tag)...)
+	}
+	lines = cleanInvoiceAddressLines(lines)
+	if len(lines) == 0 {
+		lines = cleanInvoiceAddressLines(allDeep(r, "ADDRESS"))
+	}
+	return lines
+}
+
+func normalizeHSNValue(value string) string {
+	value = strings.TrimSpace(stripTags(value))
+	if value == "" {
+		return ""
+	}
+	upper := strings.ToUpper(value)
+	if upper == "NA" || upper == "N/A" || strings.Contains(upper, "NOT APPLICABLE") {
+		return ""
+	}
+	var digits strings.Builder
+	for _, r := range value {
+		if r >= '0' && r <= '9' {
+			digits.WriteRune(r)
+		}
+	}
+	code := digits.String()
+	if len(code) >= 2 && len(code) <= 8 {
+		return code
+	}
+	return ""
+}
+
+func inventoryHSN(n *xnode) string {
+	if n == nil {
+		return ""
+	}
+	// GSTItemHSNCodeEx is TallyPrime's resolved invoice-line method. It honors
+	// Tally's configured GST hierarchy, so prefer it over raw master aliases.
+	tags := []string{"GSTITEMHSNCODEEX", "GSTOVRDNHSNCODE", "GSTHSNCODE", "HSNCODE", "HSNSAC", "HSN", "SACCODE", "GSTHSNNAME"}
+	for _, tag := range tags {
+		if code := normalizeHSNValue(directChild(n, tag)); code != "" {
+			return code
+		}
+	}
+	for _, tag := range tags {
+		if code := normalizeHSNValue(firstDeep(n, tag)); code != "" {
+			return code
+		}
+	}
+	raw := firstDeepTagMatch(n, func(tag string) bool {
+		u := strings.ToUpper(tag)
+		if !strings.Contains(u, "HSN") && !strings.Contains(u, "SAC") {
+			return false
+		}
+		if strings.Contains(u, "APPLICABLE") || strings.Contains(u, "SOURCE") || strings.Contains(u, "DATE") || strings.Contains(u, "RATE") {
+			return false
+		}
+		return strings.Contains(u, "CODE") || strings.HasSuffix(u, "HSN") || strings.HasSuffix(u, "SAC")
+	})
+	return normalizeHSNValue(raw)
+}
+
 func parseVoucherDetail(b []byte, company, masterID string, hint VoucherRow) VoucherDetail {
 	r, _ := parseTree(b)
 	return parseVoucherDetailNode(r, company, masterID, hint)
@@ -891,7 +975,7 @@ func parseVoucherDetailNode(r *xnode, company, masterID string, hint VoucherRow)
 	x.VehicleNumber = firstDeep(r, "BASICSHIPVESSELNO", "VEHICLENO", "VEHICLENUMBER")
 	x.EWayBillNumber = firstDeep(r, "EWAYBILLNO", "EWAYBILLNUMBER")
 	x.Narration = firstDeep(r, "NARRATION")
-	x.CustomerAddress = allDeep(r, "ADDRESS")
+	x.CustomerAddress = customerAddressLines(r)
 	for _, n := range invoiceInventoryRows(r) {
 		name := firstDeep(n, "STOCKITEMNAME", "ITEMNAME", "NAME")
 		if name == "" {
@@ -903,7 +987,7 @@ func parseVoucherDetailNode(r *xnode, company, masterID string, hint VoucherRow)
 		if amt == 0 {
 			amt = abs(parseAmount(firstDeep(n, "AMOUNT")))
 		}
-		x.Items = append(x.Items, InvoiceItem{Name: name, Description: strings.Join(allDeep(n, "BASICUSERDESCRIPTION"), "\n"), HSN: firstDeep(n, "HSN", "HSNCODE", "HSNSAC"), Quantity: qty, Rate: rate, Amount: amt, Discount: abs(parseAmount(directChild(n, "DISCOUNTAMOUNT")))})
+		x.Items = append(x.Items, InvoiceItem{Name: name, Description: strings.Join(allDeep(n, "BASICUSERDESCRIPTION"), "\n"), HSN: inventoryHSN(n), Quantity: qty, Rate: rate, Amount: amt, Discount: abs(parseAmount(directChild(n, "DISCOUNTAMOUNT")))})
 	}
 
 	applyInvoiceAmounts(&x, r, hint)
