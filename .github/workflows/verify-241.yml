@@ -98,7 +98,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "4189823+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git reset -- scripts/apply_241_core.py scripts/fix_241_guard.py .github/workflows/verify-241.yml android/241-screenshots || true
+          git reset -- scripts/apply_241_core.py scripts/fix_241_guard.py .github/workflows/verify-241.yml .github/workflows/build.yml .github/workflows/release.yml android/241-screenshots || true
           if ! git diff --cached --quiet; then
             git commit -m "[verified-241] Apply invoice lifecycle widget signing hardening"
             git push origin HEAD:feature/invoice-lifecycle-widget-signing-2.4.1
