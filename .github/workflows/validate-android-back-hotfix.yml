@@ -1,0 +1,62 @@
+name: Validate Android instrumentation back hotfix
+
+on:
+  push:
+    branches:
+      - fix/android-instrumentation-back-20261003
+
+permissions:
+  contents: read
+
+jobs:
+  android-emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build APK and instrumentation tests
+        working-directory: android
+        run: gradle --no-daemon test assembleDebug lintDebug assembleDebugAndroidTest
+      - name: Run all Android instrumentation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/tallybridge-android"
+          export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          trap 'cat /tmp/emulator.log || true' EXIT
+          sudo apt-get update -qq
+          sudo apt-get install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0
+          sudo chmod 666 /dev/kvm
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "system-images;android-30;google_apis;x86_64" "emulator" "platform-tools"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n design -k "system-images;android-30;google_apis;x86_64" --force
+          "$ANDROID_HOME/emulator/emulator" -avd design -skin 1080x1920 -no-window -no-audio -no-boot-anim -gpu swiftshader -no-snapshot -no-metrics > /tmp/emulator.log 2>&1 &
+          timeout 90 adb wait-for-device
+          timeout 300 bash -c 'until adb shell getprop sys.boot_completed | tr -d "\r" | grep -q 1; do sleep 3; done'
+          adb shell wm size 1080x1920
+          adb shell wm density 420
+          adb shell input keyevent 82
+          adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+          adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell am instrument -w in.tallybridge.app.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/design-results.txt
+          grep -q 'OK (10 tests)' /tmp/design-results.txt
+          mkdir -p android/ui-screenshots
+          for screen in 01-unlock 02-overview 03-reports 04-connect 05-dark-overview 06-dark-reports 07-dark-connect 08-dark-appearance 09-outstanding 10-filters 11-sync 12-proforma 13-proforma-totals 14-proforma-review 15-payments 16-health 17-diagnostics 18-more 19-orders-offline 20-orders-details-only 21-orders-widget 22-photo-order-share 23-orders-dark 24-orders-dispatched-dark 25-orders-widget-dark 26-work-today 27-customer-360 28-work-system; do
+            adb exec-out run-as in.tallybridge.app cat "files/ui/$screen.png" > "android/ui-screenshots/$screen.png"
+            test -s "android/ui-screenshots/$screen.png"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Android-Hotfix-Screenshots
+          path: android/ui-screenshots/*.png
+          if-no-files-found: ignore
