@@ -20,6 +20,7 @@ import static org.junit.Assert.*;
 public class OrdersOfflineTest {
  @Rule public ActivityTestRule<OrdersActivity> rule=new ActivityTestRule<>(OrdersActivity.class,false,false);
  private void ui(Runnable r){InstrumentationRegistry.getInstrumentation().runOnMainSync(r);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
+ private void pressBack()throws Exception {android.os.ParcelFileDescriptor command=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("input keyevent KEYCODE_BACK");if(command!=null)command.close();Thread.sleep(300);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
  private void capture(String name)throws Exception {Thread.sleep(500);Bitmap b=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(b);File dir=new File(rule.getActivity().getFilesDir(),"ui");assertTrue(dir.exists()||dir.mkdirs());try(FileOutputStream out=new FileOutputStream(new File(dir,name+".png"))){assertTrue(b.compress(Bitmap.CompressFormat.PNG,100,out));}b.recycle();}
  private JSONObject item(String name,double qty,String unit,Double rate)throws Exception {JSONObject x=new JSONObject().put("name",name).put("quantity",qty).put("unit",unit);if(rate!=null)x.put("rate",rate);return x;}
  private JSONObject order(String buyer,String phone,String notes,JSONArray items)throws Exception {return new JSONObject().put("company","Vijayalaxmi Textiles").put("buyer",buyer).put("buyerDetails",new JSONObject().put("MOBILENUMBER",phone).put("ADDRESS","Market Road").put("CITY","Solapur").put("PARTYGSTIN","27ABCDE1234F1Z5")).put("items",items).put("notes",notes);}
@@ -51,8 +52,7 @@ public class OrdersOfflineTest {
   assertTrue(finalOrder.optString("shareText").contains("ORDER DETAILS"));
   assertTrue(finalOrder.optString("shareText").contains("Vijayalaxmi Textiles"));
 
-  InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-  InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+  pressBack();
   ui(()->{
    OrdersActivity a=rule.getActivity();
    FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(232,237,242));
