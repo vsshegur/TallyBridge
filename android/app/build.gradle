@@ -1,5 +1,9 @@
 plugins { id 'com.android.application' }
 def releaseSigningEnabled = System.getenv('TB_KEYSTORE') != null && !System.getenv('TB_KEYSTORE').isEmpty()
+def releaseTaskRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+if (System.getenv('CI') == 'true' && releaseTaskRequested && !releaseSigningEnabled) {
+    throw new GradleException('CI release builds require the permanent TallyBridge signing keystore')
+}
 android {
     namespace 'in.tallybridge.app'
     compileSdk 35
@@ -8,8 +12,8 @@ android {
         minSdk 28
         targetSdk 35
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-        versionCode 20400
-        versionName '2.4.0'
+        versionCode 20401
+        versionName '2.4.1'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     signingConfigs {

@@ -160,3 +160,31 @@ func TestV150PhoneUpgradeFeaturesPresent(t *testing.T) {
 		}
 	}
 }
+
+func TestVoucherCollectionFetchesResolvedHSN(t *testing.T) {
+	x := string(voucherDetailCollectionXML("Demo", "44"))
+	if !strings.Contains(x, "AllInventoryEntries.GSTItemHSNCodeEx") {
+		t.Fatalf("voucher detail request must fetch Tally resolved HSN method: %s", x)
+	}
+}
+
+func TestVoucherDetailReadsResolvedHSNAndBuyerAddress(t *testing.T) {
+	xmlb := []byte(`<VOUCHER><MASTERID>44</MASTERID><VOUCHERNUMBER>INV-44</VOUCHERNUMBER><DATE>20261003</DATE><BASICBUYERNAME>ABC Stores</BASICBUYERNAME><BASICBUYERCITY>Solapur</BASICBUYERCITY><BASICBUYERADDRESS.LIST><BASICBUYERADDRESS>12 Market Road</BASICBUYERADDRESS><BASICBUYERADDRESS>Solapur 413001</BASICBUYERADDRESS></BASICBUYERADDRESS.LIST><ALLINVENTORYENTRIES.LIST><STOCKITEMNAME>Bath Towel</STOCKITEMNAME><GSTITEMHSNCODEEX>63026090</GSTITEMHSNCODEEX><GSTHSNCODE>99999999</GSTHSNCODE><BILLEDQTY>2 pcs</BILLEDQTY><RATE>250.00/pcs</RATE><AMOUNT>-500.00</AMOUNT></ALLINVENTORYENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>ABC Stores</LEDGERNAME><AMOUNT>-500.00</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER>`)
+	x := parseVoucherDetail(xmlb, "VIPUL TEXTILES", "44", VoucherRow{MasterID: "44", Party: "ABC Stores", Amount: 500})
+	if len(x.Items) != 1 || x.Items[0].HSN != "63026090" {
+		t.Fatalf("resolved HSN did not win: %+v", x.Items)
+	}
+	joined := strings.Join(x.CustomerAddress, " | ")
+	if !strings.Contains(joined, "12 Market Road") || !strings.Contains(joined, "Solapur 413001") {
+		t.Fatalf("buyer address not recovered: %#v", x.CustomerAddress)
+	}
+	pdf := invoiceHTML(x)
+	if strings.Contains(strings.ToLower(pdf), "read-only copy of data returned by tallyprime") {
+		t.Fatal("old read-only invoice sentence must be removed")
+	}
+	for _, want := range []string{"BILL TO", "12 Market Road", "63026090", "INV-44"} {
+		if !strings.Contains(pdf, want) {
+			t.Fatalf("invoice missing %q", want)
+		}
+	}
+}
