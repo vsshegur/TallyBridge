@@ -1,0 +1,31 @@
+name: Package final Android signing tools
+
+on:
+  push:
+    branches:
+      - build/final-production-2.4.1-20261004
+
+permissions:
+  contents: read
+
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Package Android build tools
+        shell: bash
+        run: |
+          BUILD_TOOLS=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          test -n "$BUILD_TOOLS"
+          mkdir -p signing-tools/lib signing-tools/lib64
+          cp "$BUILD_TOOLS/apksigner" signing-tools/
+          cp "$BUILD_TOOLS/lib/apksigner.jar" signing-tools/lib/
+          cp "$BUILD_TOOLS/zipalign" signing-tools/
+          if [ -d "$BUILD_TOOLS/lib64" ]; then cp -a "$BUILD_TOOLS/lib64/." signing-tools/lib64/; fi
+          chmod +x signing-tools/apksigner signing-tools/zipalign
+          ldd signing-tools/zipalign || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Android-Final-Signing-Tools
+          path: signing-tools/**
+          if-no-files-found: error
