@@ -1,0 +1,24 @@
+name: Export final source
+
+on:
+  push:
+    branches:
+      - build/final-production-2.4.1-20261004
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TallyBridge-Final-Source-399a923
+          path: |
+            .
+            !.git/**
+            !.github/workflows/export-source-final.yml
+          include-hidden-files: true
+          if-no-files-found: error
