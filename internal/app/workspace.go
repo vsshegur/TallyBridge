@@ -176,8 +176,8 @@ func (s *Server) smartAlerts(company string) []SmartAlert {
 		alerts = append(alerts, SmartAlert{ID: "tally-offline", Severity: "warning", Title: "Tally is unavailable", Detail: detail, Action: "diagnostics"})
 	}
 	sync := s.autoSyncSnapshot()
-	if strings.TrimSpace(sync.LastError) != "" {
-		alerts = append(alerts, SmartAlert{ID: "sync-error", Severity: "critical", Title: "Sync needs attention", Detail: sync.LastError, Action: "diagnostics"})
+	if strings.TrimSpace(sync.LastError) != "" && (!st.TallyOnline || sync.RetrySoon) {
+		alerts = append(alerts, SmartAlert{ID: "sync-error", Severity: "warning", Title: "Sync retrying", Detail: sync.LastError, Action: "diagnostics"})
 	}
 	if orders, err := s.listOrders(company); err == nil {
 		now := time.Now()

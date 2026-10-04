@@ -1,0 +1,11 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/quick_widget_root"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center"
+    android:padding="7dp" android:background="@drawable/quick_pi_widget_panel"
+    android:contentDescription="New proforma invoice">
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="+PI" android:textColor="#FFFFFF" android:textSize="25sp" android:textStyle="bold" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="1dp" android:text="PROFORMA" android:textColor="#DDF3EC" android:textSize="9sp" android:textStyle="bold" android:letterSpacing="0.05" />
+</LinearLayout>

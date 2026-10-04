@@ -26,21 +26,29 @@ public final class OrdersWidget extends AppWidgetProvider {
  private static void paintCached(Context c,AppWidgetManager m,int id){
   android.content.SharedPreferences p=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
   RemoteViews v=new RemoteViews(c.getPackageName(),previewLayout(c));
-  int count=p.getInt("pending",0);String names=p.getString("names","");boolean offline=p.getBoolean("offline",false);
-  Bundle options=m.getAppWidgetOptions(id);int height=options==null?0:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,0);boolean compact=height>0&&height<175;
-  v.setTextViewText(R.id.widget_pending,count+" pending order"+(count==1?"":"s"));
-  v.setTextViewText(R.id.widget_mode,offline?"OFFLINE • PHONE COPY":"SYNCED WITH PC");
-  v.setTextViewText(R.id.widget_names,names.isEmpty()?(count==0?"No pending orders. Add one when a customer calls.":"Tap Open pending to review orders."):names);
+  int count=p.getInt("pending",0);String p1=p.getString("party1","");String p2=p.getString("party2","");String p3=p.getString("party3","");int more=p.getInt("moreParties",0);boolean offline=p.getBoolean("offline",false);
+  Bundle options=m.getAppWidgetOptions(id);int height=options==null?0:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,0);boolean compact=height>0&&height<190;
+  v.setTextViewText(R.id.widget_pending,String.valueOf(count));
+  v.setTextViewText(R.id.widget_mode,offline?"PHONE OFFLINE":"PC SYNCED");
+  v.setTextViewText(R.id.widget_party1,p1.isEmpty()?(count==0?"No pending orders":"Open pending orders"):p1);
+  v.setTextViewText(R.id.widget_party2,p2);
+  v.setTextViewText(R.id.widget_party3,p3);
+  v.setTextViewText(R.id.widget_more,more>0?"+"+more+" more customer"+(more==1?"":"s"):"");
   v.setViewVisibility(R.id.widget_mode,compact?android.view.View.GONE:android.view.View.VISIBLE);
-  v.setViewVisibility(R.id.widget_names,compact?android.view.View.GONE:android.view.View.VISIBLE);
+  v.setViewVisibility(R.id.widget_party_label,compact?android.view.View.GONE:android.view.View.VISIBLE);
+  v.setViewVisibility(R.id.widget_party2,!compact&&!p2.isEmpty()?android.view.View.VISIBLE:android.view.View.GONE);
+  v.setViewVisibility(R.id.widget_party3,!compact&&!p3.isEmpty()?android.view.View.VISIBLE:android.view.View.GONE);
+  v.setViewVisibility(R.id.widget_more,!compact&&more>0?android.view.View.VISIBLE:android.view.View.GONE);
   v.setOnClickPendingIntent(R.id.widget_add,activity(c,OrdersActivity.ACTION_NEW,31));
   v.setOnClickPendingIntent(R.id.widget_open,activity(c,null,32));
   v.setOnClickPendingIntent(R.id.widget_refresh,refresh(c));
-  v.setOnClickPendingIntent(R.id.widget_names,activity(c,null,34));
+  v.setOnClickPendingIntent(R.id.widget_party1,activity(c,null,34));
+  v.setOnClickPendingIntent(R.id.widget_party2,activity(c,null,36));
+  v.setOnClickPendingIntent(R.id.widget_party3,activity(c,null,37));
   v.setOnClickPendingIntent(R.id.widget_pending,activity(c,null,35));
   m.updateAppWidget(id,v);
  }
 
- private static void cache(Context context,JSONObject data,boolean offline){JSONArray a=data.optJSONArray("pending");StringBuilder names=new StringBuilder();if(a!=null){for(int i=0;i<Math.min(3,a.length());i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;if(names.length()>0)names.append(" • ");names.append(o.optString("buyer",o.optString("number")));}}context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putInt("pending",data.optInt("pendingCount")).putString("names",names.toString()).putBoolean("offline",offline).apply();}
+ private static void cache(Context context,JSONObject data,boolean offline){JSONArray a=data.optJSONArray("pending");java.util.LinkedHashSet<String> parties=new java.util.LinkedHashSet<>();if(a!=null){for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;String name=o.optString("buyer",o.optString("number")).trim();if(!name.isEmpty())parties.add(name);}}java.util.ArrayList<String> list=new java.util.ArrayList<>(parties);String p1=list.size()>0?list.get(0):"",p2=list.size()>1?list.get(1):"",p3=list.size()>2?list.get(2):"";int more=Math.max(0,list.size()-3);context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putInt("pending",data.optInt("pendingCount")).putString("party1",p1).putString("party2",p2).putString("party3",p3).putInt("moreParties",more).putBoolean("offline",offline).apply();}
  private static void refreshAsync(Context context,PendingResult pending){ExecutorService work=Executors.newSingleThreadExecutor();work.execute(()->{boolean offlineMode=true;try{CryptoStore secure=new CryptoStore(context);OfflineOrdersStore local=new OfflineOrdersStore(secure);JSONObject saved=local.list();cache(context,saved,true);if(!secure.get("base").isEmpty()&&!secure.get("device").isEmpty()){try{JSONObject synced=local.sync(new BridgeApi(secure));cache(context,synced,false);offlineMode=false;}catch(Exception ignored){offlineMode=true;}}}catch(Exception ignored){}finally{try{if(offlineMode){try{CryptoStore secure=new CryptoStore(context);cache(context,new OfflineOrdersStore(secure).list(),true);}catch(Exception ignored){}}AppWidgetManager m=AppWidgetManager.getInstance(context);int[] ids=m.getAppWidgetIds(new ComponentName(context,OrdersWidget.class));for(int id:ids)paintCached(context,m,id);}finally{work.shutdown();if(pending!=null)pending.finish();}}});}
 }

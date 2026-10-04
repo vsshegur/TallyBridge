@@ -2,7 +2,7 @@ package app
 
 import "time"
 
-const Version = "2.4.1"
+const Version = "2.4.2"
 
 type Settings struct {
 	TallyURL    string `json:"tallyUrl"`
@@ -64,12 +64,15 @@ type LiveState struct {
 }
 
 type AutoSyncState struct {
-	Running   bool      `json:"running"`
-	Company   string    `json:"company"`
-	Step      string    `json:"step"`
-	StartedAt time.Time `json:"startedAt"`
-	LastOK    time.Time `json:"lastOk"`
-	LastError string    `json:"lastError"`
+	Running      bool      `json:"running"`
+	Company      string    `json:"company"`
+	Step         string    `json:"step"`
+	StartedAt    time.Time `json:"startedAt"`
+	LastOK       time.Time `json:"lastOk"`
+	LastProgress time.Time `json:"lastProgress,omitempty"`
+	LastError    string    `json:"lastError"`
+	LastErrorAt  time.Time `json:"lastErrorAt,omitempty"`
+	RetrySoon    bool      `json:"retrySoon,omitempty"`
 }
 
 type LedgerIndexRow struct {

@@ -37,6 +37,18 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/orders_widget_info" />
         </receiver>
+        <receiver android:name=".ProformaWidget" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/quick_pi_widget_info" />
+        </receiver>
+        <receiver android:name=".QuickOrderWidget" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/quick_order_widget_info" />
+        </receiver>
         <provider android:name=".PdfProvider" android:authorities="in.tallybridge.app.pdf"
             android:exported="false" android:grantUriPermissions="true" />
     </application>
