@@ -23,9 +23,8 @@ public class DesignTest {
  private void field(String name,Object value)throws Exception {Field f=MainActivity.class.getDeclaredField(name);f.setAccessible(true);f.set(rule.getActivity(),value);}
  private void ui(Runnable r){InstrumentationRegistry.getInstrumentation().runOnMainSync(r);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
  private void pressBack()throws Exception {
-  android.os.ParcelFileDescriptor command=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("input keyevent KEYCODE_BACK");
-  if(command!=null)command.close();
-  Thread.sleep(300);
+  assertTrue(InstrumentationRegistry.getInstrumentation().getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK));
+  Thread.sleep(500);
   InstrumentationRegistry.getInstrumentation().waitForIdleSync();
  }
  private void capture(String name)throws Exception {
