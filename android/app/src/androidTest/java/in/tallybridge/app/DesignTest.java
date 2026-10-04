@@ -22,6 +22,15 @@ public class DesignTest {
  private void call(String name)throws Exception {Method m=MainActivity.class.getDeclaredMethod(name);m.setAccessible(true);m.invoke(rule.getActivity());}
  private void field(String name,Object value)throws Exception {Field f=MainActivity.class.getDeclaredField(name);f.setAccessible(true);f.set(rule.getActivity(),value);}
  private void ui(Runnable r){InstrumentationRegistry.getInstrumentation().runOnMainSync(r);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
+ private void cancelDialog()throws Exception {
+  android.app.UiAutomation automation=InstrumentationRegistry.getInstrumentation().getUiAutomation();
+  android.view.accessibility.AccessibilityNodeInfo root=automation.getRootInActiveWindow();assertNotNull(root);
+  java.util.List<android.view.accessibility.AccessibilityNodeInfo> nodes=root.findAccessibilityNodeInfosByText("CANCEL");
+  if(nodes==null||nodes.isEmpty())nodes=root.findAccessibilityNodeInfosByText("Cancel");
+  assertNotNull(nodes);assertFalse(nodes.isEmpty());boolean clicked=false;
+  for(android.view.accessibility.AccessibilityNodeInfo node:nodes){android.view.accessibility.AccessibilityNodeInfo target=node;while(target!=null&&!target.isClickable())target=target.getParent();if(target!=null&&target.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)){clicked=true;break;}}
+  assertTrue("Could not dismiss dialog",clicked);Thread.sleep(400);InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+ }
  private void capture(String name)throws Exception {
   Thread.sleep(400);
   Bitmap b=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(b);
@@ -65,8 +74,7 @@ public class DesignTest {
   capture("11-sync");
   ui(()->{try{field("tab","More");call("more");call("chooseAppearance");}catch(Exception e){throw new RuntimeException(e);}});
   capture("08-dark-appearance");
-  InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-  InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+  cancelDialog();
   ui(()->{try{
    rule.getActivity().getSharedPreferences("appearance",0).edit().putString("mode","Light").commit();call("applyAppearance");
    field("tab","Payments");field("company","Vijayalaxmi Textiles • Solapur");
