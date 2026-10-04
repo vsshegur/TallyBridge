@@ -20,13 +20,17 @@ jobs:
           ref: fix/android-work-sync-widgets-242
           fetch-depth: 0
 
-      - name: Apply exact repair and clean staging helpers
+      - name: Apply repair and clean staging helpers
         shell: bash
         run: |
           set -euo pipefail
-          python tools/apply242.py
+          python tools/patch242_backend.py
+          python tools/patch242_android_core.py
+          python tools/patch242_widgets_core.py
+          python tools/patch242_widget_tests.py
+          python tools/patch242_finalize.py
           gofmt -w internal/app/autosync.go internal/app/types.go internal/app/workspace.go internal/app/operations_240_test.go internal/app/server.go
-          rm -f tools/apply242.py tools/patch242_android_core.py tools/patch242_backend.py .github/workflows/apply-242.yml
+          rm -f tools/apply242.py tools/patch242_android_core.py tools/patch242_backend.py tools/patch242_widgets_core.py tools/patch242_widget_tests.py tools/patch242_finalize.py .github/workflows/apply-242.yml
           git diff --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
