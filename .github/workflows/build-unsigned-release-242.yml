@@ -1,0 +1,43 @@
+name: Build unsigned Android 2.4.2 release
+
+on:
+  push:
+    branches:
+      - build/final-production-2.4.2-20261004
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build R8 compressed unsigned release
+        working-directory: android
+        env:
+          CI: 'false'
+        run: |
+          set -euo pipefail
+          gradle --no-daemon test lintRelease assembleRelease
+          APK=$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -1)
+          test -n "$APK"
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          "$AAPT" dump badging "$APK" | tee app/build/outputs/apk/release/APK-VERSION.txt
+          grep -q "versionCode='20402'" app/build/outputs/apk/release/APK-VERSION.txt
+          grep -q "versionName='2.4.2'" app/build/outputs/apk/release/APK-VERSION.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TallyBridge-Android-2.4.2-Unsigned-Release
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/apk/release/APK-VERSION.txt
+          if-no-files-found: error
