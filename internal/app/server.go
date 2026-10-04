@@ -512,7 +512,15 @@ func (s *Server) bootstrapPayload() map[string]any {
 	if cfg.AutoUpdate {
 		s.maybeCheckUpdates()
 	}
-	return map[string]any{"bridgeOnline": true, "tallyOnline": st.TallyOnline, "companies": cs, "lastSuccess": st.LastSuccess, "cacheLatestAt": s.cache.Stats().LatestAt, "summaries": s.summaries(cs), "autoSync": s.autoSyncSnapshot(), "version": Version, "pdfBanks": s.store.PDFBankNames(), "health": health, "pdfTemplate": validPDFTemplate(cfg.PDFTemplate), "autoUpdate": cfg.AutoUpdate, "update": s.updateSnapshot()}
+	cacheLatest := s.cache.Stats().LatestAt
+	sync := s.autoSyncSnapshot()
+	lastUpdated := st.LastSuccess
+	for _, at := range []time.Time{cacheLatest, sync.LastProgress, sync.LastOK} {
+		if at.After(lastUpdated) {
+			lastUpdated = at
+		}
+	}
+	return map[string]any{"bridgeOnline": true, "tallyOnline": st.TallyOnline, "companies": cs, "lastSuccess": st.LastSuccess, "cacheLatestAt": cacheLatest, "lastUpdated": lastUpdated, "summaries": s.summaries(cs), "autoSync": sync, "version": Version, "pdfBanks": s.store.PDFBankNames(), "health": health, "pdfTemplate": validPDFTemplate(cfg.PDFTemplate), "autoUpdate": cfg.AutoUpdate, "update": s.updateSnapshot()}
 }
 func (s *Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 	s.ensureAutoSync()

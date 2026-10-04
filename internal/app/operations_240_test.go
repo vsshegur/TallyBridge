@@ -1,6 +1,8 @@
 package app
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -146,5 +148,41 @@ func TestGlobalSearchIndexesInvoiceProducts(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("invoice product/HSN/description was not indexed")
+	}
+}
+
+func TestMobileOperationsRoutesAreRegistered(t *testing.T) {
+	s := newOrderTestServer(t)
+	h := s.Handler()
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/api/v1/mobile/workspace?company=Firm"},
+		{http.MethodGet, "/api/v1/mobile/global-search?company=Firm"},
+		{http.MethodGet, "/api/v1/mobile/customer-workspace?company=Firm&party=ABC"},
+		{http.MethodGet, "/api/v1/mobile/followups?company=Firm"},
+		{http.MethodPost, "/api/v1/mobile/sync"},
+	} {
+		r := httptest.NewRequest(tc.method, tc.path, nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code == http.StatusNotFound {
+			t.Fatalf("mobile route returned 404: %s %s", tc.method, tc.path)
+		}
+	}
+}
+
+func TestConnectedTallyDoesNotRaiseStaleSyncAttentionAlert(t *testing.T) {
+	s := newOrderTestServer(t)
+	s.tally.mu.Lock()
+	s.tally.tallyOnline = true
+	s.tally.mu.Unlock()
+	s.setAuto(func(a *AutoSyncState) {
+		a.LastError = "previous unsupported report"
+		a.LastErrorAt = time.Now().Add(-time.Minute)
+		a.RetrySoon = false
+	})
+	for _, a := range s.smartAlerts("Firm") {
+		if a.ID == "sync-error" {
+			t.Fatalf("connected Tally should not show stale sync attention alert: %#v", a)
+		}
 	}
 }

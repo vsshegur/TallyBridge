@@ -20,6 +20,8 @@ func (s *Server) startAutoSync(company, reason string) bool {
 	s.auto.Step = "Starting"
 	s.auto.StartedAt = time.Now()
 	s.auto.LastError = ""
+	s.auto.LastErrorAt = time.Time{}
+	s.auto.RetrySoon = false
 	s.mu.Unlock()
 	go s.runAutoSync(company, reason)
 	return true
@@ -33,7 +35,11 @@ func (s *Server) runAutoSync(company, reason string) {
 		// Probe is intentionally tiny. If it fails, keep saved data and retry later.
 		st, e := s.probeLive()
 		if e != nil {
-			s.setAuto(func(a *AutoSyncState) { a.LastError = "Tally connection: " + e.Error() })
+			s.setAuto(func(a *AutoSyncState) {
+				a.LastError = "Tally connection: " + e.Error()
+				a.LastErrorAt = time.Now()
+				a.RetrySoon = true
+			})
 			return
 		}
 		for _, c := range st.Companies {
@@ -43,7 +49,11 @@ func (s *Server) runAutoSync(company, reason string) {
 		}
 	}
 	if len(companies) == 0 {
-		s.setAuto(func(a *AutoSyncState) { a.LastError = "No open Tally company detected yet" })
+		s.setAuto(func(a *AutoSyncState) {
+			a.LastError = "No open Tally company detected yet"
+			a.LastErrorAt = time.Now()
+			a.RetrySoon = true
+		})
 		return
 	}
 	var failures []string
@@ -98,17 +108,30 @@ func (s *Server) runAutoSync(company, reason string) {
 			s.setAuto(func(a *AutoSyncState) { a.Step = st.name })
 			if e := st.fn(); e != nil {
 				failures = append(failures, fmt.Sprintf("%s / %s: %v", c, st.name, e))
-				s.setAuto(func(a *AutoSyncState) { a.LastError = strings.Join(failures, "; ") })
+				_, _, pending := s.tally.Pending()
+				s.setAuto(func(a *AutoSyncState) {
+					a.LastError = strings.Join(failures, "; ")
+					a.LastErrorAt = time.Now()
+					a.RetrySoon = pending
+				})
 				// Stop on transport/cooldown failures; continue past a single unsupported report.
-				if _, _, pending := s.tally.Pending(); pending {
+				if pending {
 					return
 				}
 				continue
 			}
+			s.setAuto(func(a *AutoSyncState) { a.LastProgress = time.Now() })
 		}
 	}
 	if len(failures) == 0 {
-		s.setAuto(func(a *AutoSyncState) { a.LastOK = time.Now(); a.LastError = "" })
+		s.setAuto(func(a *AutoSyncState) {
+			now := time.Now()
+			a.LastOK = now
+			a.LastProgress = now
+			a.LastError = ""
+			a.LastErrorAt = time.Time{}
+			a.RetrySoon = false
+		})
 	}
 }
 func (s *Server) StartBackground() {
@@ -127,7 +150,7 @@ func (s *Server) StartBackground() {
 func (s *Server) ensureAutoSync() {
 	a := s.autoSyncSnapshot()
 	interval := 3 * time.Minute
-	if a.LastError != "" {
+	if a.RetrySoon {
 		interval = 30 * time.Second
 	}
 	if a.Running || time.Since(a.StartedAt) < interval {
