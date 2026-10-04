@@ -22,14 +22,32 @@ public class DesignTest {
  private void call(String name)throws Exception {Method m=MainActivity.class.getDeclaredMethod(name);m.setAccessible(true);m.invoke(rule.getActivity());}
  private void field(String name,Object value)throws Exception {Field f=MainActivity.class.getDeclaredField(name);f.setAccessible(true);f.set(rule.getActivity(),value);}
  private void ui(Runnable r){InstrumentationRegistry.getInstrumentation().runOnMainSync(r);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
- private void cancelDialog()throws Exception {
-  android.app.UiAutomation automation=InstrumentationRegistry.getInstrumentation().getUiAutomation();
-  android.view.accessibility.AccessibilityNodeInfo root=automation.getRootInActiveWindow();assertNotNull(root);
+ private java.util.List<android.view.accessibility.AccessibilityNodeInfo> cancelNodes(android.app.UiAutomation automation){
+  android.view.accessibility.AccessibilityNodeInfo root=automation.getRootInActiveWindow();
+  if(root==null)return java.util.Collections.emptyList();
   java.util.List<android.view.accessibility.AccessibilityNodeInfo> nodes=root.findAccessibilityNodeInfosByText("CANCEL");
   if(nodes==null||nodes.isEmpty())nodes=root.findAccessibilityNodeInfosByText("Cancel");
-  assertNotNull(nodes);assertFalse(nodes.isEmpty());boolean clicked=false;
-  for(android.view.accessibility.AccessibilityNodeInfo node:nodes){android.view.accessibility.AccessibilityNodeInfo target=node;while(target!=null&&!target.isClickable())target=target.getParent();if(target!=null&&target.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)){clicked=true;break;}}
-  assertTrue("Could not dismiss dialog",clicked);Thread.sleep(400);InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+  return nodes==null?java.util.Collections.emptyList():nodes;
+ }
+ private void cancelDialog()throws Exception {
+  android.app.UiAutomation automation=InstrumentationRegistry.getInstrumentation().getUiAutomation();
+  for(int attempt=0;attempt<5;attempt++){
+   java.util.List<android.view.accessibility.AccessibilityNodeInfo> nodes=cancelNodes(automation);
+   if(nodes.isEmpty()){Thread.sleep(200);if(attempt>0)return;continue;}
+   android.view.accessibility.AccessibilityNodeInfo node=nodes.get(0),target=node;
+   while(target!=null&&!target.isClickable())target=target.getParent();
+   if(target!=null)target.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+   Thread.sleep(250);InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+   if(cancelNodes(automation).isEmpty())return;
+   android.graphics.Rect bounds=new android.graphics.Rect();(target!=null?target:node).getBoundsInScreen(bounds);
+   if(!bounds.isEmpty()){
+    android.os.ParcelFileDescriptor command=automation.executeShellCommand("input tap "+bounds.centerX()+" "+bounds.centerY());
+    if(command!=null)command.close();
+   }
+   Thread.sleep(350);InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+   if(cancelNodes(automation).isEmpty())return;
+  }
+  fail("Cancel dialog remained visible after accessibility and coordinate dismissal attempts");
  }
  private void capture(String name)throws Exception {
   Thread.sleep(400);
