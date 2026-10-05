@@ -1,0 +1,98 @@
+name: Apply Android usability patch
+on:
+  push:
+    paths:
+      - '.github/workflows/app-usability-patch.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch Work compatibility and navigation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new, label):
+              p=Path(path)
+              s=p.read_text()
+              if old not in s:
+                  raise SystemExit(f"Missing expected block: {label}")
+              if s.count(old) != 1:
+                  raise SystemExit(f"Expected one block for {label}, found {s.count(old)}")
+              p.write_text(s.replace(old,new,1))
+
+          work='android/app/src/main/java/in/tallybridge/app/WorkActivity.java'
+          main='android/app/src/main/java/in/tallybridge/app/MainActivity.java'
+
+          replace_once(work,
+          'import java.text.NumberFormat;\nimport java.util.*;',
+          'import java.text.NumberFormat;\nimport java.time.*;\nimport java.util.*;',
+          'Work java.time import')
+
+          replace_once(work,
+          ' private CryptoStore store; private BridgeApi api; private String company=""; private boolean dark=false,destroyed=false;',
+          ' private CryptoStore store; private BridgeApi api; private OfflineOrdersStore offline; private String company=""; private boolean dark=false,destroyed=false;',
+          'Work offline store field')
+
+          replace_once(work,
+          '@Override public void onCreate(Bundle b){applyTheme();super.onCreate(b);getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);styleWindow();try{store=new CryptoStore(this);api=new BridgeApi(store);company=store.get("company");}catch(Exception e){fatal(e);return;}if(store.get("base").isEmpty()||store.get("device").isEmpty()){finish();startActivity(new Intent(this,MainActivity.class));return;}showToday();}',
+          '@Override public void onCreate(Bundle b){applyTheme();super.onCreate(b);getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);styleWindow();try{store=new CryptoStore(this);api=new BridgeApi(store);offline=new OfflineOrdersStore(store);company=store.get("company");}catch(Exception e){fatal(e);return;}if(store.get("base").isEmpty()||store.get("device").isEmpty()){finish();startActivity(new Intent(this,MainActivity.class));return;}showToday();}',
+          'Work onCreate')
+
+          replace_once(work,
+          'String[] names={"Today","Search","Customer","Follow-ups","System"};View.OnClickListener[] clicks={v->showToday(),v->showSearch(),v->customerPicker(),v->showFollowUps(),v->showSystem()};',
+          'String[] names={"Today","Search","Customer","Follow-ups","Tools","System"};View.OnClickListener[] clicks={v->showToday(),v->showSearch(),v->customerPicker(),v->showFollowUps(),v->showTools(),v->showSystem()};',
+          'Work tabs')
+
+          replace_once(work,
+          'hs.addView(tabs,new HorizontalScrollView.LayoutParams(dp(620),-2));',
+          'hs.addView(tabs,new HorizontalScrollView.LayoutParams(dp(760),-2));',
+          'Work tabs width')
+
+          replace_once(work,
+          'oldBridge?"The PC bridge is older than this Android app. Install TallyBridge 2.4.3 on Windows, let it restart, then tap Retry.":(e.getMessage()==null?"Connection unavailable":e.getMessage())',
+          'oldBridge?"The connected Windows bridge does not provide this advanced Work screen yet. Core reports and offline tools remain available.":(e.getMessage()==null?"Connection unavailable":e.getMessage())',
+          'Work generic 404 copy')
+
+          replace_once(work,
+          'toast(e instanceof Http.Failure&&((Http.Failure)e).status==404?"Update Windows TallyBridge to 2.4.3, then retry.":e.getMessage());',
+          'toast(e instanceof Http.Failure&&((Http.Failure)e).status==404?"This action needs the matching Windows TallyBridge release.":e.getMessage());',
+          'Work POST 404 copy')
+
+          old_today=' private void showToday(){frame("Today","Daily work • "+company);get("Today",path("workspace"),this::renderToday);}\n private void renderToday(JSONObject x){\n  body.removeAllViews();heading(x.optBoolean("tallyOnline")?"Business ready":"Saved mode",x.optBoolean("tallyOnline")?"Tally is connected. Figures below use the latest synchronized data.":"Tally is unavailable. Last-known-good figures remain visible.");\n  LinearLayout quick=new LinearLayout(this);Button q=primary("+ Quick order",v->{Intent i=new Intent(this,OrdersActivity.class);i.setAction(OrdersActivity.ACTION_QUICK);startActivity(i);});Button o=button("Orders",v->startActivity(new Intent(this,OrdersActivity.class)));quick.addView(q,new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams op=new LinearLayout.LayoutParams(0,-2,1);op.setMargins(dp(8),0,0,0);quick.addView(o,op);body.addView(quick,full(12));'
+          new_today=''' private void showToday(){frame("Today","Daily work • "+company);loadToday();}\n private void loadToday(){busy(true);work.execute(()->{try{JSONObject x=api.get(path("workspace"));main.post(()->{if(destroyed)return;busy(false);renderToday(x);});}catch(Exception advanced){try{JSONObject x=compatibilityToday();main.post(()->{if(destroyed)return;busy(false);renderToday(x);});}catch(Exception fallback){main.post(()->{if(destroyed)return;busy(false);card("Could not load Today",fallback.getMessage()==null?"PC connection unavailable":fallback.getMessage(),"",v->loadToday());});}}}});}\n private JSONObject compatibilityToday()throws Exception{\n  JSONObject boot=api.get("/api/v1/mobile/bootstrap"),x=new JSONObject();x.put("_compat",true);x.put("tallyOnline",boot.optBoolean("tallyOnline"));\n  JSONObject sums=boot.optJSONObject("summaries"),sm=sums==null?null:sums.optJSONObject(company);x.put("receivable",sm==null?0:sm.optDouble("receivable"));x.put("payable",sm==null?0:sm.optDouble("payable"));\n  try{JSONObject d=api.get(path("today-dispatch"));x.put("salesToday",d.optDouble("total"));x.put("salesCount",d.optInt("count"));}catch(Exception ignored){}\n  int pending=0,old=0,dispatchedToday=0;try{JSONObject o=offline.list();pending=o.optInt("pendingCount");JSONArray pa=o.optJSONArray("pending");Instant cutoff=Instant.now().minus(Duration.ofHours(48));if(pa!=null)for(int i=0;i<pa.length();i++){JSONObject a=pa.optJSONObject(i);if(a==null)continue;try{String c=a.optString("createdAt");if(!c.isEmpty()&&Instant.parse(c).isBefore(cutoff))old++;}catch(Exception ignored){}}JSONArray da=o.optJSONArray("dispatched");LocalDate today=LocalDate.now();if(da!=null)for(int i=0;i<da.length();i++){JSONObject a=da.optJSONObject(i);if(a==null)continue;try{String d=a.optString("dispatchedAt");if(!d.isEmpty()&&Instant.parse(d).atZone(ZoneId.systemDefault()).toLocalDate().equals(today))dispatchedToday++;}catch(Exception ignored){}}}catch(Exception ignored){}\n  x.put("pendingOrders",pending);x.put("oldPendingOrders",old);x.put("dispatchedToday",dispatchedToday);\n  try{JSONObject f=api.get(path("followups"));x.put("followUpsDue",f.optInt("dueCount",f.optJSONArray("dueToday")==null?0:f.optJSONArray("dueToday").length()));x.put("followUpsOverdue",f.optInt("overdueCount",f.optJSONArray("overdue")==null?0:f.optJSONArray("overdue").length()));}catch(Exception ignored){}\n  JSONArray alerts=new JSONArray();alerts.put(new JSONObject().put("id","compat").put("severity","info").put("title","Compatibility mode").put("detail","Today is using core bridge data because the advanced Work endpoint is unavailable. Orders, dispatch and main account figures remain usable.").put("action","tools"));x.put("alerts",alerts);return x;\n }\n private void renderToday(JSONObject x){\n  body.removeAllViews();boolean compat=x.optBoolean("_compat");heading(x.optBoolean("tallyOnline")?"Business ready":"Saved mode",compat?"Compatibility mode • using core bridge data and the phone’s saved Orders.":x.optBoolean("tallyOnline")?"Tally is connected. Figures below use the latest synchronized data.":"Tally is unavailable. Last-known-good figures remain visible.");\n  LinearLayout quick=new LinearLayout(this);Button q=primary("+ Quick order",v->{Intent i=new Intent(this,OrdersActivity.class);i.setAction(OrdersActivity.ACTION_QUICK);startActivity(i);});Button o=button("Orders",v->startActivity(new Intent(this,OrdersActivity.class)));quick.addView(q,new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams op=new LinearLayout.LayoutParams(0,-2,1);op.setMargins(dp(8),0,0,0);quick.addView(o,op);body.addView(quick,full(12));\n  LinearLayout tools=new LinearLayout(this);Button gsm=button("GSM calculator",v->startActivity(new Intent(this,GsmCalculatorActivity.class)));Button pi=button("Proforma",v->{Intent i=new Intent(this,MainActivity.class);i.setAction(MainActivity.ACTION_NEW_PROFORMA);startActivity(i);});tools.addView(gsm,new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(0,-2,1);pp.setMargins(dp(8),0,0,0);tools.addView(pi,pp);body.addView(tools,full(8));'''
+          replace_once(work,old_today,new_today,'Work Today compatibility')
+
+          replace_once(work,
+          'else if("followups".equals(action))showFollowUps();else showSystem();',
+          'else if("followups".equals(action))showFollowUps();else if("tools".equals(action))showTools();else showSystem();',
+          'Work alert routing')
+
+          system_anchor=' private void showSystem(){frame("System","Health • diagnostics • Tally performance • signing");'
+          tools=''' private void showTools(){frame("Tools","Fast everyday actions • works with or without advanced Work data");heading("Business tools","Common actions in one place");card("GSM Calculator","Calculate towel GSM from length, breadth and weight • fully offline","",v->startActivity(new Intent(this,GsmCalculatorActivity.class)));card("Quick order","Create an order quickly • saved on phone when PC is unavailable","",v->{Intent i=new Intent(this,OrdersActivity.class);i.setAction(OrdersActivity.ACTION_QUICK);startActivity(i);});card("Proforma invoice","Create and share a proforma invoice","",v->{Intent i=new Intent(this,MainActivity.class);i.setAction(MainActivity.ACTION_NEW_PROFORMA);startActivity(i);});card("Orders","Review pending and dispatched orders","",v->startActivity(new Intent(this,OrdersActivity.class)));card("Search","Find invoices, parties, LR/RR and saved activity","",v->showSearch());}\n\n'''
+          replace_once(work,system_anchor,tools+system_anchor,'Work tools screen')
+
+          old_home='''  gap(page,8);TextView workTitle=text("DAILY WORK",11,MUTED);workTitle.setTypeface(null,Typeface.BOLD);workTitle.setLetterSpacing(.10f);page.addView(workTitle);gap(page,8);\n  quick(page,"Reports","Sales register","Month-wise invoices with verified totals",()->open(()->register("sales")));\n  quick(page,"share","Today's dispatch","Open and share today's invoices",()->open(this::dispatch));\n  quick(page,"Reports","Orders","Take a new order or review pending orders",()->startActivity(new Intent(this,OrdersActivity.class)));\n  quick(page,"search","Search everything","Customers, invoices and LR/RR numbers",()->open(this::search));\n  quick(page,"health","Company health",healthLine,()->open(this::healthScreen));'''
+          new_home='''  gap(page,8);TextView workTitle=text("QUICK ACTIONS",11,MUTED);workTitle.setTypeface(null,Typeface.BOLD);workTitle.setLetterSpacing(.10f);page.addView(workTitle);gap(page,8);\n  quick(page,"Reports","New order","Create an order quickly • works offline",()->{Intent i=new Intent(this,OrdersActivity.class);i.setAction(OrdersActivity.ACTION_QUICK);startActivity(i);});\n  quick(page,"health","Today's work","Pending orders, dispatch and items needing attention",()->startActivity(new Intent(this,WorkActivity.class)));\n  quick(page,"calculator","GSM calculator","Calculate towel GSM from size and weight • offline",()->startActivity(new Intent(this,GsmCalculatorActivity.class)));\n  quick(page,"Proforma","Proforma invoice","Create and share a proforma invoice",()->rootTab("Proforma"));\n  gap(page,8);TextView reportTitle=text("REPORTS & SEARCH",11,MUTED);reportTitle.setTypeface(null,Typeface.BOLD);reportTitle.setLetterSpacing(.10f);page.addView(reportTitle);gap(page,8);\n  quick(page,"Reports","Sales register","Month-wise invoices with verified totals",()->open(()->register("sales")));\n  quick(page,"share","Today's dispatch","Open and share today's invoices",()->open(this::dispatch));\n  quick(page,"search","Search everything","Customers, invoices and LR/RR numbers",()->open(this::search));\n  quick(page,"health","Company health",healthLine,()->open(this::healthScreen));'''
+          replace_once(main,old_home,new_home,'Home quick actions')
+
+          old_more=''' private void more(){List<Row> data=new ArrayList<>();\n  data.add(heading("System","Health, sync and maintenance"));'''
+          new_more=''' private void more(){List<Row> data=new ArrayList<>();\n  data.add(heading("Business tools","Fast everyday actions"));\n  data.add(row("GSM calculator","Towel GSM from length, breadth and weight • works offline","",()->startActivity(new Intent(this,GsmCalculatorActivity.class))));\n  data.add(row("New order","Fast offline-first order entry","",()->{Intent i=new Intent(this,OrdersActivity.class);i.setAction(OrdersActivity.ACTION_QUICK);startActivity(i);}));\n  data.add(row("Proforma invoice","Create and share a proforma","",()->rootTab("Proforma")));\n  data.add(row("Today's work","Orders, dispatch, follow-ups and alerts","",()->startActivity(new Intent(this,WorkActivity.class))));\n  data.add(heading("System","Health, sync and maintenance"));'''
+          replace_once(main,old_more,new_more,'More business tools')
+          PY
+      - name: Commit usability changes
+        shell: bash
+        run: |
+          git config user.name "Vipul Shegur"
+          git config user.email "vsshegur@gmail.com"
+          git add android/app/src/main/java/in/tallybridge/app/WorkActivity.java android/app/src/main/java/in/tallybridge/app/MainActivity.java
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m "Fix Work compatibility and reorganize Android usability"
+          git push origin HEAD:main
