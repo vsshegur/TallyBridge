@@ -1,0 +1,33 @@
+name: Polish Orders shell 2.4.6
+on:
+  push:
+    paths:
+      - '.github/workflows/polish-orders-v246.yml'
+permissions:
+  contents: write
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove redundant Orders header Home button
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/main/java/in/tallybridge/app/OrdersActivity.java')
+          s=p.read_text(encoding='utf-8')
+          old='  h.addView(titles,new LinearLayout.LayoutParams(0,-2,1));Button home=btn("Home",v->SectionNav.go(this,"Home"));h.addView(home,new LinearLayout.LayoutParams(dp(84),-2));root.addView(h);'
+          new='  h.addView(titles,new LinearLayout.LayoutParams(0,-2,1));root.addView(h);'
+          if old not in s:
+              raise SystemExit('Orders header pattern not found')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit polish
+        run: |
+          git config user.name "Vipul Shegur"
+          git config user.email "vsshegur@gmail.com"
+          git add android/app/src/main/java/in/tallybridge/app/OrdersActivity.java
+          git commit -m "Polish Orders shell navigation"
+          git push
