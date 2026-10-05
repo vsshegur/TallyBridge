@@ -24,7 +24,7 @@ public final class WorkActivity extends Activity {
 
  @Override public void onCreate(Bundle b){applyTheme();super.onCreate(b);getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);styleWindow();try{store=new CryptoStore(this);api=new BridgeApi(store);offline=new OfflineOrdersStore(store);company=store.get("company");}catch(Exception e){fatal(e);return;}if(store.get("base").isEmpty()||store.get("device").isEmpty()){finish();startActivity(new Intent(this,MainActivity.class));return;}showToday();}
  @Override protected void onDestroy(){destroyed=true;work.shutdownNow();main.removeCallbacksAndMessages(null);super.onDestroy();}
-  private String appearance(){return getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","System");}
+ private String appearance(){return getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","System");}
  private void applyTheme(){String m=appearance();dark=m.equals("Dark")||(m.equals("System")&&(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES);setTheme(dark?R.style.AppThemeDark:R.style.AppThemeLight);NAVY=dark?0xffe6edf3:0xff102d44;TEAL=dark?0xff7bd8bd:0xff176b5b;MUTED=dark?0xffa7b8c5:0xff596c79;BG=dark?0xff101820:0xfff5f7fa;SURFACE=dark?0xff1b2732:Color.WHITE;BORDER=dark?0xff344552:0xffe4eaef;TINT=dark?0xff203f3a:0xffe5f2ee;AMBER=dark?0xffffc857:0xff8a5a00;RED=dark?0xffff9c9c:0xffa12626;INK=dark?0xff102d26:Color.WHITE;}
  private void styleWindow(){getWindow().getDecorView().setSystemUiVisibility(dark?0:(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(SURFACE);}
  private int dp(float x){return Math.round(x*getResources().getDisplayMetrics().density);}
@@ -44,13 +44,14 @@ public final class WorkActivity extends Activity {
   LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);top.setPadding(dp(18),dp(14),dp(18),dp(8));
   LinearLayout titles=col();TextView brand=text("TALLYBRIDGE",10,TEAL);brand.setTypeface(null,Typeface.BOLD);brand.setLetterSpacing(.14f);titles.addView(brand);
   TextView t=text(title,25,NAVY);t.setTypeface(null,Typeface.BOLD);titles.addView(t);titles.addView(text(subtitle,12,MUTED));
-  top.addView(titles,new LinearLayout.LayoutParams(0,-2,1));Button home=button("Home",v->openMain(MainActivity.ACTION_HOME));top.addView(home,new LinearLayout.LayoutParams(dp(82),-2));root.addView(top);
+  top.addView(titles,new LinearLayout.LayoutParams(0,-2,1));root.addView(top);
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setIndeterminate(true);progress.setVisibility(View.GONE);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(TEAL));root.addView(progress,new LinearLayout.LayoutParams(-1,dp(3)));
-  LinearLayout tabs=new LinearLayout(this);String[] names={"Today","Search","Customers","Tools","System"};
+  String[] names={"Today","Search","Customers","Tools","System"};
   View.OnClickListener[] clicks={v->showToday(),v->openMain(MainActivity.ACTION_SEARCH),v->openMain(MainActivity.ACTION_CUSTOMERS),v->showTools(),v->openMain(MainActivity.ACTION_SYSTEM)};
-  for(int i=0;i<names.length;i++){Button b=button(names[i],clicks[i]);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(2),dp(7),dp(2),dp(4));tabs.addView(b,lp);}
-  HorizontalScrollView hs=new HorizontalScrollView(this);hs.setHorizontalScrollBarEnabled(false);hs.setPadding(dp(12),0,dp(12),0);hs.addView(tabs,new HorizontalScrollView.LayoutParams(dp(610),-2));root.addView(hs);
-  ScrollView sv=new ScrollView(this);body=col();body.setPadding(dp(18),dp(7),dp(18),dp(26));sv.addView(body);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
+  LinearLayout navArea=col();navArea.setPadding(dp(12),0,dp(12),dp(3));LinearLayout row1=new LinearLayout(this),row2=new LinearLayout(this);
+  for(int i=0;i<names.length;i++){Button b=button(names[i],clicks[i]);b.setTextSize(13);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(2),dp(4),dp(2),dp(2));if(i<3)row1.addView(b,lp);else row2.addView(b,lp);}
+  navArea.addView(row1,new LinearLayout.LayoutParams(-1,-2));navArea.addView(row2,new LinearLayout.LayoutParams(-1,-2));root.addView(navArea);
+  ScrollView sv=new ScrollView(this);body=col();body.setPadding(dp(18),dp(5),dp(18),dp(26));sv.addView(body);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
   root.addView(SectionNav.bar(this,"Work",SURFACE,TINT,MUTED,TEAL));setContentView(root);
  }
  private void openMain(String action){Intent i=new Intent(this,MainActivity.class).setAction(action).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);startActivity(i);finish();overridePendingTransition(0,0);}
