@@ -1,0 +1,26 @@
+<resources>
+ <style name="AppTheme" parent="AppThemeLight" />
+ <style name="AppThemeLight" parent="android:style/Theme.Material.Light.NoActionBar">
+  <item name="android:fontFamily">sans</item>
+  <item name="android:colorAccent">#176B5B</item>
+  <item name="android:windowLightStatusBar">true</item>
+  <item name="android:statusBarColor">#F5F7FA</item>
+  <item name="android:navigationBarColor">#FFFFFF</item>
+  <item name="android:windowLightNavigationBar">true</item>
+  <item name="android:windowActionModeOverlay">true</item>
+  <item name="android:windowLayoutInDisplayCutoutMode">default</item>
+  <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+ </style>
+ <style name="AppThemeDark" parent="android:style/Theme.Material.NoActionBar">
+  <item name="android:fontFamily">sans</item>
+  <item name="android:colorAccent">#7BD8BD</item>
+  <item name="android:windowBackground">#101820</item>
+  <item name="android:colorBackground">#101820</item>
+  <item name="android:windowLightStatusBar">false</item>
+  <item name="android:statusBarColor">#101820</item>
+  <item name="android:navigationBarColor">#1B2732</item>
+  <item name="android:windowLightNavigationBar">false</item>
+  <item name="android:windowActionModeOverlay">true</item>
+  <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+ </style>
+</resources>
