@@ -16,32 +16,26 @@ final class BridgeApi {
    h.put("X-TB-Device",store.get("device"));h.put("X-TB-Date",date);h.put("X-TB-Nonce",nonce);h.put("X-TB-Signature",store.sign(message));}
   return h;
  }
- JSONObject call(String path,String method,String body)throws Exception{return Http.json(store.get("base")+path,method,method.equals("GET")?null:body,headers(path,method,body,true));}
- JSONObject get(String path)throws Exception{
-  try{
-   JSONObject data=call(path,"GET","");
-   if(path.equals("/api/v2/native/status")&&data.optBoolean("approved")&&!data.optString("sessionToken").isEmpty())store.putSecret("session",data.getString("sessionToken"));
-   return data;
-  }catch(Http.Failure first){
+ private JSONObject rawCall(String path,String method,String body)throws Exception{return Http.json(store.get("base")+path,method,method.equals("GET")?null:body,headers(path,method,body,true));}
+ JSONObject call(String path,String method,String body)throws Exception{
+  try{return rawCall(path,method,body);}catch(Http.Failure first){
    if(first.status!=404||!isWorkPath(path))throw first;
    String version="";
    try{
-    JSONObject status=call("/api/v1/mobile/status","GET","");
+    JSONObject status=rawCall("/api/v1/mobile/status","GET","");
     version=status.optString("version","").trim();
     if(!version.isEmpty()&&compareVersion(version,"2.4.2")>=0){
-     try{return call(path,"GET","");}
-     catch(Http.Failure retry){
+     try{return rawCall(path,method,body);}catch(Http.Failure retry){
       if(retry.status!=404)throw retry;
       throw new Exception("Windows TallyBridge "+version+" is connected, but this Work request is unavailable. Close and reopen TallyBridge on Windows, then tap Retry. The Windows app does not need another update.");
      }
     }
-   }catch(Http.Failure probeFailure){
-    if(probeFailure.status!=404)throw probeFailure;
-   }
+   }catch(Http.Failure probeFailure){if(probeFailure.status!=404)throw probeFailure;}
    if(!version.isEmpty()&&compareVersion(version,"2.4.2")>=0)throw new Exception("Windows TallyBridge "+version+" is connected, but this Work request is unavailable. Close and reopen TallyBridge on Windows, then tap Retry. The Windows app does not need another update.");
    throw first;
   }
  }
+ JSONObject get(String path)throws Exception{JSONObject data=call(path,"GET","");if(path.equals("/api/v2/native/status")&&data.optBoolean("approved")&&!data.optString("sessionToken").isEmpty())store.putSecret("session",data.getString("sessionToken"));return data;}
  private static boolean isWorkPath(String path){
   if(path==null||!path.startsWith("/api/v1/mobile/"))return false;
   String p=path.substring("/api/v1/mobile/".length());int q=p.indexOf('?');if(q>=0)p=p.substring(0,q);
