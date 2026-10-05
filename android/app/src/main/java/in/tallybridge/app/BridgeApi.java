@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.Map;
 
 final class BridgeApi {
- static final String APP_VERSION="2.4.3";
+ static final String APP_VERSION="2.4.5";
  final CryptoStore store;final AccessLogin login;
  BridgeApi(CryptoStore store){this.store=store;login=new AccessLogin(store);}
  private Map<String,String> headers(String path,String method,String body,boolean signed)throws Exception{
@@ -27,11 +27,11 @@ final class BridgeApi {
     if(!version.isEmpty()&&compareVersion(version,"2.4.2")>=0){
      try{return rawCall(path,method,body);}catch(Http.Failure retry){
       if(retry.status!=404)throw retry;
-      throw new Exception("Windows TallyBridge "+version+" is connected, but this Work request is unavailable. Close and reopen TallyBridge on Windows, then tap Retry. The Windows app does not need another update.");
+      throw new Exception("Windows TallyBridge "+version+" is connected, but this Work request is unavailable. Compatibility mode will be used where possible.");
      }
     }
    }catch(Http.Failure probeFailure){if(probeFailure.status!=404)throw probeFailure;}
-   if(!version.isEmpty()&&compareVersion(version,"2.4.2")>=0)throw new Exception("Windows TallyBridge "+version+" is connected, but this Work request is unavailable. Close and reopen TallyBridge on Windows, then tap Retry. The Windows app does not need another update.");
+   if(!version.isEmpty()&&compareVersion(version,"2.4.2")>=0)throw new Exception("Windows TallyBridge "+version+" is connected, but this Work request is unavailable. Compatibility mode will be used where possible.");
    throw first;
   }
  }
