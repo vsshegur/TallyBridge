@@ -110,9 +110,9 @@ public final class MainActivity extends Activity {
  private void begin(){history.clear();current=null;if(store.get("base").isEmpty()){connectScreen();return;}if(store.get("device").isEmpty()){verifyOwner();return;}base("Connecting",false);int epoch=++generation;progress.setVisibility(View.VISIBLE);work.execute(()->{try{JSONObject s=api.get("/api/v2/native/status");JSONObject b=s.optBoolean("approved")?api.get("/api/v1/mobile/bootstrap"):null;main.post(()->{if(!active(epoch))return;if(b==null){approvalScreen();return;}reconnectNeeded=false;boot=b;selectInitialCompany();handlePendingLaunch();});}catch(Exception e){main.post(()->{if(active(epoch))showFailure(e);});}});}
  private void handlePendingLaunch(){String action=pendingLaunchAction;pendingLaunchAction="";
   if(ACTION_NEW_PROFORMA.equals(action)){rootTab("Proforma");return;}
-  if(ACTION_SEARCH.equals(action)){history.clear();tab="Home";open(this::search);return;}
-  if(ACTION_CUSTOMERS.equals(action)){history.clear();tab="Reports";open(()->ledgers(false));return;}
-  if(ACTION_SYSTEM.equals(action)){rootTab("More");return;}
+  if(ACTION_SEARCH.equals(action)){history.clear();history.push(()->rootTab("Work"));tab="Home";search();return;}
+  if(ACTION_CUSTOMERS.equals(action)){history.clear();history.push(()->rootTab("Work"));tab="Reports";ledgers(false);return;}
+  if(ACTION_SYSTEM.equals(action)){history.clear();history.push(()->rootTab("Work"));tab="More";diagnosticsScreen();return;}
   if(ACTION_REPORTS.equals(action)){rootTab("Reports");return;}
   if(ACTION_MORE.equals(action)){rootTab("More");return;}
   rootTab("Home");
