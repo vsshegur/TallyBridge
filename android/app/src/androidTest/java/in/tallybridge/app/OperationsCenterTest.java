@@ -41,16 +41,16 @@ public class OperationsCenterTest {
   capture("26-work-today");
 
   ui(()->{try{call("showTools",new Class[]{});}catch(Exception e){throw new RuntimeException(e);}});
-  capture("27-work-tools");
+  capture("27-customer-360");
 
-  // The 2.4.6 design intentionally routes Search, Customers and System through
-  // MainActivity's proven core screens instead of duplicating fragile Work APIs.
+  // In 2.4.6 Search, Customers and System intentionally route through the
+  // proven MainActivity core screens instead of duplicate fragile Work APIs.
   assertEquals("in.tallybridge.app.OPEN_SEARCH",MainActivity.ACTION_SEARCH);
   assertEquals("in.tallybridge.app.OPEN_CUSTOMERS",MainActivity.ACTION_CUSTOMERS);
   assertEquals("in.tallybridge.app.OPEN_SYSTEM",MainActivity.ACTION_SYSTEM);
   assertNotNull(SectionNav.class);
 
   ui(()->{try{call("frame",new Class[]{String.class,String.class},"Work","Unified navigation • Home • Work • Orders • Reports • More");}catch(Exception e){throw new RuntimeException(e);}});
-  capture("28-work-navigation");
+  capture("28-work-system");
  }
 }
