@@ -24,6 +24,8 @@ import java.util.function.Consumer;
 /** Native Android Views only. All network and PDF work runs off the UI thread. */
 public final class MainActivity extends Activity {
  static final String ACTION_NEW_PROFORMA="in.tallybridge.app.NEW_PROFORMA";
+ static final String ACTION_SEARCH="in.tallybridge.app.OPEN_SEARCH", ACTION_CUSTOMERS="in.tallybridge.app.OPEN_CUSTOMERS", ACTION_SYSTEM="in.tallybridge.app.OPEN_SYSTEM";
+ static final String ACTION_REPORTS="in.tallybridge.app.OPEN_REPORTS", ACTION_MORE="in.tallybridge.app.OPEN_MORE", ACTION_HOME="in.tallybridge.app.OPEN_HOME";
  private int NAVY,TEAL,MUTED,BG,SURFACE,BORDER,TINT,SECTION,PRIMARY_INK;
  private boolean dark;
  private String appearance(){return getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","System");}
@@ -106,7 +108,15 @@ public final class MainActivity extends Activity {
  }
  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==701){authenticating=false;if(result==RESULT_OK){unlocked=true;begin();}else showLock();}else if(request==702&&result==RESULT_OK&&data!=null&&savePDF!=null){Uri target=data.getData();File source=savePDF;work.execute(()->{try(InputStream in=new FileInputStream(source);OutputStream out=getContentResolver().openOutputStream(target)){if(out==null)throw new IOException("Could not open selected file");byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);main.post(()->toast("PDF saved"));}catch(Exception e){main.post(()->toast(e.getMessage()));}});}}
  private void begin(){history.clear();current=null;if(store.get("base").isEmpty()){connectScreen();return;}if(store.get("device").isEmpty()){verifyOwner();return;}base("Connecting",false);int epoch=++generation;progress.setVisibility(View.VISIBLE);work.execute(()->{try{JSONObject s=api.get("/api/v2/native/status");JSONObject b=s.optBoolean("approved")?api.get("/api/v1/mobile/bootstrap"):null;main.post(()->{if(!active(epoch))return;if(b==null){approvalScreen();return;}reconnectNeeded=false;boot=b;selectInitialCompany();handlePendingLaunch();});}catch(Exception e){main.post(()->{if(active(epoch))showFailure(e);});}});}
- private void handlePendingLaunch(){String action=pendingLaunchAction;pendingLaunchAction="";if(ACTION_NEW_PROFORMA.equals(action)){rootTab("Proforma");return;}rootTab("Home");}
+ private void handlePendingLaunch(){String action=pendingLaunchAction;pendingLaunchAction="";
+  if(ACTION_NEW_PROFORMA.equals(action)){rootTab("Proforma");return;}
+  if(ACTION_SEARCH.equals(action)){history.clear();tab="Home";open(this::search);return;}
+  if(ACTION_CUSTOMERS.equals(action)){history.clear();tab="Reports";open(()->ledgers(false));return;}
+  if(ACTION_SYSTEM.equals(action)){rootTab("More");return;}
+  if(ACTION_REPORTS.equals(action)){rootTab("Reports");return;}
+  if(ACTION_MORE.equals(action)){rootTab("More");return;}
+  rootTab("Home");
+ }
  private boolean active(int epoch){return !destroyed&&unlocked&&generation==epoch;}
  private void connectScreen(){base("Connect your PC",false);LinearLayout box=formPanel();box.addView(text("Enter the subdomain shown in Windows setup → Cloudflare. Sign in using your one allowed Google account.",16,NAVY));EditText url=new EditText(this);url.setSingleLine(true);url.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);url.setHint("https://tally.example.com");url.setText(store.get("base"));styleInput(url);box.addView(text("SERVER ADDRESS",11,MUTED));box.addView(url);box.addView(button("Sign in with Google",()->startLogin(url.getText().toString())));box.addView(text("Choose your Google account securely on this phone.",13,MUTED));if(!store.get("device").isEmpty())box.addView(button("Back",this::begin));}
  private void startLogin(String input){final String base;try{base=AccessLogin.baseURL(input);if(!store.get("device").isEmpty()&&!base.equals(store.get("base"))){toast("Reset phone pairing before changing the server address");return;}}catch(Exception e){toast(e.getMessage());return;}
@@ -121,7 +131,7 @@ public final class MainActivity extends Activity {
  private void chooseCompany(){JSONArray cs=array(boot,"companies");String[] names=new String[cs.length()];for(int i=0;i<cs.length();i++)names[i]=cs.optJSONObject(i).optString("name");if(names.length==0){toast("Open a company in Tally and use Refresh");return;}new AlertDialog.Builder(this).setTitle("Choose company").setItems(names,(d,i)->{company=names[i];store.put("company",company);cache.clear();cacheAt.clear();diagLedger=diagNumber=diagDate=diagMasterId=diagVoucherType="";rootTab("Home");}).show();}
  private void updateStatus(){if(statusView==null)return;JSONObject sync=object(boot,"autoSync");boolean online=boot.optBoolean("tallyOnline");String updated=latestUpdate();String state=sync.optBoolean("running")?"Syncing • "+sync.optString("step"):online?(updated.isEmpty()?"Connected • tap for sync status":"Connected • "+age(updated)):"Tally unavailable • retrying";statusView.setText(state);statusView.setOnClickListener(v->open(this::syncStatus));statusView.setContentDescription(state);}
  private void syncStatus(){List<Row> data=new ArrayList<>();JSONObject sync=object(boot,"autoSync");boolean online=boot.optBoolean("tallyOnline");data.add(heading(sync.optBoolean("running")?"Updating your accounts":online?"PC + Tally connected":"Waiting for Tally",sync.optBoolean("running")?sync.optString("company")+" • "+sync.optString("step"):online?"Automatic updates run every 3 minutes. You can also refresh now.":"Saved data stays available while TallyBridge retries automatically."));data.add(row("Last updated",time(latestUpdate()),"",null));data.add(row("Last complete sync",time(sync.optString("lastOk")),"",null));data.add(row("Last successful Tally read",time(boot.optString("lastSuccess")),"",null));if(!sync.optString("lastError").isEmpty())data.add(heading(online?"Previous sync warning":"Connection retrying",online?"Tally is connected. A previous report could not refresh and will retry automatically.\n"+sync.optString("lastError"):sync.optString("lastError")));data.add(row("Sync now","Refresh saved account data now","",this::syncNow));data.add(row("Test connection","Check the company is open in Tally","",this::probe));local("Sync status",this::syncStatus,data,false);syncScreenActive=true;}
- private void rootTab(String name){history.clear();tab=name;switch(name){case "Home":home();break;case "Work":startActivity(new Intent(this,WorkActivity.class));break;case "Orders":startActivity(new Intent(this,OrdersActivity.class));break;case "Reports":reports();break;case "Proforma":proforma();break;case "Payments":payments();break;default:more();}}
+ private void rootTab(String name){history.clear();tab=name;switch(name){case "Home":home();break;case "Work":startActivity(new Intent(this,WorkActivity.class));overridePendingTransition(0,0);break;case "Orders":startActivity(new Intent(this,OrdersActivity.class));overridePendingTransition(0,0);break;case "Reports":reports();break;case "Proforma":proforma();break;case "Payments":payments();break;default:more();}}
  private void open(Runnable next){if(current!=null)history.push(current);next.run();}
  private void goBack(){generation++;if(!history.isEmpty())history.pop().run();else rootTab("Home");}
  @Override public void onBackPressed(){if(unlocked&&!history.isEmpty())goBack();else super.onBackPressed();}
@@ -358,7 +368,7 @@ public final class MainActivity extends Activity {
   data.add(row("GSM calculator","Towel GSM from length, breadth and weight • works offline","",()->startActivity(new Intent(this,GsmCalculatorActivity.class))));
   data.add(row("New order","Fast offline-first order entry","",()->{Intent i=new Intent(this,OrdersActivity.class);i.setAction(OrdersActivity.ACTION_QUICK);startActivity(i);}));
   data.add(row("Proforma invoice","Create and share a proforma","",()->rootTab("Proforma")));
-  data.add(row("Today's work","Orders, dispatch, follow-ups and alerts","",()->startActivity(new Intent(this,WorkActivity.class))));
+  data.add(row("Today's work","Orders, dispatch, sales and alerts","",()->startActivity(new Intent(this,WorkActivity.class))));
   data.add(heading("System","Health, sync and maintenance"));
   data.add(row("Company health","GST, supplier details and payment readiness","",()->open(this::healthScreen)));
   data.add(row("Diagnostics","Connection, cache and recent Tally reads","",()->open(this::diagnosticsScreen)));

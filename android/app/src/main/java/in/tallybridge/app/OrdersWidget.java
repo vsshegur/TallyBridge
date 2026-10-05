@@ -29,6 +29,7 @@ public final class OrdersWidget extends AppWidgetProvider {
  static int layoutFor(Context c,int heightDp){boolean compact=heightDp>0&&heightDp<COMPACT_HEIGHT_DP;if(compact)return dark(c)?R.layout.orders_widget_compact_dark:R.layout.orders_widget_compact;return previewLayout(c);}
  private static PendingIntent activity(Context c,String action,int code){Intent i=new Intent(c,OrdersActivity.class);if(action!=null)i.setAction(action);return PendingIntent.getActivity(c,code,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
  private static PendingIntent refresh(Context c){Intent i=new Intent(c,OrdersWidget.class).setAction(ACTION_REFRESH);return PendingIntent.getBroadcast(c,33,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
+ private static PendingIntent gsm(Context c){Intent i=new Intent(c,GsmCalculatorActivity.class);return PendingIntent.getActivity(c,38,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
  private static void size(RemoteViews v,int id,float sp){v.setTextViewTextSize(id,TypedValue.COMPLEX_UNIT_SP,sp);}
 
  private static void paintCached(Context c,AppWidgetManager m,int id){
@@ -57,7 +58,8 @@ public final class OrdersWidget extends AppWidgetProvider {
   size(v,R.id.widget_party2,14f);
   size(v,R.id.widget_party3,14f);
   size(v,R.id.widget_add,narrow?12f:13f);
-  size(v,R.id.widget_open,narrow?12f:13f);
+  size(v,R.id.widget_open,narrow?11f:12f);
+  size(v,R.id.widget_gsm,narrow?11f:12f);
 
   v.setViewVisibility(R.id.widget_mode,!compact&&!narrow?View.VISIBLE:View.GONE);
   v.setViewVisibility(R.id.widget_party_label,compact?View.GONE:View.VISIBLE);
@@ -67,6 +69,7 @@ public final class OrdersWidget extends AppWidgetProvider {
 
   v.setOnClickPendingIntent(R.id.widget_add,activity(c,OrdersActivity.ACTION_NEW,31));
   v.setOnClickPendingIntent(R.id.widget_open,activity(c,null,32));
+  v.setOnClickPendingIntent(R.id.widget_gsm,gsm(c));
   v.setOnClickPendingIntent(R.id.widget_refresh,refresh(c));
   v.setOnClickPendingIntent(R.id.widget_party1,activity(c,null,34));
   v.setOnClickPendingIntent(R.id.widget_party2,activity(c,null,36));

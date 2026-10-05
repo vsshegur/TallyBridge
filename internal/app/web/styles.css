@@ -51,3 +51,25 @@ svg{display:block}
 .check-row{display:flex;gap:12px;align-items:flex-start;padding:13px 0}.check-row input{margin-top:3px}.check-row span{display:flex;flex-direction:column;gap:4px}.check-row small{color:var(--muted);line-height:1.45}
 @media(max-width:1100px){.action-grid{grid-template-columns:repeat(2,1fr)}.span3{grid-column:span 6}.admin-shell{grid-template-columns:240px 1fr}}
 @media(max-width:760px){.admin-shell{display:block}.sidebar{position:relative;height:auto}.main{padding:20px}.hero-card{align-items:flex-start;flex-direction:column}.action-grid,.health-grid{grid-template-columns:1fr}.span3,.span4,.span6,.span8{grid-column:span 12}}
+
+/* TALLYBRIDGE DESKTOP DARK 2.4.6 */
+.desktop-body{--navy:#081827;--navy2:#0d2235;--ink:#e8eef5;--muted:#91a4b8;--blue:#69a9ff;--blue2:#142b43;--card:#111d29;--border:#263747;--shadow:0 14px 38px rgba(0,0,0,.25);--ok:#74ddb8;--okbg:#12352d;--err:#ff9c9c;--errbg:#3a2024;--warn:#ffd078;--warnbg:#3b3020;background:#08111b;color:var(--ink)}
+.desktop-body .admin-shell{background:#08111b;grid-template-columns:238px minmax(0,1fr)}
+.desktop-body .sidebar{background:linear-gradient(180deg,#081522 0%,#091d2e 58%,#07111b 100%);border-right:1px solid #1f3040;padding:20px 14px}
+.desktop-body .brand{padding:7px 9px 18px;font-size:19px}.desktop-body .brandmark{background:#67d9b7;color:#09241e;box-shadow:0 8px 24px rgba(0,0,0,.28)}
+.desktop-body .side-nav{gap:3px}.desktop-body .side-btn{color:#a9bbcc;padding:11px 12px;border-radius:11px}.desktop-body .side-btn:hover{background:#122a3f;color:#e8eef5}.desktop-body .side-btn.active{background:linear-gradient(135deg,#174f78,#176b5b);color:#fff;box-shadow:0 7px 18px rgba(0,0,0,.18)}
+.desktop-body .sidebar-footer{border-top:1px solid #203242;margin-top:auto;padding:14px 9px 8px}.desktop-body .version-chip{color:#7890a5;line-height:1.5}
+.desktop-body .main{background:radial-gradient(circle at 78% -12%,rgba(35,107,91,.22),transparent 32%),#08111b;padding:28px 32px 54px}
+.desktop-body .page-head h1{color:#f3f7fb}.desktop-body .page-head p{color:var(--muted);max-width:760px}
+.desktop-body .card,.desktop-body .hero-card,.desktop-body .action-card{background:linear-gradient(180deg,#13212f,#101b27);border-color:#27394a;box-shadow:var(--shadow);color:var(--ink)}
+.desktop-body .hero-card{border:1px solid #2c4152}.desktop-body .hero-card h1,.desktop-body .title,.desktop-body .metric-value,.desktop-body .section-title{color:#eef4f9}
+.desktop-body .metric-label,.desktop-body .metric-sub,.desktop-body .sub{color:var(--muted)}
+.desktop-body .action-card:hover,.desktop-body .card:hover{border-color:#365369}.desktop-body .action-icon{background:#17364a;color:#7bd8bd}
+.desktop-body .btn.secondary,.desktop-body .icon-btn{background:#192b3b;color:#d8e5ef;border:1px solid #2a4053}.desktop-body .btn.secondary:hover{background:#20374a}
+.desktop-body .input,.desktop-body .select,.desktop-body input,.desktop-body select,.desktop-body textarea{background:#0c1823;color:#e8eef5;border-color:#2b3f50}
+.desktop-body .input:focus,.desktop-body .select:focus{border-color:#5b9add;box-shadow:0 0 0 3px rgba(91,154,221,.13)}
+.desktop-body .table-wrap,.desktop-body .empty{background:#0f1b27;border-color:#283a4a;color:var(--muted)}.desktop-body .table th{background:#101e2b;color:#91a4b8;border-color:#2a3b4a}.desktop-body .table td,.desktop-body .device-row,.desktop-body .list-row{border-color:#20313f}
+.desktop-body .notice.info{background:#132d46;color:#9bc9ff}.desktop-body .notice.ok{background:#12352d;color:#8ee7c7}.desktop-body .notice.warn{background:#3a2f20;color:#ffd78b}.desktop-body .notice.err{background:#392126;color:#ffb0b0}
+.desktop-body .live-pill.ok,.desktop-body .status-pill.ok{background:#12352d;color:#7fe0be}.desktop-body .live-pill.warn,.desktop-body .status-pill.warn{background:#3a2f20;color:#ffd078}.desktop-body .live-pill.err,.desktop-body .status-pill.err{background:#392126;color:#ff9c9c}
+.desktop-body .toast{background:#1b3042;border:1px solid #335064}.desktop-body ::selection{background:#1f6f70;color:#fff}
+@media(max-width:980px){.desktop-body .admin-shell{grid-template-columns:205px minmax(0,1fr)}.desktop-body .main{padding:22px 20px 44px}.desktop-body .sidebar{padding-left:10px;padding-right:10px}}

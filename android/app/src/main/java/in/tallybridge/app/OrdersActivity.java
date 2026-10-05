@@ -77,7 +77,16 @@ public final class OrdersActivity extends Activity {
  private LinearLayout.LayoutParams full(int top){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(top),0,0);return p;}
  private void fatal(Exception e){TextView v=txt("Orders could not start.\n"+e.getMessage(),16,NAVY);v.setBackgroundColor(BG);v.setPadding(dp(24),dp(60),dp(24),dp(24));setContentView(v);}
  private void needsMain(String message){LinearLayout p=col();p.setBackgroundColor(BG);p.setPadding(dp(24),dp(60),dp(24),dp(24));p.addView(txt("TallyBridge Orders",28,NAVY));p.addView(txt(message,16,MUTED),full(16));p.addView(primary("Open TallyBridge",v->startActivity(new Intent(this,MainActivity.class))),full(24));setContentView(p);}
- private void frame(String title,String subtitle){root=col();root.setBackgroundColor(BG);root.setPadding(dp(18),dp(18),dp(18),dp(18));LinearLayout h=new LinearLayout(this);h.setGravity(Gravity.CENTER_VERTICAL);LinearLayout titles=col();TextView t=txt(title,26,NAVY);t.setTypeface(Typeface.DEFAULT_BOLD);titles.addView(t);titles.addView(txt(subtitle,13,MUTED));h.addView(titles,new LinearLayout.LayoutParams(0,-2,1));Button close=btn("Back",v->finish());h.addView(close,new LinearLayout.LayoutParams(dp(84),-2));root.addView(h);progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setIndeterminate(true);progress.setVisibility(View.GONE);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(TEAL));root.addView(progress,new LinearLayout.LayoutParams(-1,dp(3)));ScrollView scroll=new ScrollView(this);body=col();body.setPadding(0,dp(14),0,dp(26));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);}
+ private void frame(String title,String subtitle){
+  root=col();root.setBackgroundColor(BG);
+  LinearLayout h=new LinearLayout(this);h.setGravity(Gravity.CENTER_VERTICAL);h.setPadding(dp(18),dp(14),dp(18),dp(8));
+  LinearLayout titles=col();TextView brand=txt("TALLYBRIDGE",10,TEAL);brand.setTypeface(Typeface.DEFAULT_BOLD);brand.setLetterSpacing(.14f);titles.addView(brand);
+  TextView t=txt(title,26,NAVY);t.setTypeface(Typeface.DEFAULT_BOLD);titles.addView(t);titles.addView(txt(subtitle,13,MUTED));
+  h.addView(titles,new LinearLayout.LayoutParams(0,-2,1));Button home=btn("Home",v->SectionNav.go(this,"Home"));h.addView(home,new LinearLayout.LayoutParams(dp(84),-2));root.addView(h);
+  progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setIndeterminate(true);progress.setVisibility(View.GONE);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(TEAL));root.addView(progress,new LinearLayout.LayoutParams(-1,dp(3)));
+  ScrollView scroll=new ScrollView(this);body=col();body.setPadding(dp(18),dp(7),dp(18),dp(24));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+  root.addView(SectionNav.bar(this,"Orders",SURFACE,TINT,MUTED,TEAL));setContentView(root);
+ }
  private void busy(boolean yes){if(progress!=null)progress.setVisibility(yes?View.VISIBLE:View.GONE);}
  private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
  private String shortError(Exception e){String m=e.getMessage();if(m==null||m.trim().isEmpty())return "PC unavailable";m=m.replace('\n',' ').trim();return m.length()>72?m.substring(0,72)+"…":m;}
