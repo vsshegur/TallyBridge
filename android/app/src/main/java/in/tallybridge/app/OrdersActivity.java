@@ -82,7 +82,7 @@ public final class OrdersActivity extends Activity {
   LinearLayout h=new LinearLayout(this);h.setGravity(Gravity.CENTER_VERTICAL);h.setPadding(dp(18),dp(14),dp(18),dp(8));
   LinearLayout titles=col();TextView brand=txt("TALLYBRIDGE",10,TEAL);brand.setTypeface(Typeface.DEFAULT_BOLD);brand.setLetterSpacing(.14f);titles.addView(brand);
   TextView t=txt(title,26,NAVY);t.setTypeface(Typeface.DEFAULT_BOLD);titles.addView(t);titles.addView(txt(subtitle,13,MUTED));
-  h.addView(titles,new LinearLayout.LayoutParams(0,-2,1));Button home=btn("Home",v->SectionNav.go(this,"Home"));h.addView(home,new LinearLayout.LayoutParams(dp(84),-2));root.addView(h);
+  h.addView(titles,new LinearLayout.LayoutParams(0,-2,1));root.addView(h);
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setIndeterminate(true);progress.setVisibility(View.GONE);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(TEAL));root.addView(progress,new LinearLayout.LayoutParams(-1,dp(3)));
   ScrollView scroll=new ScrollView(this);body=col();body.setPadding(dp(18),dp(7),dp(18),dp(24));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   root.addView(SectionNav.bar(this,"Orders",SURFACE,TINT,MUTED,TEAL));setContentView(root);
