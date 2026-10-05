@@ -79,6 +79,14 @@ jobs:
           adb shell wm size 1080x1920
           adb shell wm density 420
           adb shell input keyevent 82
+          # Google API images can occasionally show an unrelated setup-process ANR
+          # over otherwise-correct app screenshots. Disable only that emulator
+          # setup package so visual proof contains TallyBridge UI and system bars.
+          adb shell am force-stop com.google.android.googlesdksetup || true
+          adb shell pm disable-user --user 0 com.google.android.googlesdksetup || true
+          adb shell settings put global show_first_crash_dialog 0 || true
+          adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS || true
+          sleep 2
           adb install -r android/app/build/outputs/apk/debug/app-debug.apk
           adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           adb shell am instrument -w in.tallybridge.app.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/android35-results.txt
