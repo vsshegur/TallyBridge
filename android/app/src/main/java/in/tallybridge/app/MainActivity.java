@@ -170,10 +170,14 @@ public final class MainActivity extends Activity {
   metric(page,"Receivable",amountOrMissing(sm,"receivable"),time(sm.optString("rFetchedAt")),"receive",true,()->open(()->outstanding("receivable")));
   metric(page,"Payable",amountOrMissing(sm,"payable"),time(sm.optString("pFetchedAt")),"pay",false,()->open(()->outstanding("payable")));
   metric(page,"Sales this month",amountOrMissing(sm,"sales"),time(sm.optString("sFetchedAt")),"Reports",false,()->open(()->register("sales")));
-  gap(page,8);TextView workTitle=text("DAILY WORK",11,MUTED);workTitle.setTypeface(null,Typeface.BOLD);workTitle.setLetterSpacing(.10f);page.addView(workTitle);gap(page,8);
+  gap(page,8);TextView workTitle=text("QUICK ACTIONS",11,MUTED);workTitle.setTypeface(null,Typeface.BOLD);workTitle.setLetterSpacing(.10f);page.addView(workTitle);gap(page,8);
+  quick(page,"Reports","New order","Create an order quickly • works offline",()->{Intent i=new Intent(this,OrdersActivity.class);i.setAction(OrdersActivity.ACTION_QUICK);startActivity(i);});
+  quick(page,"health","Today's work","Pending orders, dispatch and items needing attention",()->startActivity(new Intent(this,WorkActivity.class)));
+  quick(page,"calculator","GSM calculator","Calculate towel GSM from size and weight • offline",()->startActivity(new Intent(this,GsmCalculatorActivity.class)));
+  quick(page,"Proforma","Proforma invoice","Create and share a proforma invoice",()->rootTab("Proforma"));
+  gap(page,8);TextView reportTitle=text("REPORTS & SEARCH",11,MUTED);reportTitle.setTypeface(null,Typeface.BOLD);reportTitle.setLetterSpacing(.10f);page.addView(reportTitle);gap(page,8);
   quick(page,"Reports","Sales register","Month-wise invoices with verified totals",()->open(()->register("sales")));
   quick(page,"share","Today's dispatch","Open and share today's invoices",()->open(this::dispatch));
-  quick(page,"Reports","Orders","Take a new order or review pending orders",()->startActivity(new Intent(this,OrdersActivity.class)));
   quick(page,"search","Search everything","Customers, invoices and LR/RR numbers",()->open(this::search));
   quick(page,"health","Company health",healthLine,()->open(this::healthScreen));
   JSONObject update=object(boot,"update");if(update.optBoolean("available")){gap(page,8);quick(page,"refresh","Update available","TallyBridge "+update.optString("latest")+" • review signed release",()->open(this::updateCheck));}
@@ -350,6 +354,11 @@ public final class MainActivity extends Activity {
  private void ageing(){load("Outstanding ageing",path("ageing"),this::ageing,x->{List<Row> data=withSource(x);data.add(heading("Saved bill coverage",x.optInt("coveredParties")+" of "+x.optInt("totalParties")+" parties • "+x.optInt("coveragePercent")+"%\nOpen a customer's outstanding report to add bill details. Partial coverage is not the complete receivable total."));data.add(row("Covered outstanding",x.optInt("billCount")+" bills",money(x.optDouble("total")),null));JSONArray a=array(x,"buckets");for(int i=0;i<a.length();i++){JSONObject b=a.optJSONObject(i);if(b!=null)data.add(row(b.optString("label"),b.optInt("bills")+" bills",money(b.optDouble("amount")),null));}rows("Outstanding ageing",data,false);});}
  private void customer(String name){load("Customer 360",path("customer360","ledger",name),()->customer(name),x->{List<Row> data=withSource(x);data.add(row(name,x.optInt("pendingBillCount")+" pending bills",money(x.optDouble("outstanding")),null));data.add(row("Overdue","Saved bill details",money(x.optDouble("overdue")),null));data.add(row("Open outstanding","Refresh bill-wise information","",()->open(()->ledgerOutstanding(name))));data.add(row("Date statement","View activity for a selected period","",()->open(()->dateMenu(name))));JSONObject payment=x.optJSONObject("lastPayment");if(payment!=null)data.add(row("Last payment",payment.optString("date")+" • "+payment.optString("number"),money(payment.optDouble("amount")),()->open(()->invoice(payment))));shareRows(data,x.optString("shareText"),path("customer360-pdf","ledger",name),"Customer-"+name);data.add(heading("Latest invoices",""));addVouchers(data,array(x,"latestInvoices"));data.add(heading("Recent activity",""));addVouchers(data,array(x,"recentActivity"));rows("Customer 360",data,false);});}
  private void more(){List<Row> data=new ArrayList<>();
+  data.add(heading("Business tools","Fast everyday actions"));
+  data.add(row("GSM calculator","Towel GSM from length, breadth and weight • works offline","",()->startActivity(new Intent(this,GsmCalculatorActivity.class))));
+  data.add(row("New order","Fast offline-first order entry","",()->{Intent i=new Intent(this,OrdersActivity.class);i.setAction(OrdersActivity.ACTION_QUICK);startActivity(i);}));
+  data.add(row("Proforma invoice","Create and share a proforma","",()->rootTab("Proforma")));
+  data.add(row("Today's work","Orders, dispatch, follow-ups and alerts","",()->startActivity(new Intent(this,WorkActivity.class))));
   data.add(heading("System","Health, sync and maintenance"));
   data.add(row("Company health","GST, supplier details and payment readiness","",()->open(this::healthScreen)));
   data.add(row("Diagnostics","Connection, cache and recent Tally reads","",()->open(this::diagnosticsScreen)));
