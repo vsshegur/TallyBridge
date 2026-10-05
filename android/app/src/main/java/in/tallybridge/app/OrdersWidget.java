@@ -5,6 +5,8 @@ import android.appwidget.*;
 import android.content.*;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.util.TypedValue;
+import android.view.View;
 import android.widget.RemoteViews;
 import org.json.*;
 import java.util.concurrent.*;
@@ -13,6 +15,9 @@ import java.util.concurrent.*;
 public final class OrdersWidget extends AppWidgetProvider {
  private static final String ACTION_REFRESH="in.tallybridge.app.ORDERS_WIDGET_REFRESH";
  private static final String PREFS="orders_widget";
+ private static final int COMPACT_HEIGHT_DP=190;
+ private static final int TALL_HEIGHT_DP=260;
+ private static final int NARROW_WIDTH_DP=300;
 
  @Override public void onUpdate(Context context,AppWidgetManager manager,int[] ids){for(int id:ids)paintCached(context,manager,id);refreshAll(context);}
  @Override public void onAppWidgetOptionsChanged(Context context,AppWidgetManager manager,int id,Bundle options){paintCached(context,manager,id);}
@@ -21,24 +26,45 @@ public final class OrdersWidget extends AppWidgetProvider {
 
  private static boolean dark(Context c){String mode=c.getSharedPreferences("appearance",Context.MODE_PRIVATE).getString("mode","System");return "Dark".equals(mode)||("System".equals(mode)&&(c.getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);}
  static int previewLayout(Context c){return dark(c)?R.layout.orders_widget_dark:R.layout.orders_widget;}
+ static int layoutFor(Context c,int heightDp){boolean compact=heightDp>0&&heightDp<COMPACT_HEIGHT_DP;if(compact)return dark(c)?R.layout.orders_widget_compact_dark:R.layout.orders_widget_compact;return previewLayout(c);}
  private static PendingIntent activity(Context c,String action,int code){Intent i=new Intent(c,OrdersActivity.class);if(action!=null)i.setAction(action);return PendingIntent.getActivity(c,code,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
  private static PendingIntent refresh(Context c){Intent i=new Intent(c,OrdersWidget.class).setAction(ACTION_REFRESH);return PendingIntent.getBroadcast(c,33,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
+ private static void size(RemoteViews v,int id,float sp){v.setTextViewTextSize(id,TypedValue.COMPLEX_UNIT_SP,sp);}
+
  private static void paintCached(Context c,AppWidgetManager m,int id){
   android.content.SharedPreferences p=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
-  RemoteViews v=new RemoteViews(c.getPackageName(),previewLayout(c));
+  Bundle options=m.getAppWidgetOptions(id);
+  int height=options==null?0:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,0);
+  int width=options==null?0:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,0);
+  boolean compact=height>0&&height<COMPACT_HEIGHT_DP;
+  boolean tall=height==0||height>=TALL_HEIGHT_DP;
+  boolean narrow=width>0&&width<NARROW_WIDTH_DP;
+  RemoteViews v=new RemoteViews(c.getPackageName(),layoutFor(c,height));
+
   int count=p.getInt("pending",0);String p1=p.getString("party1","");String p2=p.getString("party2","");String p3=p.getString("party3","");int more=p.getInt("moreParties",0);boolean offline=p.getBoolean("offline",false);
-  Bundle options=m.getAppWidgetOptions(id);int height=options==null?0:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,0);boolean compact=height>0&&height<190;
+  String first=p1.isEmpty()?(count==0?"No pending orders":"Open pending orders"):p1;
   v.setTextViewText(R.id.widget_pending,String.valueOf(count));
   v.setTextViewText(R.id.widget_mode,offline?"PHONE OFFLINE":"PC SYNCED");
-  v.setTextViewText(R.id.widget_party1,p1.isEmpty()?(count==0?"No pending orders":"Open pending orders"):p1);
+  v.setTextViewText(R.id.widget_party1,first);
   v.setTextViewText(R.id.widget_party2,p2);
   v.setTextViewText(R.id.widget_party3,p3);
   v.setTextViewText(R.id.widget_more,more>0?"+"+more+" more customer"+(more==1?"":"s"):"");
-  v.setViewVisibility(R.id.widget_mode,compact?android.view.View.GONE:android.view.View.VISIBLE);
-  v.setViewVisibility(R.id.widget_party_label,compact?android.view.View.GONE:android.view.View.VISIBLE);
-  v.setViewVisibility(R.id.widget_party2,!compact&&!p2.isEmpty()?android.view.View.VISIBLE:android.view.View.GONE);
-  v.setViewVisibility(R.id.widget_party3,!compact&&!p3.isEmpty()?android.view.View.VISIBLE:android.view.View.GONE);
-  v.setViewVisibility(R.id.widget_more,!compact&&more>0?android.view.View.VISIBLE:android.view.View.GONE);
+  v.setTextViewText(R.id.widget_add,narrow?"+ Order":"+ New order");
+  v.setTextViewText(R.id.widget_open,narrow?"Pending":"View pending");
+
+  size(v,R.id.widget_pending,compact?28f:31f);
+  size(v,R.id.widget_party1,compact?14f:14f);
+  size(v,R.id.widget_party2,14f);
+  size(v,R.id.widget_party3,14f);
+  size(v,R.id.widget_add,narrow?12f:13f);
+  size(v,R.id.widget_open,narrow?12f:13f);
+
+  v.setViewVisibility(R.id.widget_mode,!compact&&!narrow?View.VISIBLE:View.GONE);
+  v.setViewVisibility(R.id.widget_party_label,compact?View.GONE:View.VISIBLE);
+  v.setViewVisibility(R.id.widget_party2,!compact&&!p2.isEmpty()?View.VISIBLE:View.GONE);
+  v.setViewVisibility(R.id.widget_party3,!compact&&tall&&!p3.isEmpty()?View.VISIBLE:View.GONE);
+  v.setViewVisibility(R.id.widget_more,!compact&&more>0?View.VISIBLE:View.GONE);
+
   v.setOnClickPendingIntent(R.id.widget_add,activity(c,OrdersActivity.ACTION_NEW,31));
   v.setOnClickPendingIntent(R.id.widget_open,activity(c,null,32));
   v.setOnClickPendingIntent(R.id.widget_refresh,refresh(c));
