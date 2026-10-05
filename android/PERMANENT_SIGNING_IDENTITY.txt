@@ -1,9 +1,11 @@
-TallyBridge original permanent Android signing identity
+TallyBridge current permanent Android signing identity
 
 Package: in.tallybridge.app
-Certificate subject: CN=TallyBridge Android Release,O=TallyBridge,C=IN
-SHA-1: 97:43:9E:2E:F7:40:C7:6C:0C:25:CD:AB:0F:AE:B1:B7:B2:83:AA:CE
-SHA-256: 7F:17:BA:19:5D:05:7C:66:11:DE:AE:88:1D:85:B0:A0:D8:0D:BA:6A:44:EC:7C:21:43:40:05:3D:B4:D1:DB:AB
-Certificate valid until: 2054-02-13T06:05:18+00:00
+Certificate subject: CN=TallyBridge Android Release, OU=Mobile, O=TallyBridge, L=Solapur, ST=Maharashtra, C=IN
+SHA-1: 55:CC:4A:6D:74:68:51:43:A7:E1:E9:14:B7:39:CF:C6:FF:4F:2A:BE
+SHA-256: 55:2C:7E:A3:B6:93:BE:84:19:59:24:83:CD:5A:26:1B:F3:AF:83:AD:5B:93:F7:EF:35:C4:17:27:64:B0:63:DF
+Key: RSA 4096-bit
 
-This is the original permanent signing identity already used by the verified TallyBridge 2.1.2/2.1.3 APKs on 2026-09-28. Do not replace it with a newly generated key. The private keystore and passwords must never be committed to the repository.
+This is the current permanent signing identity from the saved TallyBridge Permanent Signing Kit and is already used by the verified TallyBridge 2.4.1 and 2.4.2 final production APKs. Keep using this identity for all 2.4.x and future updates. The Google OAuth Android client for package in.tallybridge.app must use the SHA-1 above.
+
+Historical note: TallyBridge 2.1.2/2.1.3 used an older certificate SHA-1 97:43:9E:2E:F7:40:C7:6C:0C:25:CD:AB:0F:AE:B1:B7:B2:83:AA:CE. That older identity must not be mixed with the current 2.4.x production line. The private keystore and passwords must never be committed to the repository.

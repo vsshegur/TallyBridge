@@ -1,8 +1,9 @@
 plugins { id 'com.android.application' }
 def releaseSigningEnabled = System.getenv('TB_KEYSTORE') != null && !System.getenv('TB_KEYSTORE').isEmpty()
 def releaseTaskRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
-if (releaseTaskRequested && !releaseSigningEnabled) {
-    throw new GradleException('Release builds require the permanent TallyBridge signing keystore')
+def unsignedReleaseAllowed = System.getenv('TB_ALLOW_UNSIGNED_RELEASE') == 'true'
+if (releaseTaskRequested && !releaseSigningEnabled && !unsignedReleaseAllowed) {
+    throw new GradleException('Release builds require the permanent TallyBridge signing keystore (or TB_ALLOW_UNSIGNED_RELEASE=true for an explicitly unsigned CI artifact)')
 }
 android {
     namespace 'in.tallybridge.app'
@@ -37,7 +38,7 @@ android {
             jniDebuggable false
             zipAlignEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            if (releaseSigningEnabled) signingConfig signingConfigs.release
         }
     }
 }

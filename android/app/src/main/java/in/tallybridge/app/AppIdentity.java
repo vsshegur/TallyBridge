@@ -9,8 +9,8 @@ import java.security.MessageDigest;
 import java.util.Locale;
 
 final class AppIdentity {
- static final String EXPECTED_SHA1="97:43:9E:2E:F7:40:C7:6C:0C:25:CD:AB:0F:AE:B1:B7:B2:83:AA:CE";
- static final String EXPECTED_SHA256="7F:17:BA:19:5D:05:7C:66:11:DE:AE:88:1D:85:B0:A0:D8:0D:BA:6A:44:EC:7C:21:43:40:05:3D:B4:D1:DB:AB";
+ static final String EXPECTED_SHA1="55:CC:4A:6D:74:68:51:43:A7:E1:E9:14:B7:39:CF:C6:FF:4F:2A:BE";
+ static final String EXPECTED_SHA256="55:2C:7E:A3:B6:93:BE:84:19:59:24:83:CD:5A:26:1B:F3:AF:83:AD:5B:93:F7:EF:35:C4:17:27:64:B0:63:DF";
  private AppIdentity(){}
 
  static String sha1(Context c){try{return digest(current(c),"SHA-1");}catch(Exception e){return "Unavailable";}}
