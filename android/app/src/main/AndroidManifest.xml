@@ -16,6 +16,8 @@
             </intent-filter>
         </activity>
         <activity android:name=".WorkActivity" android:exported="false" android:label="Today" />
+        <activity android:name=".GsmCalculatorActivity" android:exported="false"
+            android:label="GSM Calculator" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".OrdersActivity" android:exported="false"
             android:label="Orders" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".PhotoOrderActivity" android:exported="true"
