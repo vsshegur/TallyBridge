@@ -27,6 +27,9 @@ final class AccessLogin {
  synchronized void cancel(){attempt++;if(signal!=null)signal.cancel();if(pending!=null)pending.cancel(false);}
  void login(Activity activity,String base,Runnable starting)throws Exception{
   cancel();final int session=attempt;
+  if(!AppIdentity.permanent(activity)){
+   throw new Exception("This APK is not signed with the permanent TallyBridge release key. Current SHA-1: "+AppIdentity.sha1(activity)+". Required SHA-1: "+AppIdentity.EXPECTED_SHA1+". Install the signed release APK.");
+  }
   JSONObject config=Http.json(base+"/api/v2/native/config","GET",null,Http.pairs("Accept","application/json"));
   String client=config.getString("googleClientId");
   if(!base.equals(config.getString("server"))||!client.matches("[0-9]+-[a-zA-Z0-9_-]+\\.apps\\.googleusercontent\\.com"))throw new Exception("PC address or Google client ID does not match. Check desktop setup.");
@@ -44,7 +47,10 @@ final class AccessLogin {
      if(!GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(c.getType()))throw new Exception("Unexpected sign-in credential");
      result.complete(GoogleIdTokenCredential.createFrom(c.getData()).getIdToken());
     }catch(Exception e){result.completeExceptionally(e);}}
-    @Override public void onError(GetCredentialException e){result.completeExceptionally(new Exception("Google sign-in could not finish. Check your Android OAuth client, APK SHA-1 and test-user email."));}
+    @Override public void onError(GetCredentialException e){
+     String detail="Google sign-in could not finish. Permanent APK signing is verified. In Google Cloud, the Android OAuth client must use package in.tallybridge.app with SHA-1 "+AppIdentity.EXPECTED_SHA1+", and desktop setup must use the Web application client ID.";
+     result.completeExceptionally(new Exception(detail,e));
+    }
    });}catch(Exception e){result.completeExceptionally(e);}
   });
   try{

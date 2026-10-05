@@ -1,8 +1,8 @@
 plugins { id 'com.android.application' }
 def releaseSigningEnabled = System.getenv('TB_KEYSTORE') != null && !System.getenv('TB_KEYSTORE').isEmpty()
 def releaseTaskRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
-if (System.getenv('CI') == 'true' && releaseTaskRequested && !releaseSigningEnabled) {
-    throw new GradleException('CI release builds require the permanent TallyBridge signing keystore')
+if (releaseTaskRequested && !releaseSigningEnabled) {
+    throw new GradleException('Release builds require the permanent TallyBridge signing keystore')
 }
 android {
     namespace 'in.tallybridge.app'
@@ -12,8 +12,8 @@ android {
         minSdk 28
         targetSdk 35
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-        versionCode 20403
-        versionName '2.4.3'
+        versionCode 20404
+        versionName '2.4.4'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     signingConfigs {
@@ -33,8 +33,11 @@ android {
         release {
             minifyEnabled true
             shrinkResources true
+            debuggable false
+            jniDebuggable false
+            zipAlignEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            if (releaseSigningEnabled) signingConfig signingConfigs.release
+            signingConfig signingConfigs.release
         }
     }
 }
