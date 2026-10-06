@@ -77,6 +77,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("/api/v1/admin/revoke", s.localAdmin(s.handleRevoke))
 	m.HandleFunc("/api/v1/admin/pdf-bank", s.localAdmin(s.handlePDFBank))
 	m.HandleFunc("/api/v1/admin/settings", s.localAdmin(s.handleSettings))
+	m.HandleFunc("/api/v1/admin/company-sync", s.localAdmin(s.handleCompanySync))
 	m.HandleFunc("/api/v1/admin/health", s.localAdmin(s.handleHealth))
 	m.HandleFunc("/api/v1/admin/diagnostics", s.localAdmin(s.handleDiagnostics))
 	m.HandleFunc("/api/v1/admin/workspace", s.localAdmin(s.handleWorkspace))
@@ -345,11 +346,52 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOut(w, map[string]any{"ok": true})
 }
+func (s *Server) handleCompanySync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonErr(w, 405, errors.New("POST required"))
+		return
+	}
+	var q struct {
+		Company string `json:"company"`
+		Enabled bool   `json:"enabled"`
+	}
+	if readJSON(r, &q) != nil {
+		jsonErr(w, 400, errors.New("invalid company sync request"))
+		return
+	}
+	name := strings.TrimSpace(q.Company)
+	if name == "" {
+		jsonErr(w, 400, errors.New("company is required"))
+		return
+	}
+	cfg := s.store.Settings()
+	next := make([]string, 0, len(cfg.SyncExcludedCompanies)+1)
+	for _, x := range cfg.SyncExcludedCompanies {
+		x = strings.TrimSpace(x)
+		if x != "" && !strings.EqualFold(x, name) {
+			next = append(next, x)
+		}
+	}
+	if !q.Enabled {
+		next = append(next, name)
+	}
+	sort.Slice(next, func(i, j int) bool { return strings.ToLower(next[i]) < strings.ToLower(next[j]) })
+	cfg.SyncExcludedCompanies = next
+	if e := s.store.UpdateSettings(cfg); e != nil {
+		jsonErr(w, 500, e)
+		return
+	}
+	jsonOut(w, map[string]any{"ok": true, "company": name, "enabled": q.Enabled, "syncExcludedCompanies": next})
+}
 func (s *Server) handleAdminSync(w http.ResponseWriter, r *http.Request) {
 	var q struct {
 		Company string `json:"company"`
 	}
 	_ = readJSON(r, &q)
+	if strings.TrimSpace(q.Company) != "" && !s.syncCompanyEnabled(q.Company) {
+		jsonErr(w, 409, errors.New("company is excluded from sync; add it back in Companies"))
+		return
+	}
 	started := s.startAutoSync(q.Company, "desktop")
 	jsonOut(w, map[string]any{"started": started, "autoSync": s.autoSyncSnapshot()})
 }
@@ -502,15 +544,15 @@ func (s *Server) handleAuthCheck(w http.ResponseWriter, r *http.Request) {
 func (s *Server) bootstrapPayload() map[string]any {
 	st := s.stateSnapshot()
 	cc, _ := s.cache.Companies()
-	cs := st.Companies
+	cfg := s.store.Settings()
+	cs := filterSyncCompanies(st.Companies, cfg)
 	if len(cs) == 0 {
-		cs = cc
+		cs = filterSyncCompanies(cc, cfg)
 	}
 	health := map[string]CompanyHealth{}
 	for _, c := range cs {
 		health[c.Name] = s.companyHealth(c.Name, false)
 	}
-	cfg := s.store.Settings()
 	if cfg.AutoUpdate {
 		s.maybeCheckUpdates()
 	}
@@ -537,6 +579,10 @@ func (s *Server) handleMobileSync(w http.ResponseWriter, r *http.Request) {
 		Reason  string `json:"reason"`
 	}
 	_ = readJSON(r, &q)
+	if strings.TrimSpace(q.Company) != "" && !s.syncCompanyEnabled(q.Company) {
+		jsonErr(w, 409, errors.New("company is excluded from sync on the Windows app"))
+		return
+	}
 	started := s.startAutoSync(q.Company, q.Reason)
 	jsonOut(w, map[string]any{"started": started, "autoSync": s.autoSyncSnapshot()})
 }

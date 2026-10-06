@@ -1,0 +1,1 @@
+package in.tallybridge.app; final class AppSession{private static volatile boolean unlocked=false;private AppSession(){}static boolean isUnlocked(){return unlocked;}static void unlock(){unlocked=true;}static void lock(){unlocked=false;}}

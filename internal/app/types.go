@@ -2,15 +2,16 @@ package app
 
 import "time"
 
-const Version = "2.5.0"
+const Version = "2.5.1"
 
 type Settings struct {
-	TallyURL    string `json:"tallyUrl"`
-	TimeoutSec  int    `json:"timeoutSec"`
-	CooldownSec int    `json:"cooldownSec"`
-	Port        int    `json:"port"`
-	PDFTemplate string `json:"pdfTemplate,omitempty"`
-	AutoUpdate  bool   `json:"autoUpdate"`
+	TallyURL              string   `json:"tallyUrl"`
+	TimeoutSec            int      `json:"timeoutSec"`
+	CooldownSec           int      `json:"cooldownSec"`
+	Port                  int      `json:"port"`
+	PDFTemplate           string   `json:"pdfTemplate,omitempty"`
+	AutoUpdate            bool     `json:"autoUpdate"`
+	SyncExcludedCompanies []string `json:"syncExcludedCompanies,omitempty"`
 }
 
 type Device struct {
