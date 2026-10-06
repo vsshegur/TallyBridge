@@ -2,7 +2,7 @@ package app
 
 import "time"
 
-const Version = "2.5.1"
+const Version = "2.5.2"
 
 type Settings struct {
 	TallyURL              string   `json:"tallyUrl"`
