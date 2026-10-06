@@ -176,19 +176,19 @@ public final class MainActivity extends Activity {
   TextView name=text(company.isEmpty()?"Choose a company":company,23,Color.WHITE);name.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));name.setPadding(0,dp(8),0,dp(5));hero.addView(name);
   int score=health.optInt("score",0);String healthLine=health.length()==0?"Company setup is being checked":health.optBoolean("ready")?"Company health ready":score+"% company data health";
   hero.addView(text(healthLine+" • "+time(sync.optString("lastOk")),12,0xffc7d7e2));page.addView(hero);gap(page,16);
-  TextView moneyTitle=text("MONEY OVERVIEW",11,MUTED);moneyTitle.setTypeface(null,Typeface.BOLD);moneyTitle.setLetterSpacing(.10f);page.addView(moneyTitle);gap(page,8);
+  TextView workTitle=text("QUICK ACTIONS",11,MUTED);workTitle.setTypeface(null,Typeface.BOLD);workTitle.setLetterSpacing(.10f);page.addView(workTitle);gap(page,8);
+  quick(page,"search","Search everything","Customers, invoices, orders, items and LR/RR numbers",()->startActivity(new Intent(this,UniversalSearchActivity.class)));
+  quick(page,"Reports","New order","Create an order quickly • works offline",()->{Intent i=new Intent(this,OrdersActivity.class);i.setAction(OrdersActivity.ACTION_QUICK);startActivity(i);});
+  quick(page,"health","Today's work","Pending orders, dispatch, business status and items needing attention",()->startActivity(new Intent(this,WorkActivity.class)));
+  quick(page,"calculator","GSM calculator","Calculate towel GSM from size and weight • offline",()->startActivity(new Intent(this,GsmCalculatorActivity.class)));
+  quick(page,"Proforma","Proforma invoice","Create and share a proforma invoice",()->rootTab("Proforma"));
+  gap(page,10);TextView moneyTitle=text("MONEY OVERVIEW",11,MUTED);moneyTitle.setTypeface(null,Typeface.BOLD);moneyTitle.setLetterSpacing(.10f);page.addView(moneyTitle);gap(page,8);
   metric(page,"Receivable",amountOrMissing(sm,"receivable"),time(sm.optString("rFetchedAt")),"receive",true,()->open(()->outstanding("receivable")));
   metric(page,"Payable",amountOrMissing(sm,"payable"),time(sm.optString("pFetchedAt")),"pay",false,()->open(()->outstanding("payable")));
   metric(page,"Sales this month",amountOrMissing(sm,"sales"),time(sm.optString("sFetchedAt")),"Reports",false,()->open(()->register("sales")));
-  gap(page,8);TextView workTitle=text("QUICK ACTIONS",11,MUTED);workTitle.setTypeface(null,Typeface.BOLD);workTitle.setLetterSpacing(.10f);page.addView(workTitle);gap(page,8);
-  quick(page,"Reports","New order","Create an order quickly • works offline",()->{Intent i=new Intent(this,OrdersActivity.class);i.setAction(OrdersActivity.ACTION_QUICK);startActivity(i);});
-  quick(page,"health","Today's work","Pending orders, dispatch and items needing attention",()->startActivity(new Intent(this,WorkActivity.class)));
-  quick(page,"calculator","GSM calculator","Calculate towel GSM from size and weight • offline",()->startActivity(new Intent(this,GsmCalculatorActivity.class)));
-  quick(page,"Proforma","Proforma invoice","Create and share a proforma invoice",()->rootTab("Proforma"));
-  gap(page,8);TextView reportTitle=text("REPORTS & SEARCH",11,MUTED);reportTitle.setTypeface(null,Typeface.BOLD);reportTitle.setLetterSpacing(.10f);page.addView(reportTitle);gap(page,8);
+  gap(page,8);TextView reportTitle=text("REPORTS & MORE",11,MUTED);reportTitle.setTypeface(null,Typeface.BOLD);reportTitle.setLetterSpacing(.10f);page.addView(reportTitle);gap(page,8);
   quick(page,"Reports","Sales register","Month-wise invoices with verified totals",()->open(()->register("sales")));
   quick(page,"share","Today's dispatch","Open and share today's invoices",()->open(this::dispatch));
-  quick(page,"search","Search everything","Customers, invoices and LR/RR numbers",()->open(this::search));
   quick(page,"health","Company health",healthLine,()->open(this::healthScreen));
   JSONObject update=object(boot,"update");if(update.optBoolean("available")){gap(page,8);quick(page,"refresh","Update available","TallyBridge "+update.optString("latest")+" • review signed release",()->open(this::updateCheck));}
   String error=sync.optString("lastError");if(!error.isEmpty()){gap(page,8);LinearLayout warn=column();warn.setPadding(dp(14),dp(12),dp(14),dp(12));warn.setBackground(surface(dark?0xff3a3022:0xfffff7e6,14));TextView wt=text("Sync needs attention",13,dark?0xffffd28a:0xff8a5a00);wt.setTypeface(null,Typeface.BOLD);warn.addView(wt);warn.addView(text(error,12,MUTED));page.addView(warn);}
