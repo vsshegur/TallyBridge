@@ -1,0 +1,248 @@
+name: Apply TallyBridge 2.5.2 Final Polish
+on:
+  push:
+    branches: [final-polish-2.5.2]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, 'Apply TallyBridge 2.5.2 final polish') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: final-polish-2.5.2
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.12'
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Apply final polish
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def rw(path, fn):
+              p=Path(path); s=p.read_text(); n=fn(s)
+              if n==s: raise SystemExit(f'no change made to {path}')
+              p.write_text(n)
+
+          # Versions stay update-compatible with the permanent Android identity.
+          rw('android/app/build.gradle', lambda s:s.replace('versionCode 20501','versionCode 20502').replace("versionName '2.5.1'","versionName '2.5.2'"))
+          rw('internal/app/types.go', lambda s:s.replace('const Version = "2.5.1"','const Version = "2.5.2"'))
+          rw('internal/app/web/admin.js', lambda s:s.replace('v2.5.1 FINAL','v2.5.2 FINAL'))
+
+          # Add group bill-wise endpoint.
+          rw('internal/app/server.go', lambda s:s.replace(
+              'm.HandleFunc("/api/v1/mobile/group-balances", s.mobileAuth(s.handleGroupBalances))\n\tm.HandleFunc("/api/v1/mobile/group-balances-pdf", s.mobileAuth(s.handleGroupBalancesPDF))',
+              'm.HandleFunc("/api/v1/mobile/group-balances", s.mobileAuth(s.handleGroupBalances))\n\tm.HandleFunc("/api/v1/mobile/group-outstanding", s.mobileAuth(s.handleGroupOutstanding))\n\tm.HandleFunc("/api/v1/mobile/group-balances-pdf", s.mobileAuth(s.handleGroupBalancesPDF))'))
+          rw('internal/app/native.go', lambda s:s.replace('"group-balances", "group-balances-pdf"','"group-balances", "group-outstanding", "group-balances-pdf"'))
+
+          Path('internal/app/group_outstanding.go').write_text(r'''package app
+
+import (
+    "errors"
+    "fmt"
+    "net/http"
+    "strings"
+    "time"
+)
+
+type GroupOutstandingData struct {
+    CommonData
+    Company        string    `json:"company"`
+    Group          string    `json:"group"`
+    Bills          []BillRow `json:"bills"`
+    Total          float64   `json:"total"`
+    Count          int       `json:"count"`
+    ShareText      string    `json:"shareText"`
+    PartialLedgers []string  `json:"partialLedgers,omitempty"`
+}
+
+func prettyBillDate(v string) string {
+    if d, e := time.Parse("2006-01-02", normISODate(v)); e == nil {
+        return d.Format("02 Jan 2006")
+    }
+    if strings.TrimSpace(v) == "" { return "Not available" }
+    return v
+}
+
+func groupOutstandingShareText(x GroupOutstandingData) string {
+    var b strings.Builder
+    b.WriteString("*Outstanding by Group*\n")
+    fmt.Fprintf(&b, "Company: %s\nGroup: %s\n", x.Company, x.Group)
+    fmt.Fprintf(&b, "Pending bills: %d\nTotal pending: ₹%s\n", x.Count, indianNumber(x.Total))
+    b.WriteString("Oldest bill first\n")
+    for i, bill := range x.Bills {
+        fmt.Fprintf(&b, "\n*%d. %s*\n", i+1, bill.Party)
+        fmt.Fprintf(&b, "Bill date: %s\n", prettyBillDate(bill.Date))
+        fmt.Fprintf(&b, "Invoice: %s\n", bill.BillNumber)
+        fmt.Fprintf(&b, "Amount: ₹%s", indianNumber(bill.PendingAmount))
+        if bill.DrCr != "" { fmt.Fprintf(&b, " %s", bill.DrCr) }
+        b.WriteString("\n")
+        if bill.InvoiceDays >= 0 { fmt.Fprintf(&b, "Age: %d days\n", bill.InvoiceDays) }
+    }
+    if len(x.PartialLedgers) > 0 {
+        fmt.Fprintf(&b, "\nNote: Bill-wise breakup was unavailable for %d ledger(s).\n", len(x.PartialLedgers))
+    }
+    return strings.TrimSpace(b.String())
+}
+
+func (s *Server) getGroupOutstanding(company, group string) (GroupOutstandingData, error) {
+    gb, err := s.getGroupBalances(company, group)
+    if err != nil { return GroupOutstandingData{}, err }
+    out := GroupOutstandingData{CommonData: gb.CommonData, Company: company, Group: group}
+    out.Live = true
+    out.Source = "live"
+    out.FetchedAt = time.Now()
+    for _, row := range gb.Ledgers {
+        if row.Balance == 0 || strings.TrimSpace(row.Ledger) == "" { continue }
+        led, e := s.getLedgerOutstanding(company, row.Ledger)
+        if e != nil || led.SummaryOnly || len(led.Bills) == 0 {
+            out.PartialLedgers = append(out.PartialLedgers, row.Ledger)
+            out.Live = false
+            out.Source = "mixed"
+            continue
+        }
+        if !led.Live { out.Live = false; out.Source = "mixed" }
+        for _, bill := range led.Bills {
+            bill.Party = row.Ledger
+            bill.Date = normISODate(bill.Date)
+            bill.InvoiceDays = invoiceDays(bill.Date)
+            if bill.PendingAmount == 0 { bill.PendingAmount = abs(bill.SignedAmount) }
+            out.Bills = append(out.Bills, bill)
+            out.Total += abs(bill.PendingAmount)
+        }
+    }
+    out.Bills = sortedBills(out.Bills)
+    out.Count = len(out.Bills)
+    if out.Count == 0 && len(out.PartialLedgers) > 0 {
+        return out, errors.New("bill-wise outstanding is not available yet; open the affected ledger outstanding once and retry")
+    }
+    out.ShareText = groupOutstandingShareText(out)
+    return out, nil
+}
+
+func (s *Server) handleGroupOutstanding(w http.ResponseWriter, r *http.Request) {
+    c, g := strings.TrimSpace(r.URL.Query().Get("company")), strings.TrimSpace(r.URL.Query().Get("group"))
+    if c == "" || g == "" { jsonErr(w, 400, errors.New("company and group required")); return }
+    x, e := s.getGroupOutstanding(c, g)
+    if e != nil { jsonErr(w, 503, e); return }
+    jsonOut(w, x)
+}
+''')
+
+          # Android: preserve current report context on company switch, including selected register month.
+          p=Path('android/app/src/main/java/in/tallybridge/app/MainActivity.java')
+          s=p.read_text()
+          old=' private void chooseCompany(){JSONArray cs=array(boot,"companies");String[] names=new String[cs.length()];for(int i=0;i<cs.length();i++)names[i]=cs.optJSONObject(i).optString("name");if(names.length==0){toast("Open a company in Tally and use Refresh");return;}new AlertDialog.Builder(this).setTitle("Choose company").setItems(names,(d,i)->{company=names[i];store.put("company",company);cache.clear();cacheAt.clear();diagLedger=diagNumber=diagDate=diagMasterId=diagVoucherType="";rootTab("Home");}).show();}'
+          new=' private void chooseCompany(){JSONArray cs=array(boot,"companies");String[] names=new String[cs.length()];for(int i=0;i<cs.length();i++)names[i]=cs.optJSONObject(i).optString("name");if(names.length==0){toast("Open a company in Tally and use Refresh");return;}new AlertDialog.Builder(this).setTitle("Choose company").setItems(names,(d,i)->{String next=names[i];if(next.equals(company))return;Runnable resume=current;String selectedTab=tab;company=next;store.put("company",company);cache.clear();cacheAt.clear();diagLedger=diagNumber=diagDate=diagMasterId=diagVoucherType="";forceNext=true;history.clear();if(resume!=null)resume.run();else rootTab(selectedTab);}).show();}'
+          if old not in s: raise SystemExit('chooseCompany anchor missing')
+          s=s.replace(old,new)
+
+          a=s.index(' private void register(String kind){')
+          b=s.index(' private void addVouchers(', a)
+          register=r''' private String registerTitle(String kind){return kind.equals("purchase")?"Purchase register":kind.equals("proforma")?"Proforma invoices":"Sales register";}
+ private String registerPath(String kind){return path("vouchers","type",kind,"period","fy","refresh","1");}
+ private void register(String kind){String title=registerTitle(kind);load(title,registerPath(kind),()->register(kind),x->{List<Row> data=withSource(x);data.add(row("Financial-year total",x.optInt("count")+" vouchers",money(x.optDouble("total")),null));JSONArray all=array(x,"vouchers");TreeMap<String,JSONArray> months=new TreeMap<>(Collections.reverseOrder());LocalDate now=LocalDate.now();LocalDate fy=LocalDate.of(now.getMonthValue()<4?now.getYear()-1:now.getYear(),4,1);for(int i=0;i<12;i++)months.put(fy.plusMonths(i).toString().substring(0,7),new JSONArray());for(int i=0;i<all.length();i++){JSONObject v=all.optJSONObject(i);if(v==null)continue;String date=v.optString("date"),month=date.length()>=7?date.substring(0,7):"Unknown";if(!months.containsKey(month))months.put(month,new JSONArray());months.get(month).put(v);}data.add(row("All vouchers","Search the complete register","",()->open(()->registerAll(kind))));for(Map.Entry<String,JSONArray> entry:months.entrySet()){String month=entry.getKey();JSONArray values=entry.getValue();if(values.length()==0)continue;double total=0;for(int i=0;i<values.length();i++)total+=Math.abs(values.optJSONObject(i).optDouble("amount"));data.add(row(monthLabel(month),values.length()+" vouchers",money(total),()->open(()->registerMonth(kind,month))));}rows(title,data,false);});}
+ private void registerAll(String kind){String title=registerTitle(kind);load(title,registerPath(kind),()->registerAll(kind),x->{JSONArray a=array(x,"vouchers");List<Row> data=withSource(x);addVouchers(data,a);empty(data,a.length(),"No vouchers in this period.");rows(title,data,true);});}
+ private void registerMonth(String kind,String month){String title=monthLabel(month);load(title,registerPath(kind),()->registerMonth(kind,month),x->{JSONArray all=array(x,"vouchers"),filtered=new JSONArray();for(int i=0;i<all.length();i++){JSONObject v=all.optJSONObject(i);if(v!=null&&v.optString("date").startsWith(month))filtered.put(v);}List<Row> data=withSource(x);double total=0;for(int i=0;i<filtered.length();i++)total+=Math.abs(filtered.optJSONObject(i).optDouble("amount"));data.add(row(title+" total",filtered.length()+" vouchers",money(total),null));addVouchers(data,filtered);empty(data,filtered.length(),"No vouchers in this month for "+company+".");rows(title,data,true);});}
+'''
+          s=s[:a]+register+s[b:]
+
+          old_group=re.search(r' private void group\(String name\)\{.*?\}\n private void reports\(\)',s,re.S)
+          if not old_group: raise SystemExit('group method anchor missing')
+          group=r''' private void group(String name){load("Group balances",path("group-balances","group",name),()->group(name),x->{List<Row> data=withSource(x);data.add(row(name,"Debit "+money(x.optDouble("drTotal"))+" • Credit "+money(x.optDouble("crTotal")),money(x.optDouble("total")),null));data.add(row("Bill-wise outstanding","Oldest pending invoice first across every ledger • shareable details","",()->open(()->groupOutstanding(name))));JSONArray a=array(x,"ledgers");for(int i=0;i<a.length();i++){JSONObject v=a.optJSONObject(i);if(v==null)continue;String ledger=v.optString("ledger");data.add(row(ledger,"Ledger balance",money(v.optDouble("balance"))+" "+v.optString("drCr"),()->open(()->ledger(ledger))));}rows("Group balances",data,true);});}
+ private void groupOutstanding(String name){load("Group outstanding",path("group-outstanding","group",name),()->groupOutstanding(name),x->{List<Row> data=withSource(x);JSONArray bills=array(x,"bills"),partial=array(x,"partialLedgers");data.add(heading(name,"Parent group • oldest pending bill first"));data.add(row("Total pending",x.optInt("count")+" bills",money(x.optDouble("total")),null));if(!x.optString("shareText").isEmpty())data.add(row("Share bill-wise outstanding","Group shown once at top • bill date + invoice + amount + age","",()->reviewMessage("Review group outstanding",x.optString("shareText"))));if(partial.length()>0)data.add(heading("Some bill details unavailable",partial.length()+" ledger(s) could not return bill-wise breakup. Existing bill details are still sorted correctly."));for(int i=0;i<bills.length();i++){JSONObject bill=bills.optJSONObject(i);if(bill==null)continue;String ledger=bill.optString("party","Ledger");int days=bill.optInt("invoiceDays",-1);String detail="Invoice "+bill.optString("billNumber","—")+"\nBill date "+bill.optString("date","Not available")+(days>=0?" • "+days+" days pending":"");data.add(row(ledger,detail,money(bill.optDouble("pendingAmount"))+" "+bill.optString("drCr"),()->open(()->ledgerOutstanding(ledger))));}empty(data,bills.length(),"No bill-wise pending invoices were returned for this group.");rows("Group outstanding",data,true);});}
+ private void reports()'''
+          s=s[:old_group.start()]+group+s[old_group.end():]
+          p.write_text(s)
+
+          # Full Order Desk: use the previously blank header area for a high-visibility pending count.
+          light='''<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="14dp" android:background="@drawable/orders_widget_panel">
+ <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical"><LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical"><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TALLYBRIDGE" android:textColor="#176B5B" android:textSize="9sp" android:textStyle="bold" android:letterSpacing="0.13"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Order Desk" android:textColor="#102D44" android:textSize="19sp" android:textStyle="bold"/></LinearLayout><LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="8dp" android:gravity="center" android:orientation="horizontal" android:paddingLeft="10dp" android:paddingTop="5dp" android:paddingRight="10dp" android:paddingBottom="5dp" android:background="@drawable/orders_widget_secondary"><TextView android:id="@+id/widget_pending" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#102D44" android:textSize="22sp" android:textStyle="bold"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="5dp" android:text="PENDING" android:textColor="#176B5B" android:textSize="8sp" android:textStyle="bold"/></LinearLayout><TextView android:id="@+id/widget_mode" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingLeft="8dp" android:paddingTop="4dp" android:paddingRight="8dp" android:paddingBottom="4dp" android:background="@drawable/orders_widget_secondary" android:text="SAVED" android:textColor="#596C79" android:textSize="9sp" android:textStyle="bold"/><TextView android:id="@+id/widget_refresh" android:layout_width="38dp" android:layout_height="38dp" android:layout_marginStart="6dp" android:gravity="center" android:background="@drawable/orders_widget_secondary" android:text="↻" android:textColor="#176B5B" android:textSize="18sp" android:textStyle="bold"/></LinearLayout>
+ <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="ORDER DETAILS • SCROLL FOR PARTY + ITEM + QUANTITY" android:textColor="#596C79" android:textStyle="bold" android:textSize="8sp" android:letterSpacing="0.05"/>
+ <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="4dp"><ListView android:id="@+id/widget_orders_list" android:layout_width="match_parent" android:layout_height="match_parent" android:divider="@android:color/transparent" android:dividerHeight="5dp" android:scrollbars="none"/><TextView android:id="@+id/widget_empty" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:text="No pending orders\nTap + New order to add one" android:textColor="#596C79" android:textSize="11sp"/></FrameLayout>
+ <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp"><TextView android:id="@+id/widget_add" android:layout_width="0dp" android:layout_height="43dp" android:layout_weight="1.2" android:gravity="center" android:background="@drawable/orders_widget_primary" android:text="+ New order" android:textColor="#FFFFFF" android:textSize="12sp" android:textStyle="bold"/><TextView android:id="@+id/widget_open" android:layout_width="0dp" android:layout_height="43dp" android:layout_weight="1" android:layout_marginStart="7dp" android:gravity="center" android:background="@drawable/orders_widget_secondary" android:text="Open Orders" android:textColor="#176B5B" android:textSize="12sp" android:textStyle="bold"/></LinearLayout>
+</LinearLayout>'''
+          dark=light.replace('@drawable/orders_widget_panel','@drawable/orders_widget_panel_dark').replace('@drawable/orders_widget_secondary','@drawable/orders_widget_secondary_dark').replace('@drawable/orders_widget_primary','@drawable/orders_widget_primary_dark').replace('#176B5B','#7BD8BD').replace('#102D44','#E6EDF3').replace('#596C79','#A7B8C5').replace('android:textColor="#FFFFFF" android:textSize="12sp"','android:textColor="#102D26" android:textSize="12sp"')
+          Path('android/app/src/main/res/layout/orders_widget.xml').write_text(light)
+          Path('android/app/src/main/res/layout/orders_widget_dark.xml').write_text(dark)
+
+          # Compact, launcher-safe 1x1 widgets: app palette, two visual levels, no clipped third line.
+          widget_layouts={
+          'search_widget.xml':('⌕','Search','Find anything'),
+          'voice_order_widget.xml':('◉','Voice Order','Speak & review'),
+          'gsm_widget.xml':('GSM','Calculator','Offline tool'),
+          }
+          for fn,(icon,title,sub) in widget_layouts.items():
+              Path('android/app/src/main/res/layout/'+fn).write_text(f'''<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center" android:padding="8dp" android:background="@drawable/quick_order_widget_panel"><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="{icon}" android:textColor="#7BD8BD" android:textStyle="bold" android:textSize="20sp" android:maxLines="1"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="{title}" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="11sp" android:maxLines="1" android:ellipsize="end"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="{sub}" android:textColor="#B9CBD5" android:textSize="7sp" android:maxLines="1" android:ellipsize="end"/></LinearLayout>''')
+          for fn in ['search_widget_info.xml','voice_order_widget_info.xml','gsm_widget_info.xml','quick_order_widget_info.xml','quick_pi_widget_info.xml']:
+              path=Path('android/app/src/main/res/xml/'+fn)
+              if not path.exists(): continue
+              z=path.read_text().replace('android:minWidth="70dp"','android:minWidth="40dp"').replace('android:minHeight="70dp"','android:minHeight="40dp"').replace('android:minResizeWidth="70dp"','android:minResizeWidth="40dp"').replace('android:minResizeHeight="70dp"','android:minResizeHeight="40dp"')
+              path.write_text(z)
+
+          # Desktop: one coherent dark control-center palette across every admin surface.
+          css=Path('internal/app/web/styles.css')
+          css.write_text(css.read_text()+r'''
+
+/* TallyBridge 2.5.2 desktop final polish: coherent dark control center */
+.desktop-body{
+  --ink:#edf5f8;--muted:#9db1bf;--blue:#5fa8ff;--blue2:#153349;--card:#102430;--border:#28424f;
+  --shadow:0 10px 30px rgba(0,0,0,.18);--ok:#69dfbc;--okbg:#103b31;--err:#ff948c;--errbg:#3b2022;--warn:#ffd27d;--warnbg:#3a3020;
+  color:var(--ink)!important;background:#07151f!important;
+}
+.desktop-body .admin-shell{background:#07151f}.desktop-body .sidebar{background:linear-gradient(180deg,#081b28 0%,#0a2130 58%,#092633 100%);border-right:1px solid #1f3946}
+.desktop-body .brandmark{background:#70dfc3;color:#092536;box-shadow:none}.desktop-body .side-btn{color:#b9cad5}.desktop-body .side-btn:hover{background:#102e3d;color:#fff}.desktop-body .side-btn.active{background:linear-gradient(90deg,#15567a,#187966);color:#fff}
+.desktop-body .main{background:radial-gradient(circle at 100% 0,rgba(33,130,121,.10),transparent 30%),#07151f;color:var(--ink)}
+.desktop-body .page-head h1,.desktop-body h1,.desktop-body h2,.desktop-body h3,.desktop-body .title,.desktop-body .metric-value,.desktop-body .pair-code{color:#f3f8fa}
+.desktop-body .page-head p,.desktop-body .sub,.desktop-body .metric-sub,.desktop-body .metric-label{color:#9db1bf}
+.desktop-body .card,.desktop-body .summary-card,.desktop-body .mobile-card,.desktop-body .action-card,.desktop-body .health-item,.desktop-body .table-wrap,.desktop-body .empty{background:#102430!important;border-color:#28424f!important;color:#edf5f8!important;box-shadow:0 10px 28px rgba(0,0,0,.16)}
+.desktop-body .health-item b,.desktop-body .health-item .title,.desktop-body .health-item span{color:#edf5f8!important}.desktop-body .health-item .sub{color:#a8bbc7!important}.desktop-body .health-item.ok{background:#0f2d2a!important;border-color:#20594d!important}.desktop-body .health-item.warn{background:#30291d!important;border-color:#5b4a24!important}.desktop-body .health-mark{background:#123f34!important;color:#70dfc3!important}
+.desktop-body .input,.desktop-body .select,.desktop-body input,.desktop-body select,.desktop-body textarea{background:#0b1d28!important;color:#f0f6f8!important;border-color:#34505e!important}.desktop-body select option{background:#0b1d28;color:#f0f6f8}
+.desktop-body .table{color:#eaf2f5}.desktop-body .table th{background:#0c202c!important;color:#a9bdc9;border-color:#28424f}.desktop-body .table td{border-color:#203845}.desktop-body .table tr:hover td{background:#122b38}
+.desktop-body .list-row,.desktop-body .device-row{border-color:#233d49}.desktop-body .btn.secondary{background:#173241;color:#bfeadf;border:1px solid #31505d}.desktop-body .btn.danger{background:#3a2022;color:#ff9d96;border-color:#603035}
+.desktop-body .notice.info{background:#102d42;color:#add6f5}.desktop-body .notice.ok{background:#103b31;color:#83e5c8}.desktop-body .notice.warn{background:#3a3020;color:#ffd27d}.desktop-body .notice.err{background:#3b2022;color:#ffaaa3}
+.desktop-body .hero-card{border:1px solid #29505b;box-shadow:0 18px 40px rgba(0,0,0,.18)}.desktop-body .version-chip{color:#8197a5}
+.desktop-body .toolbar .status-pill{box-shadow:none}
+''')
+
+          # Give previously duplicated info icons distinct meanings in the Windows sidebar.
+          admin=Path('internal/app/web/admin.js')
+          js=admin.read_text()
+          marker='const icon=n=>`<svg viewBox="0 0 24 24" aria-hidden="true">${I[n]||I.about}</svg>`;'
+          extra='''Object.assign(I,{cloudflare:'<path d="M5 12h14M12 5l7 7-7 7"/><circle cx="5" cy="12" r="2"/>',health:'<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-5"/>',pdfbank:'<path d="M3 9h18M5 9v9M9 9v9M15 9v9M19 9v9M3 18h18M12 3l9 4H3z"/>',backup:'<path d="M12 4v10M8 8l4-4 4 4"/><path d="M5 14v5h14v-5"/>',updates:'<path d="M20 11a8 8 0 1 1-2.3-5.7"/><path d="M20 4v7h-7"/>'});\n'''
+          if marker not in js: raise SystemExit('admin icon marker missing')
+          admin.write_text(js.replace(marker,extra+marker))
+          PY
+          gofmt -w internal/app/group_outstanding.go internal/app/server.go internal/app/native.go internal/app/types.go
+          node --check internal/app/web/admin.js
+          go test ./internal/app
+          go vet ./internal/app ./cmd/tallybridge
+          cd android
+          gradle --no-daemon test assembleDebug lintDebug
+          cd ..
+          grep -q 'versionCode 20502' android/app/build.gradle
+          grep -q "versionName '2.5.2'" android/app/build.gradle
+          grep -q 'group-outstanding' internal/app/server.go
+          grep -q 'registerMonth(kind,month)' android/app/src/main/java/in/tallybridge/app/MainActivity.java
+      - name: Commit final polish
+        shell: bash
+        run: |
+          git config user.name "Vipul Shegur"
+          git config user.email "vsshegur@gmail.com"
+          git add android internal/app
+          git commit -m "Apply TallyBridge 2.5.2 final polish"
+          git push origin final-polish-2.5.2
