@@ -1,0 +1,50 @@
+name: Validate TallyBridge 2.5.1 Final
+on:
+  push:
+    branches: [final-2.5.1]
+    paths: ['.github/workflows/validate-final-v251.yml']
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: final-2.5.1}
+      - uses: actions/setup-go@v5
+        with: {go-version: '1.23.12', cache: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-java@v5
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - name: Validate Windows and backend source
+        run: |
+          node --check internal/app/web/admin.js
+          go test ./internal/app
+          go vet ./internal/app ./cmd/tallybridge
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o /tmp/TallyBridge.exe ./cmd/tallybridge
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o /tmp/TallyBridge-Uninstall.exe ./cmd/uninstall
+          test -s /tmp/TallyBridge.exe
+          test -s /tmp/TallyBridge-Uninstall.exe
+      - name: Validate Android debug tests and visual-test APK
+        working-directory: android
+        run: |
+          gradle --no-daemon test assembleDebug lintDebug assembleDebugAndroidTest
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          test -s app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+      - name: Validate optimized Android release
+        working-directory: android
+        env:
+          TB_ALLOW_UNSIGNED_RELEASE: 'true'
+        run: |
+          gradle --no-daemon assembleRelease lintRelease
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Verify final version
+        run: |
+          grep -q 'const Version = "2.5.1"' internal/app/types.go
+          grep -q 'versionCode 20501' android/app/build.gradle
+          grep -q "versionName '2.5.1'" android/app/build.gradle
+          grep -q 'QuickDockWidget' android/app/src/main/AndroidManifest.xml
+          grep -q 'SyncExcludedCompanies' internal/app/types.go
