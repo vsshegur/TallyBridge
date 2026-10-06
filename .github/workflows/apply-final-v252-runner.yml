@@ -35,6 +35,12 @@ jobs:
           fi
           awk 'BEGIN{f=0} /python3 - <<.PY./{f=1;next} f && /^          PY$/{f=0;exit} f{sub(/^          /,"");print}' .github/workflows/apply-final-v252-polish.yml > /tmp/apply_v252.py
           test -s /tmp/apply_v252.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/apply_v252.py')
+          s=p.read_text().replace("'voice_order_widget.xml':('◉','Voice Order','Speak & review')", "'voice_order_widget.xml':('◉','Voice Order','Speak &amp; review')")
+          p.write_text(s)
+          PY
           python3 /tmp/apply_v252.py
           gofmt -w internal/app/group_outstanding.go internal/app/server.go internal/app/native.go internal/app/types.go
       - name: Validate source
