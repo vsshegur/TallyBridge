@@ -258,14 +258,14 @@ public final class MainActivity extends Activity {
   data.add(heading("Customers & ledgers","Statements, balances and history"));
   data.add(row("Ledgers","Search all parties and accounts","",()->open(()->ledgers(false))));
   data.add(row("Ledger groups","Browse balances by Tally group","",()->open(()->ledgers(true))));
-  data.add(row("Customer 360","Choose a customer from Ledgers","",()->open(()->ledgers(false))));
+  data.add(row("Customer 360","Search any customer and open the complete relationship view","",()->startActivity(new Intent(this,UniversalSearchActivity.class).putExtra(UniversalSearchActivity.EXTRA_MODE,UniversalSearchActivity.MODE_CUSTOMERS))));
   data.add(row("Bills receivable","Customers who need to pay","",()->open(()->outstanding("receivable"))));
   data.add(row("Bills payable","Amounts we need to pay","",()->open(()->outstanding("payable"))));
   data.add(row("Outstanding ageing","Overdue analysis with saved coverage","",()->open(this::ageing)));
-  data.add(heading("Accounting","Read-only Tally reports"));
-  for(String n:new String[]{"Day Book","Trial Balance","Profit and Loss","Balance Sheet"}){String report=n;data.add(row(report,"Accounting report","",()->open(()->genericReport(report))));}
+  data.add(heading("Activity","Useful daily Tally activity"));
+  data.add(row("Day Book","Read-only daily voucher activity","",()->open(()->genericReport("Day Book"))));
   data.add(heading("Tools","Find and reuse information"));
-  data.add(row("Universal search","Customers, invoices and LR/RR numbers","",()->open(this::search)));
+  data.add(row("Universal search","Customers, invoices, orders, items, LR/RR, GSTIN and mobile","",()->startActivity(new Intent(this,UniversalSearchActivity.class))));
   data.add(row("Favourite customers","Frequently used ledgers","",()->open(this::favourites)));
   local("Reports",this::reports,data,false);
  }

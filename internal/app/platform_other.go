@@ -14,4 +14,5 @@ func configureTailscale(port int) (bool, string, string, error) {
 	return false, "Tailscale configure is available on Windows", "", errors.New("Tailscale CLI is Windows-only in this build")
 }
 func openDesktop(url string) error { fmt.Println("TallyBridge:", url); return nil }
+func restartDesktopProcess() error { return errors.New("restart is available on Windows") }
 func hideProcess(any)              {}
