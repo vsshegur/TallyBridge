@@ -65,6 +65,7 @@ func (s *Store) load() {
 					s.settings.AutoUpdate = x.AutoUpdate
 				}
 			}
+			s.settings.SyncExcludedCompanies = append([]string(nil), x.SyncExcludedCompanies...)
 		}
 	}
 	// v1 compatibility: phone.json may be []Device or {devices:[...]}

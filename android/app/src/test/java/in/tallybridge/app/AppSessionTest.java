@@ -1,0 +1,1 @@
+package in.tallybridge.app; import org.junit.Test; import static org.junit.Assert.*; public class AppSessionTest{@Test public void sharedUnlock(){AppSession.lock();assertFalse(AppSession.isUnlocked());AppSession.unlock();assertTrue(AppSession.isUnlocked());AppSession.lock();}}

@@ -9,7 +9,41 @@ import (
 
 func (s *Server) autoSyncSnapshot() AutoSyncState { s.mu.Lock(); defer s.mu.Unlock(); return s.auto }
 func (s *Server) setAuto(fn func(*AutoSyncState)) { s.mu.Lock(); fn(&s.auto); s.mu.Unlock() }
+func companySyncEnabled(cfg Settings, name string) bool {
+	target := strings.TrimSpace(name)
+	if target == "" {
+		return false
+	}
+	for _, x := range cfg.SyncExcludedCompanies {
+		if strings.EqualFold(strings.TrimSpace(x), target) {
+			return false
+		}
+	}
+	return true
+}
+func filterSyncCompanies(companies []Company, cfg Settings) []Company {
+	out := make([]Company, 0, len(companies))
+	seen := map[string]bool{}
+	for _, c := range companies {
+		name := strings.TrimSpace(c.Name)
+		key := strings.ToLower(name)
+		if name == "" || seen[key] || !companySyncEnabled(cfg, name) {
+			continue
+		}
+		c.Name = name
+		out = append(out, c)
+		seen[key] = true
+	}
+	return out
+}
+func (s *Server) syncCompanyEnabled(name string) bool {
+	return companySyncEnabled(s.store.Settings(), name)
+}
 func (s *Server) startAutoSync(company, reason string) bool {
+	company = strings.TrimSpace(company)
+	if company != "" && !s.syncCompanyEnabled(company) {
+		return false
+	}
 	s.mu.Lock()
 	if s.auto.Running {
 		s.mu.Unlock()
@@ -29,6 +63,7 @@ func (s *Server) startAutoSync(company, reason string) bool {
 func (s *Server) runAutoSync(company, reason string) {
 	defer s.setAuto(func(a *AutoSyncState) { a.Running = false; a.Step = "" })
 	companies := []string{}
+	discovered := 0
 	if strings.TrimSpace(company) != "" {
 		companies = []string{company}
 	} else {
@@ -43,14 +78,21 @@ func (s *Server) runAutoSync(company, reason string) {
 			return
 		}
 		for _, c := range st.Companies {
-			if c.Name != "" {
-				companies = append(companies, c.Name)
+			if strings.TrimSpace(c.Name) != "" {
+				discovered++
+				if s.syncCompanyEnabled(c.Name) {
+					companies = append(companies, strings.TrimSpace(c.Name))
+				}
 			}
 		}
 	}
 	if len(companies) == 0 {
 		s.setAuto(func(a *AutoSyncState) {
-			a.LastError = "No open Tally company detected yet"
+			if discovered > 0 {
+				a.LastError = "No companies are enabled for automatic sync"
+			} else {
+				a.LastError = "No open Tally company detected yet"
+			}
 			a.LastErrorAt = time.Now()
 			a.RetrySoon = true
 		})
