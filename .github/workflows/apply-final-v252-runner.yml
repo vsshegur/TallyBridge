@@ -42,6 +42,20 @@ jobs:
           p.write_text(s)
           PY
           python3 /tmp/apply_v252.py
+          python3 - <<'PY'
+          from pathlib import Path
+          ids={
+            'search_widget.xml':'search_widget_root',
+            'voice_order_widget.xml':'voice_widget_root',
+            'gsm_widget.xml':'gsm_widget_root',
+          }
+          for fn,rid in ids.items():
+              p=Path('android/app/src/main/res/layout')/fn
+              s=p.read_text()
+              if f'@+id/{rid}' not in s:
+                  s=s.replace('<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"',f'<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/{rid}"',1)
+              p.write_text(s)
+          PY
           gofmt -w internal/app/group_outstanding.go internal/app/server.go internal/app/native.go internal/app/types.go
       - name: Validate source
         shell: bash
@@ -56,6 +70,9 @@ jobs:
           grep -q "versionName '2.5.2'" android/app/build.gradle
           grep -q 'group-outstanding' internal/app/server.go
           grep -q 'registerMonth(kind,month)' android/app/src/main/java/in/tallybridge/app/MainActivity.java
+          grep -q 'search_widget_root' android/app/src/main/res/layout/search_widget.xml
+          grep -q 'voice_widget_root' android/app/src/main/res/layout/voice_order_widget.xml
+          grep -q 'gsm_widget_root' android/app/src/main/res/layout/gsm_widget.xml
       - name: Commit source polish
         shell: bash
         run: |
