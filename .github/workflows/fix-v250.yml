@@ -1,0 +1,38 @@
+name: Fix TallyBridge 2.5.0 compile
+on:
+  push:
+    branches: [upgrade-2.5.0]
+    paths: ['.github/workflows/fix-v250.yml']
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: upgrade-2.5.0}
+      - name: Fix Work syntax and remove Follow Up from search
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/main/java/in/tallybridge/app/WorkActivity.java')
+          s=p.read_text(encoding='utf-8')
+          old='body.addView(button("Proforma invoice",v->startActivity(new Intent(this,MainActivity.class).setAction(MainActivity.ACTION_NEW_PROFORMA)),full(8));'
+          new='body.addView(button("Proforma invoice",v->startActivity(new Intent(this,MainActivity.class).setAction(MainActivity.ACTION_NEW_PROFORMA))),full(8));'
+          if old not in s: raise SystemExit('Work syntax pattern not found')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          p=Path('android/app/src/main/java/in/tallybridge/app/UniversalSearchActivity.java')
+          s=p.read_text(encoding='utf-8')
+          old='private boolean match(JSONObject x,String q){String k=x.optString("kind");if(customersOnly&&!customerKind(k))return false;'
+          new='private boolean match(JSONObject x,String q){String k=x.optString("kind");if(k.equals("followup"))return false;if(customersOnly&&!customerKind(k))return false;'
+          if old not in s: raise SystemExit('Universal search match pattern not found')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+      - name: Commit fixes
+        run: |
+          git config user.name "Vipul Shegur"
+          git config user.email "vsshegur@gmail.com"
+          git add android/app/src/main/java/in/tallybridge/app/WorkActivity.java android/app/src/main/java/in/tallybridge/app/UniversalSearchActivity.java
+          git commit -m "Fix Work compile and exclude Follow Up search"
+          git push origin upgrade-2.5.0
