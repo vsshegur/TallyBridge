@@ -131,7 +131,7 @@ public final class OrdersActivity extends Activity {
  private void shareOrder(JSONObject o){
   String text=o.optString("shareText");if(text.isEmpty()){toast("Only pending orders can be shared");return;}
   ScrollView scroll=new ScrollView(this);TextView preview=txt(text,15,NAVY);preview.setTextIsSelectable(true);preview.setPadding(dp(20),dp(12),dp(20),dp(12));scroll.addView(preview);
-  new AlertDialog.Builder(this).setTitle("Details only").setMessage("Review before sharing").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Share",(d,w)->{Intent i=new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text);startActivity(Intent.createChooser(i,"Share order details"));}).show();
+  new AlertDialog.Builder(this).setTitle("Details only").setMessage("Review before sharing").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Share",(d,w)->ShareCenter.shareText(this,"Share order details",text)).show();
  }
  private void dispatch(JSONObject o){
   LinearLayout box=col();box.setPadding(dp(20),dp(6),dp(20),0);TextView info=txt(o.optString("number")+" • "+o.optString("buyer")+"\nThis works offline and syncs later.",13,MUTED);box.addView(info);EditText through=input("Transport / courier / person (optional)",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_WORDS);through.setText(o.optString("dispatchedThrough"));box.addView(txt("DISPATCHED THROUGH",11,MUTED),full(14));box.addView(through,full(5));
