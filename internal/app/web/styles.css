@@ -73,3 +73,24 @@ svg{display:block}
 .desktop-body .live-pill.ok,.desktop-body .status-pill.ok{background:#12352d;color:#7fe0be}.desktop-body .live-pill.warn,.desktop-body .status-pill.warn{background:#3a2f20;color:#ffd078}.desktop-body .live-pill.err,.desktop-body .status-pill.err{background:#392126;color:#ff9c9c}
 .desktop-body .toast{background:#1b3042;border:1px solid #335064}.desktop-body ::selection{background:#1f6f70;color:#fff}
 @media(max-width:980px){.desktop-body .admin-shell{grid-template-columns:205px minmax(0,1fr)}.desktop-body .main{padding:22px 20px 44px}.desktop-body .sidebar{padding-left:10px;padding-right:10px}}
+
+
+/* TallyBridge 2.5.2 desktop final polish: coherent dark control center */
+.desktop-body{
+  --ink:#edf5f8;--muted:#9db1bf;--blue:#5fa8ff;--blue2:#153349;--card:#102430;--border:#28424f;
+  --shadow:0 10px 30px rgba(0,0,0,.18);--ok:#69dfbc;--okbg:#103b31;--err:#ff948c;--errbg:#3b2022;--warn:#ffd27d;--warnbg:#3a3020;
+  color:var(--ink)!important;background:#07151f!important;
+}
+.desktop-body .admin-shell{background:#07151f}.desktop-body .sidebar{background:linear-gradient(180deg,#081b28 0%,#0a2130 58%,#092633 100%);border-right:1px solid #1f3946}
+.desktop-body .brandmark{background:#70dfc3;color:#092536;box-shadow:none}.desktop-body .side-btn{color:#b9cad5}.desktop-body .side-btn:hover{background:#102e3d;color:#fff}.desktop-body .side-btn.active{background:linear-gradient(90deg,#15567a,#187966);color:#fff}
+.desktop-body .main{background:radial-gradient(circle at 100% 0,rgba(33,130,121,.10),transparent 30%),#07151f;color:var(--ink)}
+.desktop-body .page-head h1,.desktop-body h1,.desktop-body h2,.desktop-body h3,.desktop-body .title,.desktop-body .metric-value,.desktop-body .pair-code{color:#f3f8fa}
+.desktop-body .page-head p,.desktop-body .sub,.desktop-body .metric-sub,.desktop-body .metric-label{color:#9db1bf}
+.desktop-body .card,.desktop-body .summary-card,.desktop-body .mobile-card,.desktop-body .action-card,.desktop-body .health-item,.desktop-body .table-wrap,.desktop-body .empty{background:#102430!important;border-color:#28424f!important;color:#edf5f8!important;box-shadow:0 10px 28px rgba(0,0,0,.16)}
+.desktop-body .health-item b,.desktop-body .health-item .title,.desktop-body .health-item span{color:#edf5f8!important}.desktop-body .health-item .sub{color:#a8bbc7!important}.desktop-body .health-item.ok{background:#0f2d2a!important;border-color:#20594d!important}.desktop-body .health-item.warn{background:#30291d!important;border-color:#5b4a24!important}.desktop-body .health-mark{background:#123f34!important;color:#70dfc3!important}
+.desktop-body .input,.desktop-body .select,.desktop-body input,.desktop-body select,.desktop-body textarea{background:#0b1d28!important;color:#f0f6f8!important;border-color:#34505e!important}.desktop-body select option{background:#0b1d28;color:#f0f6f8}
+.desktop-body .table{color:#eaf2f5}.desktop-body .table th{background:#0c202c!important;color:#a9bdc9;border-color:#28424f}.desktop-body .table td{border-color:#203845}.desktop-body .table tr:hover td{background:#122b38}
+.desktop-body .list-row,.desktop-body .device-row{border-color:#233d49}.desktop-body .btn.secondary{background:#173241;color:#bfeadf;border:1px solid #31505d}.desktop-body .btn.danger{background:#3a2022;color:#ff9d96;border-color:#603035}
+.desktop-body .notice.info{background:#102d42;color:#add6f5}.desktop-body .notice.ok{background:#103b31;color:#83e5c8}.desktop-body .notice.warn{background:#3a3020;color:#ffd27d}.desktop-body .notice.err{background:#3b2022;color:#ffaaa3}
+.desktop-body .hero-card{border:1px solid #29505b;box-shadow:0 18px 40px rgba(0,0,0,.18)}.desktop-body .version-chip{color:#8197a5}
+.desktop-body .toolbar .status-pill{box-shadow:none}

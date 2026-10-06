@@ -112,6 +112,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("/api/v1/mobile/ledger-outstanding", s.mobileAuth(s.handleLedgerOutstanding))
 	m.HandleFunc("/api/v1/mobile/ledger-outstanding-pdf", s.mobileAuth(s.handleLedgerOutstandingPDF))
 	m.HandleFunc("/api/v1/mobile/group-balances", s.mobileAuth(s.handleGroupBalances))
+	m.HandleFunc("/api/v1/mobile/group-outstanding", s.mobileAuth(s.handleGroupOutstanding))
 	m.HandleFunc("/api/v1/mobile/group-balances-pdf", s.mobileAuth(s.handleGroupBalancesPDF))
 	m.HandleFunc("/api/v1/mobile/customer360", s.mobileAuth(s.handleCustomer360))
 	m.HandleFunc("/api/v1/mobile/customer360-pdf", s.mobileAuth(s.handleCustomer360PDF))
