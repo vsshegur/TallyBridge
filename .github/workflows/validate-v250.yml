@@ -31,3 +31,4 @@ jobs:
         env:
           TB_ALLOW_UNSIGNED_RELEASE: 'true'
         run: gradle --no-daemon assembleRelease lintRelease
+# validation revision 3: Work syntax + Follow Up filter + scrollable widget
