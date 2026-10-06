@@ -1,0 +1,61 @@
+name: Update 2.5 widget visual tests
+on:
+  push:
+    branches: [upgrade-2.5.0]
+    paths: ['.github/workflows/update-v250-tests.yml']
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: upgrade-2.5.0}
+      - name: Update visual tests for scrollable widget
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/androidTest/java/in/tallybridge/app/OrdersOfflineTest.java')
+          s=p.read_text(encoding='utf-8')
+          start=s.index('  cancelDialog();\n  ui(()->{')+len('  cancelDialog();\n')
+          end=s.index('  capture("21-orders-widget");',start)
+          light='''  ui(()->{\n   OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(232,237,242));\n   View widget=a.getLayoutInflater().inflate(R.layout.orders_widget,stage,false);\n   ((TextView)widget.findViewById(R.id.widget_pending)).setText("2");((TextView)widget.findViewById(R.id.widget_mode)).setText("PHONE OFFLINE");\n   widget.findViewById(R.id.widget_orders_list).setVisibility(View.GONE);TextView empty=widget.findViewById(R.id.widget_empty);empty.setVisibility(View.VISIBLE);empty.setText("Raj Fabrics  •  48 PCS Microfiber Napkin 14x21\\nMahesh Textiles  •  12 PCS Bath Towel 70x140");\n   int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(300*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(w,h,Gravity.CENTER));a.setContentView(stage);\n  });\n'''
+          s=s[:start]+light+s[end:]
+          old='ui(()->{OrdersActivity a=rule.getActivity();assertEquals(R.layout.orders_widget_compact,OrdersWidget.layoutFor(a,150));FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(232,237,242));View widget=a.getLayoutInflater().inflate(R.layout.orders_widget_compact,stage,false);((TextView)widget.findViewById(R.id.widget_pending)).setText("2");((TextView)widget.findViewById(R.id.widget_party1)).setText("Mahesh Textiles");int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(150*a.getResources().getDisplayMetrics().density);FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(w,h,Gravity.CENTER);stage.addView(widget,lp);a.setContentView(stage);});'
+          new='ui(()->{OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(232,237,242));View widget=a.getLayoutInflater().inflate(R.layout.orders_widget_compact,stage,false);((TextView)widget.findViewById(R.id.widget_pending)).setText("2");((TextView)widget.findViewById(R.id.widget_party1)).setText("Mahesh Textiles • 12 PCS Bath Towel 70x140");int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(150*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(w,h,Gravity.CENTER));a.setContentView(stage);});'
+          if old not in s: raise SystemExit('light compact block not found')
+          s=s.replace(old,new,1)
+          dark_start=s.index('  ui(()->{OrdersActivity a=rule.getActivity();assertEquals(R.layout.orders_widget_dark')
+          dark_end=s.index('  capture("25-orders-widget-dark");',dark_start)
+          dark='''  ui(()->{OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(15,22,29));View widget=a.getLayoutInflater().inflate(R.layout.orders_widget_dark,stage,false);((TextView)widget.findViewById(R.id.widget_pending)).setText("2");((TextView)widget.findViewById(R.id.widget_mode)).setText("PHONE OFFLINE");widget.findViewById(R.id.widget_orders_list).setVisibility(View.GONE);TextView empty=widget.findViewById(R.id.widget_empty);empty.setVisibility(View.VISIBLE);empty.setText("Raj Fabrics  •  48 PCS Microfiber Napkin 14x21\\nMahesh Textiles  •  12 PCS Bath Towel 70x140");int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(300*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(w,h,Gravity.CENTER));a.setContentView(stage);});\n'''
+          s=s[:dark_start]+dark+s[dark_end:]
+          old='ui(()->{OrdersActivity a=rule.getActivity();assertEquals(R.layout.orders_widget_compact_dark,OrdersWidget.layoutFor(a,150));FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(15,22,29));View widget=a.getLayoutInflater().inflate(R.layout.orders_widget_compact_dark,stage,false);((TextView)widget.findViewById(R.id.widget_pending)).setText("2");((TextView)widget.findViewById(R.id.widget_party1)).setText("Mahesh Textiles");int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(150*a.getResources().getDisplayMetrics().density);FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(w,h,Gravity.CENTER);stage.addView(widget,lp);a.setContentView(stage);});'
+          new='ui(()->{OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(15,22,29));View widget=a.getLayoutInflater().inflate(R.layout.orders_widget_compact_dark,stage,false);((TextView)widget.findViewById(R.id.widget_pending)).setText("2");((TextView)widget.findViewById(R.id.widget_party1)).setText("Mahesh Textiles • 12 PCS Bath Towel 70x140");int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(150*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(w,h,Gravity.CENTER));a.setContentView(stage);});'
+          if old not in s: raise SystemExit('dark compact block not found')
+          s=s.replace(old,new,1)
+          marker='  capture("30-widget-order-1x1");\n'
+          extra='''  capture("30-widget-order-1x1");\n  ui(()->{OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(232,237,242));View widget=a.getLayoutInflater().inflate(R.layout.gsm_widget,stage,false);int size=Math.round(104*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(size,size,Gravity.CENTER));a.setContentView(stage);});capture("33-widget-gsm-1x1");\n  ui(()->{OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(232,237,242));View widget=a.getLayoutInflater().inflate(R.layout.search_widget,stage,false);int size=Math.round(104*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(size,size,Gravity.CENTER));a.setContentView(stage);});capture("34-widget-search-1x1");\n  ui(()->{OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(232,237,242));View widget=a.getLayoutInflater().inflate(R.layout.voice_order_widget,stage,false);int size=Math.round(104*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(size,size,Gravity.CENTER));a.setContentView(stage);});capture("35-widget-voice-order-1x1");\n'''
+          if marker not in s: raise SystemExit('widget insertion marker missing')
+          s=s.replace(marker,extra,1)
+          p.write_text(s,encoding='utf-8')
+          # Universal search can match exact numeric amounts too.
+          p=Path('android/app/src/main/java/in/tallybridge/app/UniversalSearchActivity.java');s=p.read_text(encoding='utf-8')
+          old='x.optString("number")+" "+x.optString("party")).toLowerCase(Locale.ROOT)'
+          new='x.optString("number")+" "+x.optString("party")+" "+x.optString("amount")).toLowerCase(Locale.ROOT)'
+          if old not in s: raise SystemExit('amount search pattern missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          # Collect screenshots for the new separate widgets on the main emulator workflow.
+          p=Path('.github/workflows/build.yml');s=p.read_text(encoding='utf-8')
+          old='31-orders-widget-compact 32-orders-widget-compact-dark; do'
+          new='31-orders-widget-compact 32-orders-widget-compact-dark 33-widget-gsm-1x1 34-widget-search-1x1 35-widget-voice-order-1x1; do'
+          if old not in s: raise SystemExit('screenshot loop marker missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+      - name: Commit visual test update
+        run: |
+          git config user.name "Vipul Shegur"
+          git config user.email "vsshegur@gmail.com"
+          git add android/app/src/androidTest/java/in/tallybridge/app/OrdersOfflineTest.java android/app/src/main/java/in/tallybridge/app/UniversalSearchActivity.java .github/workflows/build.yml
+          git commit -m "Update tests for scrollable Order Desk and separate widgets"
+          git push origin upgrade-2.5.0
