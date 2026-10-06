@@ -2,7 +2,7 @@ package app
 
 import "time"
 
-const Version = "2.5.2"
+const Version = "2.5.3"
 
 type Settings struct {
 	TallyURL              string   `json:"tallyUrl"`
@@ -302,8 +302,8 @@ type SearchResult struct {
 	Date        string  `json:"date,omitempty"`
 	LRNumber    string  `json:"lrNumber,omitempty"`
 	Amount      float64 `json:"amount,omitempty"`
-	VoucherType string  `json:"voucherType,omitempty"`
-	Optional    bool    `json:"optional,omitempty"`
+	VoucherType string   `json:"voucherType,omitempty"`
+	Optional    bool     `json:"optional,omitempty"`
 }
 
 type SearchIndexData struct {
