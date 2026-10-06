@@ -20,8 +20,9 @@ jobs:
       - name: Go tests and vet
         run: |
           go test ./internal/app
-          go vet ./internal/app ./cmd/tallybridge ./cmd/uninstall
+          go vet ./internal/app ./cmd/tallybridge
           GOOS=windows GOARCH=amd64 go build ./cmd/tallybridge
+          GOOS=windows GOARCH=amd64 go build ./cmd/uninstall
       - name: Android unit compile lint debug
         working-directory: android
         run: gradle --no-daemon test assembleDebug lintDebug assembleDebugAndroidTest
