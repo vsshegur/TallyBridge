@@ -15,7 +15,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".WorkActivity" android:exported="false" android:label="Today" />
+        <activity android:name=".WorkActivity" android:exported="false" android:label="Work" />
+        <activity android:name=".UniversalSearchActivity" android:exported="false" android:label="Universal Search" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".Customer360Activity" android:exported="false" android:label="Customer 360" />
         <activity android:name=".GsmCalculatorActivity" android:exported="false"
             android:label="GSM Calculator" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".OrdersActivity" android:exported="false"
@@ -33,12 +35,16 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
+        <service android:name=".OrdersWidgetService" android:permission="android.permission.BIND_REMOTEVIEWS" android:exported="false" />
         <receiver android:name=".OrdersWidget" android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/orders_widget_info" />
         </receiver>
+        <receiver android:name=".GsmWidget" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/gsm_widget_info" /></receiver>
+        <receiver android:name=".SearchWidget" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/search_widget_info" /></receiver>
+        <receiver android:name=".VoiceOrderWidget" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/voice_order_widget_info" /></receiver>
         <receiver android:name=".ProformaWidget" android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

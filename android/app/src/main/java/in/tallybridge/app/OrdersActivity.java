@@ -22,7 +22,7 @@ import java.util.concurrent.*;
 
 /** Fast native order notebook. Orders remain usable offline and sync to the Windows bridge later. */
 public final class OrdersActivity extends Activity {
- static final String ACTION_NEW="in.tallybridge.app.ORDER_NEW", ACTION_QUICK="in.tallybridge.app.ORDER_QUICK";
+ static final String ACTION_NEW="in.tallybridge.app.ORDER_NEW", ACTION_QUICK="in.tallybridge.app.ORDER_QUICK", ACTION_VOICE="in.tallybridge.app.ORDER_VOICE";
  private final ExecutorService work=Executors.newSingleThreadExecutor();
  private final Handler main=new Handler(Looper.getMainLooper());
  private CryptoStore store; private BridgeApi api; private OfflineOrdersStore offline;
@@ -32,7 +32,7 @@ public final class OrdersActivity extends Activity {
  private final Map<String,String> unitByItem=new HashMap<>();
  private final List<ItemRow> itemRows=new ArrayList<>();
  private JSONObject buyerDetails=new JSONObject(); private String buyerDetailsFor="";
- private boolean dispatchedTab=false,destroyed=false,mastersLoading=false,dark=false,quickMode=false;
+ private boolean dispatchedTab=false,destroyed=false,mastersLoading=false,dark=false,quickMode=false,voiceMode=false;
  private int ordersHeaderCount=0;
  private TextView pendingTabView,dispatchedTabView;
  private static final int VOICE_ORDER=840; private AutoCompleteTextView voiceBuyer; private EditText voiceNotes; private LinearLayout voiceItemsBox;
@@ -58,7 +58,7 @@ public final class OrdersActivity extends Activity {
   applyAppearance();super.onCreate(state);styleWindow();getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);currency.setCurrency(Currency.getInstance("INR"));
   try{store=new CryptoStore(this);api=new BridgeApi(store);offline=new OfflineOrdersStore(store);}catch(Exception e){fatal(e);return;}
   if(store.get("base").isEmpty()||store.get("device").isEmpty()){needsMain("Connect and approve this phone in TallyBridge once. After that, Orders works even when the PC is offline.");return;}
-  String action=getIntent().getAction();quickMode=ACTION_QUICK.equals(action);if(ACTION_NEW.equals(action)||quickMode)openForm(null);else showOrders();
+  String action=getIntent().getAction();quickMode=ACTION_QUICK.equals(action);voiceMode=ACTION_VOICE.equals(action);if(ACTION_NEW.equals(action)||quickMode||voiceMode)openForm(null);else showOrders();
  }
  @Override protected void onDestroy(){destroyed=true;work.shutdownNow();main.removeCallbacksAndMessages(null);super.onDestroy();}
 
@@ -131,7 +131,7 @@ public final class OrdersActivity extends Activity {
  private void shareOrder(JSONObject o){
   String text=o.optString("shareText");if(text.isEmpty()){toast("Only pending orders can be shared");return;}
   ScrollView scroll=new ScrollView(this);TextView preview=txt(text,15,NAVY);preview.setTextIsSelectable(true);preview.setPadding(dp(20),dp(12),dp(20),dp(12));scroll.addView(preview);
-  new AlertDialog.Builder(this).setTitle("Details only").setMessage("Review before sharing").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Share",(d,w)->{Intent i=new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text);startActivity(Intent.createChooser(i,"Share order details"));}).show();
+  new AlertDialog.Builder(this).setTitle("Details only").setMessage("Review before sharing").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Share",(d,w)->ShareCenter.shareText(this,"Share order details",text)).show();
  }
  private void dispatch(JSONObject o){
   LinearLayout box=col();box.setPadding(dp(20),dp(6),dp(20),0);TextView info=txt(o.optString("number")+" • "+o.optString("buyer")+"\nThis works offline and syncs later.",13,MUTED);box.addView(info);EditText through=input("Transport / courier / person (optional)",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_WORDS);through.setText(o.optString("dispatchedThrough"));box.addView(txt("DISPATCHED THROUGH",11,MUTED),full(14));box.addView(through,full(5));
@@ -172,7 +172,7 @@ public final class OrdersActivity extends Activity {
   body.addView(txt("BUYER",11,MUTED),full(14));AutoCompleteTextView buyer=auto("Search saved Tally buyer or type name");if(order!=null)buyer.setText(order.optString("buyer"),false);body.addView(buyer,full(6));TextView buyerInfo=txt(buyerSummary(buyerDetails),12,MUTED);body.addView(buyerInfo);
   LinearLayout itemsBox=col();body.addView(txt("ITEMS",11,MUTED),full(16));body.addView(itemsBox);JSONArray existing=order==null?null:order.optJSONArray("items");if(existing!=null&&existing.length()>0){for(int i=0;i<existing.length();i++)addItemRow(itemsBox,existing.optJSONObject(i));}else addItemRow(itemsBox,null);body.addView(btn("+ Add another item",v->addItemRow(itemsBox,null)),full(8));
   body.addView(txt("DISPATCHED THROUGH",11,MUTED),full(16));EditText dispatchedThrough=input("Transport / courier / person (optional)",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_WORDS);if(order!=null)dispatchedThrough.setText(order.optString("dispatchedThrough"));body.addView(dispatchedThrough,full(6));
-  EditText notes=input("Colours, packing, delivery instructions…",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);notes.setMinLines(2);if(order!=null)notes.setText(order.optString("notes"));if(!quickMode||order!=null){body.addView(txt("NOTES",11,MUTED),full(16));body.addView(notes,full(6));}if(order==null)body.addView(btn("🎙 Speak order",v->startVoiceOrder(buyer,notes,itemsBox)),full(8));body.addView(primary(order==null?(quickMode?"Save quick order":"Save pending order"):"Update pending order",v->saveForm(order,companySpin,buyer,dispatchedThrough,notes)),full(18));
+  EditText notes=input("Colours, packing, delivery instructions…",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);notes.setMinLines(2);if(order!=null)notes.setText(order.optString("notes"));if(!quickMode||order!=null){body.addView(txt("NOTES",11,MUTED),full(16));body.addView(notes,full(6));}if(order==null){body.addView(btn("🎙 Speak order",v->startVoiceOrder(buyer,notes,itemsBox)),full(8));if(voiceMode){voiceMode=false;main.postDelayed(()->startVoiceOrder(buyer,notes,itemsBox),700);}}body.addView(primary(order==null?(quickMode?"Save quick order":"Save pending order"):"Update pending order",v->saveForm(order,companySpin,buyer,dispatchedThrough,notes)),full(18));
   final String[] loadedCompany={""};companySpin.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){String c=names.get(pos);store.put("company",c);if(!c.equals(loadedCompany[0])){if(!loadedCompany[0].isEmpty()){buyer.setText("",false);buyerDetails=new JSONObject();buyerDetailsFor="";buyerInfo.setText(buyerSummary(buyerDetails));}loadedCompany[0]=c;loadMasters(c,buyer,buyerInfo);}}});
   buyer.setOnItemClickListener((p,v,pos,id)->fetchBuyer(String.valueOf(companySpin.getSelectedItem()),buyer.getText().toString(),buyerInfo));buyer.setOnFocusChangeListener((v,has)->{if(!has&&!buyer.getText().toString().trim().isEmpty())fetchBuyer(String.valueOf(companySpin.getSelectedItem()),buyer.getText().toString(),buyerInfo);});
  }

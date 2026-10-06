@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const hiddenFlag = 0x08000000
@@ -132,4 +133,17 @@ func openDesktop(url string) error {
 		}
 	}
 	return hiddenCmd("rundll32.exe", "url.dll,FileProtocolHandler", url).Start()
+}
+func restartDesktopProcess() error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	command := fmt.Sprintf(`ping 127.0.0.1 -n 3 >nul & start "" "%s" --background`, exe)
+	cmd := hiddenCmd("cmd.exe", "/C", command)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { time.Sleep(350 * time.Millisecond); os.Exit(0) }()
+	return nil
 }
