@@ -1,7 +1,7 @@
 name: Android optimized unsigned build
 on:
   push:
-    branches: [main]
+    branches: [main, final-organized-2.5.4]
   workflow_dispatch:
 permissions:
   contents: read
