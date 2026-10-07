@@ -15,9 +15,12 @@ final class UiIcon extends View {
  @Override protected void onDraw(Canvas c){super.onDraw(c);c.save();float size=Math.min(getWidth(),getHeight());c.translate((getWidth()-size)/2,(getHeight()-size)/2);c.scale(size/24,size/24);
  switch(name){
  case "Home":line(c,3,10,12,3,21,10);line(c,5,9,5,21,10,21,10,14,14,14,14,21,19,21,19,9);break;
+ case "Orders":c.drawRoundRect(5,4,19,21,2,2,paint);line(c,9,4,9,2,15,2,15,4);line(c,9,9,16,9);line(c,9,13,16,13);line(c,9,17,14,17);break;
  case "Ledgers":c.drawRoundRect(4,3,20,21,2,2,paint);line(c,8,3,8,21);line(c,12,8,16,8);line(c,12,12,16,12);break;
  case "Due":c.drawCircle(12,12,9,paint);line(c,12,7,12,12,16,14);break;
  case "Reports":line(c,4,3,4,21,21,21);line(c,8,17,8,12);line(c,13,17,13,8);line(c,18,17,18,5);break;
+ case "Tools":c.drawCircle(7,17,2.5f,paint);line(c,9,15,18,6);c.drawArc(14,2,22,10,35,220,false,paint);line(c,17,7,21,3);break;
+ case "System":c.drawCircle(12,12,4,paint);c.drawCircle(12,12,9,paint);line(c,12,1,12,4);line(c,12,20,12,23);line(c,1,12,4,12);line(c,20,12,23,12);line(c,4,4,6,6);line(c,18,18,20,20);line(c,18,6,20,4);line(c,4,20,6,18);break;
  case "Proforma":c.drawRoundRect(5,3,19,21,2,2,paint);line(c,8,8,16,8);line(c,8,12,16,12);line(c,8,16,13,16);break;
  case "Payments":c.drawRoundRect(3,6,21,18,2,2,paint);line(c,3,10,21,10);c.drawCircle(17,14,1.2f,paint);break;
  case "health":c.drawCircle(12,12,9,paint);line(c,8,12,11,15,17,8);break;
@@ -28,6 +31,7 @@ final class UiIcon extends View {
  case "next":line(c,9,5,16,12,9,19);break;
  case "refresh":c.drawArc(4,4,20,20,45,290,false,paint);line(c,20,4,20,10,14,10);break;
  case "search":c.drawCircle(10,10,6,paint);line(c,15,15,21,21);break;
+ case "calculator":c.drawRoundRect(5,3,19,21,2,2,paint);line(c,8,7,16,7);line(c,8,11,9,11);line(c,12,11,13,11);line(c,16,11,17,11);line(c,8,15,9,15);line(c,12,15,13,15);line(c,16,15,17,15);break;
  case "down":line(c,6,9,12,15,18,9);break;
  case "receive":line(c,18,6,6,18,6,9);line(c,6,18,15,18);break;
  case "pay":line(c,6,18,18,6,9,6);line(c,18,6,18,15);break;
