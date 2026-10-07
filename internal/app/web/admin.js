@@ -7,8 +7,13 @@ const I={home:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z
 Object.assign(I,{cloudflare:'<path d="M5 12h14M12 5l7 7-7 7"/><circle cx="5" cy="12" r="2"/>',health:'<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-5"/>',pdfbank:'<path d="M3 9h18M5 9v9M9 9v9M15 9v9M19 9v9M3 18h18M12 3l9 4H3z"/>',backup:'<path d="M12 4v10M8 8l4-4 4 4"/><path d="M5 14v5h14v-5"/>',updates:'<path d="M20 11a8 8 0 1 1-2.3-5.7"/><path d="M20 4v7h-7"/>'});
 const icon=n=>`<svg viewBox="0 0 24 24" aria-hidden="true">${I[n]||I.about}</svg>`;
 let snap=null, route=(location.hash||'#home').slice(1), poll=null, busy=false, lastRenderKey='';
-const nav=[['home','Overview'],['companies','Companies'],['live','Sync'],['devices','Phones'],['cloudflare','Connection'],['health','Company Health'],['pdfbank','Payments'],['diag','Diagnostics'],['backup','Backup & Restore'],['updates','Updates'],['settings','Settings'],['about','About']];
-function shell(){document.getElementById('adminApp').innerHTML=`<div class="admin-shell"><aside class="sidebar"><div class="brand"><div class="brandmark">TB</div><div>TallyBridge<small>CONTROL CENTER</small></div></div><nav class="side-nav">${nav.map(([k,t])=>`<button class="side-btn ${route===k?'active':''}" data-route="${k}">${icon(k)}<span>${t}</span></button>`).join('')}</nav><div class="sidebar-footer"><div class="version-chip">v2.5.2 FINAL • read-only Tally access</div></div></aside><main class="main"><div id="page"></div></main></div>`;document.getElementById('adminApp').addEventListener('click',onClick)}
+const nav=[
+ ['__group','OPERATIONS'],['home','Overview'],['companies','Companies'],
+ ['__group','CONNECTIVITY'],['live','Sync'],['devices','Phones'],['cloudflare','Connection'],
+ ['__group','BUSINESS SETUP'],['health','Company Health'],['pdfbank','Payments'],
+ ['__group','MAINTENANCE'],['diag','Diagnostics'],['backup','Backup & Restore'],['updates','Updates'],['settings','Settings'],['about','About']
+];
+function shell(){document.getElementById('adminApp').innerHTML=`<div class="admin-shell"><aside class="sidebar"><div class="brand"><div class="brandmark">TB</div><div>TallyBridge<small>CONTROL CENTER</small></div></div><nav class="side-nav">${nav.map(([k,t])=>k==='__group'?`<div class="nav-group-label">${t}</div>`:`<button class="side-btn ${route===k?'active':''}" data-route="${k}">${icon(k)}<span>${t}</span></button>`).join('')}</nav><div class="sidebar-footer"><div class="version-chip">v2.5.4 FINAL • read-only Tally access</div></div></aside><main class="main"><div id="page"></div></main></div>`;document.getElementById('adminApp').addEventListener('click',onClick)}
 async function api(path,opts={}){const r=await fetch(path,{cache:'no-store',headers:{'Content-Type':'application/json','X-TB-Admin':'1',...(opts.headers||{})},...opts});const txt=await r.text();let d={};try{d=txt?JSON.parse(txt):{}}catch{d={error:txt}}if(!r.ok)throw new Error(d.error||`HTTP ${r.status}`);return d}
 function toast(msg,err=false){const e=document.createElement('div');e.className='toast'+(err?' err':'');e.textContent=msg;document.body.appendChild(e);setTimeout(()=>e.remove(),3500)}
 function renderKey(d){if(route==='pdfbank'||route==='cloudflare'||route==='devices')return route;const l=d?.live||{},dev=d?.devices||[],c=d?.cache||{},cc=d?.cachedCompanies||[],a=d?.autoSync||{};if(route==='home')return JSON.stringify([route,!!l.tallyOnline,(l.companies||[]).map(x=>x.name),!!l.tailscaleOnline,l.tailscaleStatus,l.phoneUrl,dev.filter(x=>!x.revoked).length,l.gateState,l.busyReport,l.lastError,c.entries,c.latestAt,a.running,a.company,a.step,a.lastOk,a.lastError]);if(route==='companies')return JSON.stringify([route,!!l.tallyOnline,(l.companies||[]).map(x=>[x.id,x.name]),cc.map(x=>[x.id,x.name]),l.lastError,a.running,d.settings?.syncExcludedCompanies||[]]);if(route==='devices')return JSON.stringify([route,dev.map(x=>[x.id,x.name,!!x.revoked,x.lastSeen])]);if(route==='tailscale')return JSON.stringify([route,!!l.tailscaleOnline,l.tailscaleStatus,l.phoneUrl]);if(route==='live')return JSON.stringify([route,a.running,a.company,a.step,a.lastOk,a.lastError,c.entries,c.latestAt,cc.map(x=>x.name),d.settings?.syncExcludedCompanies||[]]);if(route==='diag')return JSON.stringify([route,l.gateState,l.lastSuccess,l.lastError,c.entries,c.latestAt,(d.logs||[]).length,a.running,a.step,a.lastError]);return route}
@@ -60,15 +65,29 @@ async function loadHealth(refresh){
  const seq=++healthRequest,c=healthCompany;try{
   const x=await api('/api/v1/admin/health?company='+encodeURIComponent(c)+(refresh?'&refresh=1':''));
   if(seq!==healthRequest||route!=='health')return;
-  const items=x.items||[];
-  $('#healthBody').innerHTML=`<div class="grid">
+  const items=x.items||[],groups={identity:[],payments:[],sync:[],other:[]};
+  for(const item of items){
+   const k=String(item.label||'').toLowerCase();
+   if(/gst|address|mobile|phone|email|identity/.test(k))groups.identity.push(item);
+   else if(/bank|ifsc|upi|qr|payment/.test(k))groups.payments.push(item);
+   else if(/sync|sales|proforma|register|cache/.test(k))groups.sync.push(item);
+   else groups.other.push(item);
+  }
+  const healthCards=list=>list.map(i=>`<div class="health-item ${i.ok?'ok':'warn'}"><div class="health-mark">${i.ok?'✓':'!'}</div><div><b>${esc(i.label)}</b><div class="sub">${esc(i.value||i.hint||'Not available')}</div></div><span>${i.ok?'Ready':i.required?'Required':'Optional'}</span></div>`).join('');
+  const section=(title,sub,list)=>list.length?`<section class="health-section"><div class="health-section-head"><div><b>${title}</b><span>${sub}</span></div><span class="status-pill ${list.every(i=>i.ok)?'ok':'warn'}">${list.filter(i=>i.ok).length}/${list.length}</span></div><div class="health-grid">${healthCards(list)}</div></section>`:'';
+  $('#healthBody').innerHTML=`<div class="grid health-summary">
    <div class="card span4"><div class="metric-label">Health score</div><div class="metric-value">${x.score||0}%</div><div class="metric-sub">${x.ready?'Ready':'Needs attention'}</div></div>
    <div class="card span4"><div class="metric-label">PDF identity</div><div class="metric-value metric-small">${x.readyForPdf?'READY':'INCOMPLETE'}</div><div class="metric-sub">GST + address + mobile</div></div>
    <div class="card span4"><div class="metric-label">Payments</div><div class="metric-value metric-small">${x.readyForPayments?'READY':'INCOMPLETE'}</div><div class="metric-sub">Bank/IFSC or UPI</div></div>
-  </div><div class="health-grid">${items.map(i=>`<div class="health-item ${i.ok?'ok':'warn'}"><div class="health-mark">${i.ok?'✓':'!'}</div><div><b>${esc(i.label)}</b><div class="sub">${esc(i.value||i.hint||'Not available')}</div></div><span>${i.ok?'Ready':i.required?'Required':'Optional'}</span></div>`).join('')}</div>
-  ${(x.issues||[]).length?`<div class="notice warn" style="margin-top:16px"><b>What needs attention</b><br>${x.issues.map(esc).join('<br>')}</div>`:''}`;
+  </div>
+  ${section('Identity & Contact','Supplier identity used on invoices and PDFs',groups.identity)}
+  ${section('Payments','Bank, IFSC, UPI and QR readiness',groups.payments)}
+  ${section('Sync Readiness','Registers and cached business data',groups.sync)}
+  ${section('Other Checks','Additional company readiness checks',groups.other)}
+  ${(x.issues||[]).length?`<div class="notice warn health-attention"><b>What needs attention</b><br>${x.issues.map(esc).join('<br>')}</div>`:''}`;
  }catch(e){if(seq===healthRequest&&route==='health')$('#healthBody').innerHTML=`<div class="notice err">${esc(e.message)}</div>`}
 }
+
 let diagCompany='',diagRequest=0;
 function renderDiag(){
  const names=allCompanies();if(!names.includes(diagCompany))diagCompany=names[0]||'';
