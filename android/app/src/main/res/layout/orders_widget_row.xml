@@ -1,13 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_row_root" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:padding="9dp" android:layout_marginBottom="5dp" android:background="@drawable/orders_widget_secondary_dark">
- <TextView android:layout_width="4dp" android:layout_height="match_parent" android:minHeight="48dp" android:background="#53D4B7"/>
- <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1.45" android:layout_marginStart="9dp" android:orientation="vertical">
-  <TextView android:id="@+id/widget_row_party" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#F4F8FA" android:textStyle="bold" android:textSize="11sp" android:maxLines="1" android:ellipsize="end"/>
-  <TextView android:id="@+id/widget_row_number" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="#79BFD5" android:textSize="8sp" android:maxLines="1" android:ellipsize="end"/>
- </LinearLayout>
- <TextView android:id="@+id/widget_row_items" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1.2" android:layout_marginStart="8dp" android:textColor="#D6E4EA" android:textSize="9sp" android:maxLines="2" android:ellipsize="end"/>
- <LinearLayout android:layout_width="70dp" android:layout_height="wrap_content" android:layout_marginStart="7dp" android:gravity="end" android:orientation="vertical">
-  <TextView android:id="@+id/widget_row_date" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#F4F8FA" android:textStyle="bold" android:textSize="9sp"/>
-  <TextView android:id="@+id/widget_row_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="#9FB3C1" android:textSize="8sp"/>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+ android:id="@+id/widget_row_root"
+ android:layout_width="match_parent" android:layout_height="wrap_content"
+ android:minHeight="96dp" android:orientation="horizontal" android:gravity="center_vertical"
+ android:paddingLeft="10dp" android:paddingTop="11dp" android:paddingRight="11dp" android:paddingBottom="11dp"
+ android:background="@drawable/orders_widget_secondary_dark">
+ <TextView android:layout_width="4dp" android:layout_height="match_parent" android:minHeight="74dp" android:background="#53D4B7"/>
+ <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+  android:layout_marginStart="10dp" android:orientation="vertical">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+   <TextView android:id="@+id/widget_row_party" android:layout_width="0dp" android:layout_height="wrap_content"
+    android:layout_weight="1" android:textColor="#F4F8FA" android:textStyle="bold" android:textSize="12.5sp"
+    android:maxLines="1" android:ellipsize="end"/>
+   <LinearLayout android:layout_width="68dp" android:layout_height="wrap_content" android:layout_marginStart="8dp"
+    android:gravity="end" android:orientation="vertical">
+    <TextView android:id="@+id/widget_row_date" android:layout_width="wrap_content" android:layout_height="wrap_content"
+     android:textColor="#F4F8FA" android:textStyle="bold" android:textSize="9.5sp"/>
+    <TextView android:id="@+id/widget_row_time" android:layout_width="wrap_content" android:layout_height="wrap_content"
+     android:layout_marginTop="1dp" android:textColor="#9FB3C1" android:textSize="8sp"/>
+   </LinearLayout>
+  </LinearLayout>
+  <TextView android:id="@+id/widget_row_number" android:layout_width="match_parent" android:layout_height="wrap_content"
+   android:layout_marginTop="2dp" android:textColor="#79BFD5" android:textSize="9sp"
+   android:maxLines="1" android:ellipsize="end"/>
+  <TextView android:id="@+id/widget_row_items" android:layout_width="match_parent" android:layout_height="wrap_content"
+   android:layout_marginTop="5dp" android:textColor="#D6E4EA" android:textSize="10.5sp"
+   android:maxLines="3" android:ellipsize="end" android:lineSpacingExtra="1.5dp"/>
  </LinearLayout>
 </LinearLayout>
