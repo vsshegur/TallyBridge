@@ -50,7 +50,7 @@ public class OperationsCenterTest {
   assertEquals("in.tallybridge.app.OPEN_SYSTEM",MainActivity.ACTION_SYSTEM);
   assertNotNull(SectionNav.class);
 
-  ui(()->{try{call("frame",new Class[]{String.class,String.class},"Work","Unified navigation • Home • Work • Orders • Reports • More");}catch(Exception e){throw new RuntimeException(e);}});
+  ui(()->{try{call("frame",new Class[]{String.class,String.class},"Today","Unified navigation • Home • Orders • Reports • Tools • System");}catch(Exception e){throw new RuntimeException(e);}});
   capture("28-work-system");
  }
 }
