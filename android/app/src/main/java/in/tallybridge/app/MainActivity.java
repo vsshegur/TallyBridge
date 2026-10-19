@@ -182,12 +182,7 @@ public final class MainActivity extends Activity {
   int scrollY=body!=null&&body.getChildCount()>0&&body.getChildAt(0) instanceof ScrollView?body.getChildAt(0).getScrollY():0;
   base("Home",true);LinearLayout page=formPanel();page.setPadding(dp(20),dp(4),dp(20),dp(28));
   JSONObject sm=object(object(boot,"summaries"),company),sync=object(boot,"autoSync"),health=object(object(boot,"health"),company);
-  boolean online=boot.optBoolean("tallyOnline");
-  LinearLayout hero=column();hero.setPadding(dp(18),dp(16),dp(18),dp(16));hero.setBackground(touch(dark?0xff17352f:0xff102d44,22));hero.setFocusable(true);hero.setOnClickListener(v->open(this::syncStatus));
-  TextView state=text(online?"● TALLY CONNECTED":"● SAVED MODE • TALLY NOT REACHABLE",11,online?(dark?0xff9ce4cf:0xff9bdcca):0xffffd28a);state.setTypeface(null,Typeface.BOLD);state.setLetterSpacing(.10f);hero.addView(state);
-  TextView name=text(company.isEmpty()?"Choose a company":company,21,Color.WHITE);name.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));name.setMaxLines(2);name.setEllipsize(TextUtils.TruncateAt.END);name.setPadding(0,dp(6),0,dp(4));hero.addView(name);
-  int score=health.optInt("score",0);String healthLine=health.length()==0?"Company setup is being checked":health.optBoolean("ready")?"Company details complete":score+"% company details complete";
-  hero.addView(text(healthLine+" • "+time(sync.optString("lastOk")),12,0xffc7d7e2));hero.setContentDescription((online?"Tally connected. ":"Saved mode. ")+company+". "+healthLine+". Opens sync status.");page.addView(hero);gap(page,18);
+  gap(page,4);
 
   label(page,"QUICK ACTIONS");
   LinearLayout first=tileRow(page);
@@ -210,6 +205,8 @@ public final class MainActivity extends Activity {
   JSONArray fav=favouriteArray();
   if(fav.length()>0){label(page,"YOUR PARTIES");int shown=Math.min(4,fav.length());for(int i=0;i<shown;i++){String party=fav.optString(i);quick(page,"star",party,"Outstanding, statement and invoices",()->open(()->ledger(party)));}if(fav.length()>shown)quick(page,"Parties","All favourite parties",fav.length()+" saved on this phone",()->open(this::favourites));gap(page,4);}
 
+  int score=health.optInt("score",0);
+  if(health.length()>0&&!health.optBoolean("ready"))quick(page,"health","Company details "+score+"% complete","Add the missing GST, address, mobile or bank details in Tally",()->open(this::healthScreen));
   int waiting=new BillOutbox(this).waiting();
   if(waiting>0)quick(page,"bill",waiting==1?"1 purchase bill waiting":waiting+" purchase bills waiting","Sends by itself when the PC is connected • tap to see",()->startActivity(new Intent(this,BillScanActivity.class)));
   JSONObject update=object(boot,"update");if(update.optBoolean("available"))quick(page,"refresh","Update available","TallyBridge "+update.optString("latest")+" • review signed release",()->open(this::updateCheck));
