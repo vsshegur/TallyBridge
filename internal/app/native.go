@@ -560,8 +560,11 @@ func (s *Server) verifyNativeRequest(r *http.Request, requireApproval bool) (Nat
 // Photo orders carry a base64 JPEG (the phone allows up to 3 MB before
 // encoding), so that one route gets the same ceiling its handler enforces.
 func nativeBodyLimit(r *http.Request) int64 {
-	if r.URL.Path == "/api/v1/mobile/orders/photo" {
+	switch r.URL.Path {
+	case "/api/v1/mobile/orders/photo":
 		return maxPhotoJSONBody
+	case "/api/v1/mobile/bills/page":
+		return maxBillPageBody
 	}
 	return 2 << 20
 }

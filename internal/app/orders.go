@@ -485,8 +485,11 @@ func (s *Server) DesktopHandlerWithOrders() http.Handler {
 	s.startOrderJanitor()
 	base := s.DesktopHandler()
 	orders := s.localAdmin(s.handleOrders)
+	invoices := s.localAdmin(s.handleITAdmin)
 	return securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/v1/admin/invoicetotally"):
+			invoices(w, r)
 		case r.URL.Path == "/assets/orders.js":
 			s.serveFile("web/orders.js", "application/javascript; charset=utf-8")(w, r)
 		case strings.HasPrefix(r.URL.Path, "/api/v1/admin/orders"):
@@ -501,9 +504,14 @@ func (s *Server) NativeHandlerWithOrders() http.Handler {
 	s.startOrderJanitor()
 	base := s.NativeHandler()
 	orders := s.nativeOrdersAuth(s.handleOrders)
+	bills := s.nativeOrdersAuth(s.handleBills)
 	return securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/v1/mobile/orders") {
 			orders(w, r)
+			return
+		}
+		if r.URL.Path == "/api/v1/mobile/bills" || strings.HasPrefix(r.URL.Path, "/api/v1/mobile/bills/") {
+			bills(w, r)
 			return
 		}
 		base.ServeHTTP(w, r)
