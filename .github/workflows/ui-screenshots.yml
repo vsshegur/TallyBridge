@@ -1,11 +1,10 @@
 # Manual helper: runs the Android visual checks and publishes the screenshots
 # to the "ui-screenshots" branch so they can be viewed without downloading
-# build artifacts, together with the unit-test and lint output. Touches no other branch.
+# build artifacts, together with the unit-test and lint output. Run it from the
+# Actions tab (any branch). Touches no other branch.
 name: Android screenshots (manual)
 on:
   workflow_dispatch:
-  push:
-    branches: [feature/2.7-bank-android]
 permissions:
   contents: write
 jobs:
