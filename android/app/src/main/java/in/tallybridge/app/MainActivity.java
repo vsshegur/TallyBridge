@@ -191,6 +191,7 @@ public final class MainActivity extends Activity {
   TextView dailyTitle=text("DAILY WORK",11,MUTED);dailyTitle.setTypeface(null,Typeface.BOLD);dailyTitle.setLetterSpacing(.10f);page.addView(dailyTitle);gap(page,8);
   quick(page,"Home","Today's work","Pending orders, dispatch, sales and anything needing attention",()->startActivity(new Intent(this,WorkActivity.class)));
   quick(page,"Orders","New order","Fast order entry • works offline",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_QUICK)));
+  quick(page,"bill","Scan purchase bill","Photo or PDF → read by InvoiceTotally → review on PC",()->startActivity(new Intent(this,BillScanActivity.class)));
   quick(page,"search","Search everything","Customers, invoices, orders, items, LR/RR, GSTIN and mobile",()->startActivity(new Intent(this,UniversalSearchActivity.class)));
   quick(page,"Tools","Voice order","Speak an order, review it, then save",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_VOICE)));
 
@@ -382,6 +383,8 @@ public final class MainActivity extends Activity {
   data.add(heading("Create","Fast everyday business actions"));
   data.add(row("New order","Offline-first order entry","",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_QUICK))));
   data.add(row("Voice order","Speak an order, review it, then save","",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_VOICE))));
+  data.add(row("Scan purchase bill","Photo or PDF of a supplier bill → InvoiceTotally → Tally","",()->startActivity(new Intent(this,BillScanActivity.class))));
+  data.add(row("Purchase bills sent","Status of bills sent from this phone","",()->startActivity(new Intent(this,BillScanActivity.class))));
   data.add(row("Proforma invoice","Create, preview and share a proforma","",()->rootTab("Proforma")));
   data.add(row("GSM calculator","Towel GSM from length, breadth and weight • offline","",()->startActivity(new Intent(this,GsmCalculatorActivity.class))));
   data.add(heading("Find & reuse","Search and customer shortcuts"));
