@@ -7,8 +7,9 @@ package app
 // file is the single, separate path that can create anything in Tally. It is
 // called only by the InvoiceTotally connector (invoicetotally.go), only after
 // the user has switched on "Allow InvoiceTotally to post to Tally" on this PC,
-// and only for requests that pass validatePostingXML: one Purchase or Sales
-// voucher, or one new ledger, stock item or unit, for the expected company.
+// and only for requests that pass validatePostingXML: one Purchase, Sales,
+// Receipt, Payment or Contra voucher, or one new ledger, stock item or unit,
+// for the expected company.
 // Nothing can be altered or deleted through it.
 
 import (
@@ -31,6 +32,9 @@ var (
 )
 
 const maxPostingXML = 2 << 20
+
+// Bills (Purchase/Sales) and bank statement entries (Receipt/Payment/Contra).
+var postableVoucherTypes = map[string]bool{"Purchase": true, "Sales": true, "Receipt": true, "Payment": true, "Contra": true}
 
 // pnode is a small XML tree used to check posting requests and read masters.
 type pnode struct {
@@ -138,7 +142,7 @@ func parseXTree(b []byte, strict bool) (*pnode, error) {
 }
 
 // validatePostingXML accepts exactly the requests InvoiceTotally sends to post a
-// bill: Import Data of one Purchase/Sales voucher, or of one new ledger, stock
+// bill or bank entry: Import Data of one Purchase/Sales/Receipt/Payment/Contra voucher, or of one new ledger, stock
 // item or unit, into tallyCompany. It returns a short label for the activity log.
 func validatePostingXML(b []byte, tallyCompany string) (string, error) {
 	if len(b) > maxPostingXML {
@@ -241,8 +245,8 @@ func validatePostingXML(b []byte, tallyCompany string) (string, error) {
 		if n := obj.kid("VOUCHERTYPENAME"); n != nil {
 			name = strings.TrimSpace(n.Text)
 		}
-		if (vt != "Purchase" && vt != "Sales") || name != vt {
-			return "", fmt.Errorf("only Purchase and Sales vouchers can be posted (got %q)", vt)
+		if !postableVoucherTypes[vt] || name != vt {
+			return "", fmt.Errorf("only Purchase, Sales, Receipt, Payment and Contra vouchers can be posted (got %q)", vt)
 		}
 		return vt + " voucher", nil
 	case "LEDGER", "STOCKITEM", "UNIT":

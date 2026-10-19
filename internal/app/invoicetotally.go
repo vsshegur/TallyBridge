@@ -16,12 +16,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -631,11 +634,15 @@ func (c *ITConnector) handle(ctx context.Context, l *itLink, j itJob) {
 		sleepCtx(ctx, c.retryPause)
 		return
 	}
+	if itRowKinds[j.Kind] {
+		c.handleTallyRows(ctx, l, j, label, tc)
+		return
+	}
 	if strings.HasPrefix(j.Kind, "export_") {
 		c.handleExport(ctx, l, j, label, tc)
 		return
 	}
-	if j.Kind != "import_voucher" && j.Kind != "import_master" {
+	if j.Kind != "import_voucher" && j.Kind != "import_master" && j.Kind != "import_bank" {
 		c.report(ctx, l, j, map[string]any{"ok": false, "error": "TallyBridge does not know this job type"})
 		return
 	}
@@ -700,7 +707,7 @@ func (c *ITConnector) handle(ctx context.Context, l *itLink, j itJob) {
 	ok, errs := importOutcome(resp)
 	finish(map[string]any{"ok": true, "response": resp})
 	if ok {
-		if j.Kind == "import_voucher" {
+		if j.Kind == "import_voucher" || j.Kind == "import_bank" {
 			c.bump(l, "posted")
 			c.log("Posted "+label, j.Kind, true, l)
 		} else {
@@ -1123,4 +1130,65 @@ func (c *ITConnector) save(ctx context.Context, rawServer string, add, remove []
 	c.log(fmt.Sprintf("Connected to InvoiceTotally — %d compan%s: %s", len(keep), map[bool]string{true: "y", false: "ies"}[len(keep) == 1], strings.Join(names, ", ")), "settings", true, nil)
 	c.Start()
 	return results, nil
+}
+
+// Reads for bank statement matching: pending bills of every party, and the
+// entries already in the bank ledger. Read-only, like the master reads.
+var itRowKinds = map[string]bool{"export_bills_receivable": true, "export_bills_payable": true, "export_bank_entries": true}
+
+var childOfRE = regexp.MustCompile(`(?is)<CHILDOF>(.*?)</CHILDOF>`)
+
+func itTallyRows(kind string, request, reply []byte) []map[string]any {
+	out := []map[string]any{}
+	if kind == "export_bank_entries" {
+		ledger := ""
+		if m := childOfRE.FindSubmatch(request); m != nil {
+			ledger = html.UnescapeString(strings.TrimSpace(string(m[1])))
+		}
+		rows, _ := statementRows(reply, ledger)
+		for _, r := range rows {
+			if r.Debit == nil || r.Credit == nil || r.Date == "" {
+				continue
+			}
+			// a debit to the bank ledger is money in
+			out = append(out, map[string]any{"date": r.Date, "amount": math.Round((*r.Debit-*r.Credit)*100) / 100, "vtype": r.VoucherType, "number": r.Number, "party": r.Party})
+		}
+		return out
+	}
+	for _, b := range parsePartyBills(reply, "") {
+		out = append(out, map[string]any{"party": b.Party, "name": b.BillNumber, "date": b.Date, "amount": b.PendingAmount, "due": b.DueDate})
+	}
+	return out
+}
+
+func (c *ITConnector) handleTallyRows(ctx context.Context, l *itLink, j itJob, label, tc string) {
+	waitCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	b, err := c.s.tally.requestWait(waitCtx, "InvoiceTotally: "+label, tc, []byte(j.Payload), 5*time.Minute)
+	cancel()
+	if err != nil {
+		if errors.Is(err, ErrTallyRequest) {
+			c.log(label+" failed: "+err.Error(), j.Kind, false, l)
+			c.report(ctx, l, j, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		c.waitNote(l, "Waiting for Tally — "+label+" will run when TallyPrime answers", j.Kind)
+		c.report(ctx, l, j, map[string]any{"ok": false, "retry": true, "error": "Tally not reachable"})
+		sleepCtx(ctx, c.retryPause)
+		return
+	}
+	rows := itTallyRows(j.Kind, []byte(j.Payload), b)
+	cfg := c.config()
+	for part, i := 0, 0; i < len(rows) || part == 0; part, i = part+1, i+400 {
+		end := min(i+400, len(rows))
+		if err := c.call(ctx, cfg.ServerURL, l.conn.Token, "POST", "/api/bridge/jobs/"+url.PathEscape(j.ID)+"/masters",
+			map[string]any{"part": part, "rows": rows[i:end]}, nil, 2*time.Minute); err != nil {
+			c.report(ctx, l, j, map[string]any{"ok": false, "error": "Could not upload: " + friendlyNetErr(err)})
+			return
+		}
+		if end >= len(rows) {
+			break
+		}
+	}
+	c.report(ctx, l, j, map[string]any{"ok": true, "response": fmt.Sprintf("%d records", len(rows))})
+	c.log(fmt.Sprintf("%s: %d found", label, len(rows)), j.Kind, true, l)
 }
