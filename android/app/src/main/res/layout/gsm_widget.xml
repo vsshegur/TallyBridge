@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Home-screen widget: the launcher inflates it without AppCompat, so the framework android:tint is the one that works. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" tools:ignore="UseAppTint"
     android:id="@+id/gsm_widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
     android:orientation="vertical" android:gravity="center" android:padding="6dp"
     android:background="@drawable/quick_order_widget_panel" android:contentDescription="GSM">
