@@ -59,6 +59,17 @@ func TestValidatePostingXMLRejectsEverythingElse(t *testing.T) {
 		"malformed":           v[:len(v)-20],
 		"nested object":       strings.Replace(led, "<PARENT>", `<OBJECT NAME="x"/><PARENT>`, 1),
 		"second tallymessage": strings.Replace(led, "</REQUESTDATA>", "<TALLYMESSAGE><UNIT NAME=\"A\" ACTION=\"Create\"/></TALLYMESSAGE></REQUESTDATA>", 1),
+		"lowercase alter":     strings.Replace(v, `ACTION="Create"`, `action="alter"`, 1),
+		"duplicate action":    strings.Replace(v, `ACTION="Create"`, `ACTION="Create" ACTION="Alter"`, 1),
+		"namespaced action":   strings.Replace(v, `ACTION="Create"`, `ACTION="Create" x:ACTION="Delete" xmlns:x="urn:x"`, 1),
+		"namespaced element":  strings.Replace(led, "<PARENT>", `<x:ALTER xmlns:x="urn:x"/><PARENT>`, 1),
+		"doctype":             `<!DOCTYPE ENVELOPE [<!ENTITY x "y">]>` + v,
+		"processing instr":    `<?tally do="alter"?>` + v,
+		"remote id":           strings.Replace(v, "<DATE>", "<REMOTEID>abc</REMOTEID><DATE>", 1),
+		"remote id attr":      strings.Replace(v, `ACTION="Create"`, `ACTION="Create" REMOTEID="abc"`, 1),
+		"guid":                strings.Replace(v, "<DATE>", "<GUID>abc</GUID><DATE>", 1),
+		"rename":              strings.Replace(led, "<PARENT>", "<OLDNAME>Cash</OLDNAME><PARENT>", 1),
+		"action element":      strings.Replace(led, "<PARENT>", "<ACTION>Delete</ACTION><PARENT>", 1),
 	}
 	for name, x := range cases {
 		company := itCompany
@@ -95,7 +106,7 @@ const tallyStockReply = `<ENVELOPE><BODY><DATA><COLLECTION>
 <RATEDETAILS.LIST><GSTRATEDUTYHEAD>CGST</GSTRATEDUTYHEAD><GSTRATE>2.5</GSTRATE></RATEDETAILS.LIST>
 <RATEDETAILS.LIST><GSTRATEDUTYHEAD>Integrated Tax</GSTRATEDUTYHEAD><GSTRATE>5</GSTRATE></RATEDETAILS.LIST></STATEWISEDETAILS.LIST></GSTDETAILS.LIST></STOCKITEM>
 <STOCKITEM NAME="Buttons"><BASEUNITS>DOZ</BASEUNITS><RATEDETAILS.LIST><GSTRATEDUTYHEAD>Central Tax</GSTRATEDUTYHEAD><GSTRATE>6</GSTRATE></RATEDETAILS.LIST></STOCKITEM>
-<STOCKITEM NAME="Loose"><BASEUNITS>KG</BASEUNITS></STOCKITEM>
+<STOCKITEM NAME="Loose" xmlns:UDF="TallyUDF"><BASEUNITS>KG</BASEUNITS><UDF:COLOUR.LIST DESC="Colour"><UDF:COLOUR>Red</UDF:COLOUR></UDF:COLOUR.LIST></STOCKITEM>
 </COLLECTION></DATA></BODY></ENVELOPE>`
 
 func TestParseITMasters(t *testing.T) {

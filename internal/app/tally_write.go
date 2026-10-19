@@ -59,7 +59,10 @@ func (n *pnode) walk(f func(*pnode) bool) {
 	}
 }
 
-func parseXTree(b []byte) (*pnode, error) {
+// parseXTree builds the tree. strict (for posting requests) refuses anything
+// TallyBridge itself would not send: directives, processing instructions,
+// namespaced names and repeated attributes. Replies from Tally are read leniently.
+func parseXTree(b []byte, strict bool) (*pnode, error) {
 	clean, _ := sanitizeXML(b)
 	d := xml.NewDecoder(bytes.NewReader(clean))
 	var root *pnode
@@ -73,16 +76,40 @@ func parseXTree(b []byte) (*pnode, error) {
 			return nil, err
 		}
 		switch t := tok.(type) {
+		case xml.Directive:
+			if strict {
+				return nil, errors.New("DOCTYPE and other XML directives are not allowed")
+			}
+		case xml.ProcInst:
+			if strict && !strings.EqualFold(t.Target, "xml") {
+				return nil, errors.New("XML processing instructions are not allowed")
+			}
 		case xml.StartElement:
 			if len(stack) > 64 {
 				return nil, errors.New("XML is nested too deeply")
 			}
+			if strict && t.Name.Space != "" {
+				return nil, fmt.Errorf("namespaced element %s:%s is not allowed", t.Name.Space, t.Name.Local)
+			}
 			n := &pnode{Name: strings.ToUpper(t.Name.Local), Attr: map[string]string{}}
-			if t.Name.Space != "" && !strings.EqualFold(t.Name.Space, "UDF") {
+			if t.Name.Space != "" {
 				n.Name = strings.ToUpper(t.Name.Space + ":" + t.Name.Local)
 			}
 			for _, a := range t.Attr {
-				n.Attr[strings.ToUpper(a.Name.Local)] = a.Value
+				if a.Name.Space == "xmlns" || (a.Name.Space == "" && a.Name.Local == "xmlns") {
+					continue
+				}
+				if a.Name.Space != "" {
+					if strict {
+						return nil, fmt.Errorf("namespaced attribute %s:%s is not allowed", a.Name.Space, a.Name.Local)
+					}
+					continue
+				}
+				key := strings.ToUpper(a.Name.Local)
+				if _, dup := n.Attr[key]; dup && strict {
+					return nil, fmt.Errorf("attribute %s appears twice", a.Name.Local)
+				}
+				n.Attr[key] = a.Value
 			}
 			if len(stack) == 0 {
 				if root != nil {
@@ -117,7 +144,13 @@ func validatePostingXML(b []byte, tallyCompany string) (string, error) {
 	if len(b) > maxPostingXML {
 		return "", errors.New("request is too large")
 	}
-	root, err := parseXTree(b)
+	u := strings.ToUpper(string(b))
+	for _, x := range []string{"<!DOCTYPE", "<!ENTITY", "ALTER TARGET", "DELETE TARGET", "MODIFY OBJECT", "TDLMESSAGE"} {
+		if strings.Contains(u, x) {
+			return "", fmt.Errorf("%s is not allowed in a posting request", strings.TrimPrefix(x, "<!"))
+		}
+	}
+	root, err := parseXTree(b, true)
 	if err != nil {
 		return "", fmt.Errorf("request is not valid XML: %v", err)
 	}
@@ -130,8 +163,15 @@ func validatePostingXML(b []byte, tallyCompany string) (string, error) {
 			bad = fmt.Errorf("only new entries can be created (found ACTION=%q)", a)
 		}
 		switch n.Name {
-		case "TDL", "TDLMESSAGE", "OBJECT", "SYSTEM", "COLLECTION", "REPORT", "FORM", "FUNCTION":
+		case "TDL", "TDLMESSAGE", "OBJECT", "SYSTEM", "COLLECTION", "REPORT", "FORM", "FUNCTION", "ACTION",
+			// identifiers that could make Tally match, rename or overwrite an existing entry
+			"GUID", "REMOTEID", "MASTERID", "ALTERID", "VCHKEY", "OLDNAME", "REMOTEALTGUID":
 			bad = fmt.Errorf("%s is not allowed in a posting request", n.Name)
+		}
+		for _, a := range []string{"REMOTEID", "VCHKEY", "OLDNAME", "GUID", "MASTERID"} {
+			if _, ok := n.Attr[a]; ok {
+				bad = fmt.Errorf("%s is not allowed in a posting request", a)
+			}
 		}
 		return bad == nil
 	})

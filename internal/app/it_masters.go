@@ -93,7 +93,7 @@ func xGSTRate(n *pnode) *float64 {
 
 func parseITMasters(kind string, b []byte) ([]itMaster, error) {
 	tag := itExportTags[kind]
-	root, err := parseXTree(b)
+	root, err := parseXTree(b, false)
 	if err != nil {
 		return nil, err
 	}
