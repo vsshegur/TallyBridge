@@ -1,1 +1,11 @@
-<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android" android:minWidth="300dp" android:minHeight="70dp" android:minResizeWidth="250dp" android:minResizeHeight="70dp" android:targetCellWidth="5" android:targetCellHeight="1" android:updatePeriodMillis="0" android:initialLayout="@layout/quick_dock_widget" android:resizeMode="horizontal" android:widgetCategory="home_screen"/>
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_dock_desc"
+    android:previewLayout="@layout/quick_dock_widget"
+    android:minWidth="300dp" android:minHeight="56dp"
+    android:minResizeWidth="180dp" android:minResizeHeight="56dp"
+    android:targetCellWidth="5" android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/quick_dock_widget"
+    android:resizeMode="horizontal"
+    android:widgetCategory="home_screen" />

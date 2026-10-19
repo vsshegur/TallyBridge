@@ -2,10 +2,10 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
  android:id="@+id/widget_row_root"
  android:layout_width="match_parent" android:layout_height="wrap_content"
- android:minHeight="96dp" android:orientation="horizontal" android:gravity="center_vertical"
- android:paddingLeft="10dp" android:paddingTop="11dp" android:paddingRight="11dp" android:paddingBottom="11dp"
+ android:minHeight="88dp" android:orientation="horizontal" android:gravity="center_vertical"
+ android:paddingLeft="10dp" android:paddingTop="10dp" android:paddingRight="11dp" android:paddingBottom="10dp"
  android:background="@drawable/orders_widget_secondary_dark">
- <TextView android:layout_width="4dp" android:layout_height="match_parent" android:minHeight="74dp" android:background="#53D4B7"/>
+ <TextView android:layout_width="4dp" android:layout_height="match_parent" android:minHeight="66dp" android:background="#53D4B7"/>
  <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
   android:layout_marginStart="10dp" android:orientation="vertical">
   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">

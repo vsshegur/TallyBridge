@@ -1,15 +1,28 @@
 package in.tallybridge.app;
 
-import android.app.*;import android.appwidget.*;import android.content.*;import android.content.res.Configuration;import android.net.Uri;import android.os.Bundle;import android.widget.RemoteViews;import org.json.*;import java.util.*;import java.util.concurrent.*;
+import android.app.*;import android.appwidget.*;import android.content.*;import android.content.res.Configuration;import android.net.Uri;import android.os.Bundle;import android.widget.RemoteViews;import org.json.*;import java.time.*;import java.time.format.DateTimeFormatter;import java.util.*;import java.util.concurrent.*;import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Scrollable Order Desk widget: every pending order shows party, products, quantities and order time. */
 public final class OrdersWidget extends AppWidgetProvider{
  private static final String ACTION_REFRESH="in.tallybridge.app.WIDGET_REFRESH_ORDERS", PREF="orders_widget_state";
  private static final ExecutorService IO=Executors.newSingleThreadExecutor();
- @Override public void onUpdate(Context c,AppWidgetManager m,int[] ids){for(int id:ids)paint(c,m,id);refreshAsync(c);}
+ private static final ScheduledExecutorService TIMER=Executors.newSingleThreadScheduledExecutor();
+ /** Longest a home-screen refresh may keep the app awake; the next refresh picks up anything left over. */
+ private static final long REFRESH_LIMIT_SECONDS=25;
+ @Override public void onUpdate(Context c,AppWidgetManager m,int[] ids){for(int id:ids)paint(c,m,id);refreshAsync(c,goAsync());}
  @Override public void onAppWidgetOptionsChanged(Context c,AppWidgetManager m,int id,Bundle opts){paint(c,m,id);}
- @Override public void onReceive(Context c,Intent i){super.onReceive(c,i);if(ACTION_REFRESH.equals(i.getAction()))refreshAsync(c);}
- public static void refreshAll(Context c){refreshAsync(c.getApplicationContext());}
+ @Override public void onReceive(Context c,Intent i){super.onReceive(c,i);if(ACTION_REFRESH.equals(i.getAction()))refreshAsync(c,goAsync());}
+ public static void refreshAll(Context c){refreshAsync(c.getApplicationContext(),null);}
+ /** One line under the title: what the list shows and how fresh it is. */
+ static String status(SharedPreferences p,long now){
+  if(now-p.getLong("refreshingAt",0)<60000)return "Updating…";
+  long updated=p.getLong("updated",0);
+  if(updated<=0)return p.getBoolean("offline",true)?"Saved on phone":"Synced";
+  ZonedDateTime at=Instant.ofEpochMilli(updated).atZone(ZoneId.systemDefault());
+  boolean today=at.toLocalDate().equals(Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDate());
+  String when=at.format(DateTimeFormatter.ofPattern(today?"h:mm a":"d MMM, h:mm a",Locale.ENGLISH));
+  return (p.getBoolean("offline",true)?"Saved on phone • ":"Synced ")+when;
+ }
  private static boolean dark(Context c){String mode=c.getSharedPreferences("appearance",Context.MODE_PRIVATE).getString("mode","System");return mode.equals("Dark")||(mode.equals("System")&&(c.getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);}
  private static boolean compact(AppWidgetManager m,int id){Bundle o=m.getAppWidgetOptions(id);return o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,220)<185;}
  private static int layout(Context c,AppWidgetManager m,int id){boolean d=dark(c);if(compact(m,id))return d?R.layout.orders_widget_compact_dark:R.layout.orders_widget_compact;return d?R.layout.orders_widget_dark:R.layout.orders_widget;}
@@ -18,9 +31,9 @@ public final class OrdersWidget extends AppWidgetProvider{
  private static PendingIntent refresh(Context c,int id){Intent i=new Intent(c,OrdersWidget.class).setAction(ACTION_REFRESH).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id);return PendingIntent.getBroadcast(c,6100+id,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
  private static void paint(Context c,AppWidgetManager m,int id){
   SharedPreferences p=c.getSharedPreferences(PREF,Context.MODE_PRIVATE);int count=p.getInt("count",0);boolean isCompact=compact(m,id);RemoteViews v=new RemoteViews(c.getPackageName(),layout(c,m,id));
-  v.setTextViewText(R.id.widget_pending,String.valueOf(count));v.setTextViewText(R.id.widget_mode,p.getBoolean("offline",true)?"SAVED":"SYNCED");v.setOnClickPendingIntent(R.id.widget_refresh,refresh(c,id));
+  v.setTextViewText(R.id.widget_pending,String.valueOf(count));v.setTextViewText(R.id.widget_mode,status(p,System.currentTimeMillis()));v.setOnClickPendingIntent(R.id.widget_refresh,refresh(c,id));
+  v.setOnClickPendingIntent(R.id.widget_add,activity(c,6200+id,new Intent(c,OrdersActivity.class).setAction(OrdersActivity.ACTION_NEW)));
   if(isCompact){
-   v.setOnClickPendingIntent(R.id.widget_add,activity(c,6200+id,new Intent(c,OrdersActivity.class).setAction(OrdersActivity.ACTION_NEW)));
    v.setOnClickPendingIntent(R.id.widget_open,activity(c,6300+id,new Intent(c,OrdersActivity.class)));
    String first="No pending orders";try{JSONArray a=new JSONArray(p.getString("rows","[]"));if(a.length()>0){JSONObject x=a.optJSONObject(0);first=x.optString("party")+(x.optString("detail").isEmpty()?"":" • "+x.optString("detail"));}}catch(Exception ignored){}v.setTextViewText(R.id.widget_party1,first);
   }else{
@@ -34,5 +47,12 @@ public final class OrdersWidget extends AppWidgetProvider{
  private static String orderDetail(JSONObject o){JSONArray items=o.optJSONArray("items");StringBuilder b=new StringBuilder();if(items!=null)for(int j=0;j<items.length();j++){JSONObject x=items.optJSONObject(j);if(x==null)continue;if(b.length()>0)b.append(" • ");String unit=x.optString("unit").trim();b.append(qty(x.optDouble("quantity")));if(!unit.isEmpty())b.append(' ').append(unit);b.append(' ').append(x.optString("name","Item"));}if(b.length()==0&&o.optBoolean("photoOrder"))b.append("Photo order");return b.toString();}
  private static void cache(Context c,JSONObject data,boolean offline){JSONArray pending=data.optJSONArray("pending"),rows=new JSONArray();if(pending!=null)for(int i=0;i<pending.length();i++){JSONObject o=pending.optJSONObject(i);if(o==null)continue;try{rows.put(new JSONObject().put("id",o.optString("id")).put("party",o.optString("buyer","Order")).put("number",o.optString("number")).put("detail",orderDetail(o)).put("createdAt",o.optString("createdAt")));}catch(Exception ignored){}}c.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().putInt("count",pending==null?0:pending.length()).putBoolean("offline",offline).putString("rows",rows.toString()).putLong("updated",System.currentTimeMillis()).apply();}
  private static void updateAll(Context c){AppWidgetManager m=AppWidgetManager.getInstance(c);int[] ids=m.getAppWidgetIds(new ComponentName(c,OrdersWidget.class));for(int id:ids)paint(c,m,id);}
- private static void refreshAsync(Context c){Context app=c.getApplicationContext();IO.execute(()->{try{CryptoStore secure=new CryptoStore(app);OfflineOrdersStore orders=new OfflineOrdersStore(secure);JSONObject local=orders.list();cache(app,local,true);updateAll(app);if(!secure.get("base").isEmpty()&&!secure.get("device").isEmpty()){try{JSONObject synced=orders.sync(new BridgeApi(secure));cache(app,synced,false);}catch(Exception ignored){cache(app,orders.list(),true);}}}catch(Exception ignored){}finally{updateAll(app);}});}
+ private static void finishOnce(AtomicBoolean done,BroadcastReceiver.PendingResult pending){if(pending!=null&&done.compareAndSet(false,true))try{pending.finish();}catch(Exception ignored){}}
+ /** Shows saved orders at once, then syncs with the PC. When started by a broadcast the app is kept awake until done (at most REFRESH_LIMIT_SECONDS). */
+ private static void refreshAsync(Context c,BroadcastReceiver.PendingResult pending){
+  Context app=c.getApplicationContext();AtomicBoolean done=new AtomicBoolean(false);
+  SharedPreferences prefs=app.getSharedPreferences(PREF,Context.MODE_PRIVATE);prefs.edit().putLong("refreshingAt",System.currentTimeMillis()).apply();updateAll(app);
+  if(pending!=null)TIMER.schedule(()->finishOnce(done,pending),REFRESH_LIMIT_SECONDS,TimeUnit.SECONDS);
+  IO.execute(()->{try{CryptoStore secure=new CryptoStore(app);OfflineOrdersStore orders=new OfflineOrdersStore(secure);JSONObject local=orders.list();cache(app,local,true);updateAll(app);if(!secure.get("base").isEmpty()&&!secure.get("device").isEmpty()){try{JSONObject synced=orders.sync(new BridgeApi(secure));cache(app,synced,false);}catch(Exception ignored){cache(app,orders.list(),true);}}}catch(Exception ignored){}finally{prefs.edit().remove("refreshingAt").apply();updateAll(app);finishOnce(done,pending);}});
+ }
 }

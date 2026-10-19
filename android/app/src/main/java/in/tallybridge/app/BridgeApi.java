@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.Map;
 
 final class BridgeApi {
- static final String APP_VERSION="2.6.0";
+ static final String APP_VERSION="2.7.0";
  final CryptoStore store;final AccessLogin login;
  BridgeApi(CryptoStore store){this.store=store;login=new AccessLogin(store);}
  private Map<String,String> headers(String path,String method,String body,boolean signed)throws Exception{

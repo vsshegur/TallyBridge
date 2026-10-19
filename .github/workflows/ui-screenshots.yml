@@ -1,0 +1,62 @@
+# Manual helper: runs the Android visual checks and publishes the screenshots
+# to the "ui-screenshots" branch so they can be viewed without downloading
+# build artifacts. Never runs on push; does not touch any other branch.
+name: Android screenshots (manual)
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/2.7-bank-android]
+permissions:
+  contents: write
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build app and visual checks
+        working-directory: android
+        run: gradle --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Run visual checks on Android emulator
+        timeout-minutes: 25
+        run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/tallybridge-android"
+          export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          sudo apt-get update -qq
+          sudo apt-get install -y libpulse0 libxkbcommon-x11-0 libxcb-cursor0
+          sudo chmod 666 /dev/kvm
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "system-images;android-30;google_apis;x86_64" "emulator" "platform-tools"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n design -k "system-images;android-30;google_apis;x86_64" --force
+          "$ANDROID_HOME/emulator/emulator" -avd design -skin 1080x1920 -cores 4 -memory 2048 -no-window -no-audio -no-boot-anim -gpu swiftshader -no-snapshot -no-metrics > /tmp/emulator.log 2>&1 &
+          timeout 120 adb wait-for-device
+          timeout 540 bash -c 'until adb shell getprop sys.boot_completed | tr -d "\r" | grep -q 1; do sleep 3; done'
+          adb shell wm size 1080x1920
+          adb shell wm density 420
+          adb shell input keyevent 82
+          adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+          adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell am instrument -w in.tallybridge.app.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/design-results.txt || true
+          mkdir -p android/ui-screenshots
+          for screen in $(adb exec-out run-as in.tallybridge.app ls files/ui | tr -d '\r'); do
+            adb exec-out run-as in.tallybridge.app cat "files/ui/$screen" > "android/ui-screenshots/$screen"
+          done
+          cp /tmp/design-results.txt android/ui-screenshots/results.txt
+      - name: Publish screenshots to the ui-screenshots branch
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          cd android/ui-screenshots
+          git init -q
+          git checkout -q -b ui-screenshots
+          git add .
+          git -c user.name="github-actions" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "Android screenshots for ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ui-screenshots

@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 public final class MainActivity extends Activity {
  static final String ACTION_NEW_PROFORMA="in.tallybridge.app.NEW_PROFORMA";
  static final String ACTION_SEARCH="in.tallybridge.app.OPEN_SEARCH", ACTION_CUSTOMERS="in.tallybridge.app.OPEN_CUSTOMERS", ACTION_SYSTEM="in.tallybridge.app.OPEN_SYSTEM";
- static final String ACTION_REPORTS="in.tallybridge.app.OPEN_REPORTS", ACTION_TOOLS="in.tallybridge.app.OPEN_TOOLS", ACTION_MORE="in.tallybridge.app.OPEN_MORE", ACTION_HOME="in.tallybridge.app.OPEN_HOME";
+ static final String ACTION_REPORTS="in.tallybridge.app.OPEN_REPORTS", ACTION_TOOLS="in.tallybridge.app.OPEN_TOOLS", ACTION_MORE="in.tallybridge.app.OPEN_MORE", ACTION_HOME="in.tallybridge.app.OPEN_HOME", ACTION_PARTIES="in.tallybridge.app.OPEN_PARTIES";
  private int NAVY,TEAL,MUTED,BG,SURFACE,BORDER,TINT,SECTION,PRIMARY_INK;
  private boolean dark;
  private String appearance(){return getSharedPreferences("appearance",MODE_PRIVATE).getString("mode","System");}
@@ -39,7 +39,7 @@ public final class MainActivity extends Activity {
  private void chooseAppearance(){
   String[] modes={"System","Light","Dark"};int selected=java.util.Arrays.asList(modes).indexOf(appearance());
   new AlertDialog.Builder(this).setTitle("Appearance").setSingleChoiceItems(modes,selected,(dialog,which)->{
-   getSharedPreferences("appearance",MODE_PRIVATE).edit().putString("mode",modes[which]).apply();dialog.dismiss();applyAppearance();OrdersWidget.refreshAll(this);system();
+   getSharedPreferences("appearance",MODE_PRIVATE).edit().putString("mode",modes[which]).apply();dialog.dismiss();applyAppearance();OrdersWidget.refreshAll(this);more();
   }).setNegativeButton("Cancel",null).show();
  }
  private final ExecutorService work=Executors.newSingleThreadExecutor();
@@ -110,12 +110,11 @@ public final class MainActivity extends Activity {
  private void begin(){history.clear();current=null;if(store.get("base").isEmpty()){connectScreen();return;}if(store.get("device").isEmpty()){verifyOwner();return;}base("Connecting",false);int epoch=++generation;progress.setVisibility(View.VISIBLE);work.execute(()->{try{JSONObject s=api.get("/api/v2/native/status");JSONObject b=s.optBoolean("approved")?api.get("/api/v1/mobile/bootstrap"):null;main.post(()->{if(!active(epoch))return;if(b==null){approvalScreen();return;}reconnectNeeded=false;boot=b;selectInitialCompany();BillOutbox.flushInBackground(this,api);handlePendingLaunch();});}catch(Exception e){main.post(()->{if(active(epoch))showFailure(e);});}});}
  private void handlePendingLaunch(){String action=pendingLaunchAction;pendingLaunchAction="";
   if(ACTION_NEW_PROFORMA.equals(action)){rootTab("Proforma");return;}
-  if(ACTION_SEARCH.equals(action)){rootTab("Tools");startActivity(new Intent(this,UniversalSearchActivity.class));return;}
-  if(ACTION_CUSTOMERS.equals(action)){rootTab("Reports");startActivity(new Intent(this,UniversalSearchActivity.class).putExtra(UniversalSearchActivity.EXTRA_MODE,UniversalSearchActivity.MODE_CUSTOMERS));return;}
-  if(ACTION_SYSTEM.equals(action)){rootTab("System");return;}
+  if(ACTION_SEARCH.equals(action)){rootTab("Home");startActivity(new Intent(this,UniversalSearchActivity.class));return;}
+  if(ACTION_CUSTOMERS.equals(action)){rootTab("Parties");startActivity(new Intent(this,UniversalSearchActivity.class).putExtra(UniversalSearchActivity.EXTRA_MODE,UniversalSearchActivity.MODE_CUSTOMERS));return;}
+  if(ACTION_PARTIES.equals(action)){rootTab("Parties");return;}
   if(ACTION_REPORTS.equals(action)){rootTab("Reports");return;}
-  if(ACTION_TOOLS.equals(action)){rootTab("Tools");return;}
-  if(ACTION_MORE.equals(action)){rootTab("System");return;}
+  if(ACTION_SYSTEM.equals(action)||ACTION_TOOLS.equals(action)||ACTION_MORE.equals(action)){rootTab("More");return;}
   rootTab("Home");
  }
  private boolean active(int epoch){return !destroyed&&unlocked&&generation==epoch;}
@@ -132,16 +131,17 @@ public final class MainActivity extends Activity {
  private void chooseCompany(){JSONArray cs=array(boot,"companies");String[] names=new String[cs.length()];for(int i=0;i<cs.length();i++)names[i]=cs.optJSONObject(i).optString("name");if(names.length==0){toast("Open a company in Tally and use Refresh");return;}new AlertDialog.Builder(this).setTitle("Choose company").setItems(names,(d,i)->{String next=names[i];if(next.equals(company))return;Runnable resume=current;String selectedTab=tab;company=next;store.put("company",company);cache.clear();cacheAt.clear();diagLedger=diagNumber=diagDate=diagMasterId=diagVoucherType="";forceNext=true;history.clear();if(resume!=null)resume.run();else rootTab(selectedTab);}).show();}
  private void updateStatus(){if(statusView==null)return;JSONObject sync=object(boot,"autoSync");boolean online=boot.optBoolean("tallyOnline");String updated=latestUpdate();String state=sync.optBoolean("running")?"Syncing • "+sync.optString("step"):online?(updated.isEmpty()?"Connected • tap for sync status":"Connected • "+age(updated)):"Tally unavailable • retrying";statusView.setText(state);statusView.setOnClickListener(v->open(this::syncStatus));statusView.setContentDescription(state);}
  private void syncStatus(){List<Row> data=new ArrayList<>();JSONObject sync=object(boot,"autoSync");boolean online=boot.optBoolean("tallyOnline");data.add(heading(sync.optBoolean("running")?"Updating your accounts":online?"PC + Tally connected":"Waiting for Tally",sync.optBoolean("running")?sync.optString("company")+" • "+sync.optString("step"):online?"Automatic updates run every 3 minutes. You can also refresh now.":"Saved data stays available while TallyBridge retries automatically."));data.add(row("Last updated",time(latestUpdate()),"",null));data.add(row("Last complete sync",time(sync.optString("lastOk")),"",null));data.add(row("Last successful Tally read",time(boot.optString("lastSuccess")),"",null));if(!sync.optString("lastError").isEmpty())data.add(heading(online?"Previous sync warning":"Connection retrying",online?"Tally is connected. A previous report could not refresh and will retry automatically.\n"+sync.optString("lastError"):sync.optString("lastError")));data.add(row("Sync now","Refresh saved account data now","",this::syncNow));data.add(row("Test connection","Check the company is open in Tally","",this::probe));local("Sync status",this::syncStatus,data,false);syncScreenActive=true;}
- private void rootTab(String name){history.clear();tab=name;switch(name){
+ private void rootTab(String name){
+  if("Orders".equals(name)){startActivity(new Intent(this,OrdersActivity.class));overridePendingTransition(0,0);return;}
+  history.clear();tab=name;switch(name){
   case "Home":home();break;
-  case "Orders":startActivity(new Intent(this,OrdersActivity.class));overridePendingTransition(0,0);break;
+  case "Parties":parties();break;
   case "Reports":reports();break;
-  case "Tools":tools();break;
-  case "System":system();break;
-  case "Proforma":tab="Tools";proforma();break;
-  case "Payments":tab="System";payments();break;
-  case "More":tab="System";system();break;
-  default:home();
+  case "More":more();break;
+  case "Tools":case "System":tab="More";more();break;
+  case "Proforma":tab="Home";proforma();break;
+  case "Payments":tab="More";payments();break;
+  default:tab="Home";home();
  }}
  private void open(Runnable next){if(current!=null)history.push(current);next.run();}
  private void goBack(){generation++;if(!history.isEmpty())history.pop().run();else rootTab("Home");}
@@ -182,33 +182,55 @@ public final class MainActivity extends Activity {
   int scrollY=body!=null&&body.getChildCount()>0&&body.getChildAt(0) instanceof ScrollView?body.getChildAt(0).getScrollY():0;
   base("Home",true);LinearLayout page=formPanel();page.setPadding(dp(20),dp(4),dp(20),dp(28));
   JSONObject sm=object(object(boot,"summaries"),company),sync=object(boot,"autoSync"),health=object(object(boot,"health"),company);
-  LinearLayout hero=column();hero.setPadding(dp(20),dp(20),dp(20),dp(20));hero.setBackground(touch(dark?0xff17352f:0xff102d44,22));hero.setOnClickListener(v->rootTab("System"));
-  TextView state=text(boot.optBoolean("tallyOnline")?"TALLY CONNECTED":"SAVED MODE",11,dark?0xff9ce4cf:0xff9bdcca);state.setTypeface(null,Typeface.BOLD);state.setLetterSpacing(.12f);hero.addView(state);
-  TextView name=text(company.isEmpty()?"Choose a company":company,23,Color.WHITE);name.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));name.setPadding(0,dp(8),0,dp(5));hero.addView(name);
-  int score=health.optInt("score",0);String healthLine=health.length()==0?"Company setup is being checked":health.optBoolean("ready")?"Company health ready":score+"% company data health";
-  hero.addView(text(healthLine+" • "+time(sync.optString("lastOk")),12,0xffc7d7e2));page.addView(hero);gap(page,16);
+  boolean online=boot.optBoolean("tallyOnline");
+  LinearLayout hero=column();hero.setPadding(dp(18),dp(16),dp(18),dp(16));hero.setBackground(touch(dark?0xff17352f:0xff102d44,22));hero.setFocusable(true);hero.setOnClickListener(v->open(this::syncStatus));
+  TextView state=text(online?"● TALLY CONNECTED":"● SAVED MODE • TALLY NOT REACHABLE",11,online?(dark?0xff9ce4cf:0xff9bdcca):0xffffd28a);state.setTypeface(null,Typeface.BOLD);state.setLetterSpacing(.10f);hero.addView(state);
+  TextView name=text(company.isEmpty()?"Choose a company":company,21,Color.WHITE);name.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));name.setMaxLines(2);name.setEllipsize(TextUtils.TruncateAt.END);name.setPadding(0,dp(6),0,dp(4));hero.addView(name);
+  int score=health.optInt("score",0);String healthLine=health.length()==0?"Company setup is being checked":health.optBoolean("ready")?"Company details complete":score+"% company details complete";
+  hero.addView(text(healthLine+" • "+time(sync.optString("lastOk")),12,0xffc7d7e2));hero.setContentDescription((online?"Tally connected. ":"Saved mode. ")+company+". "+healthLine+". Opens sync status.");page.addView(hero);gap(page,18);
 
-  TextView dailyTitle=text("DAILY WORK",11,MUTED);dailyTitle.setTypeface(null,Typeface.BOLD);dailyTitle.setLetterSpacing(.10f);page.addView(dailyTitle);gap(page,8);
-  quick(page,"Home","Today's work","Pending orders, dispatch, sales and anything needing attention",()->startActivity(new Intent(this,WorkActivity.class)));
-  quick(page,"Orders","New order","Fast order entry • works offline",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_QUICK)));
-  quick(page,"bill","Scan purchase bill","Photo or PDF → read by InvoiceTotally → review on PC",()->startActivity(new Intent(this,BillScanActivity.class)));
-  quick(page,"search","Search everything","Customers, invoices, orders, items, LR/RR, GSTIN and mobile",()->startActivity(new Intent(this,UniversalSearchActivity.class)));
-  quick(page,"Tools","Voice order","Speak an order, review it, then save",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_VOICE)));
+  label(page,"QUICK ACTIONS");
+  LinearLayout first=tileRow(page);
+  tile(first,"plus","New order",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_QUICK)));
+  tile(first,"mic","Voice order",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_VOICE)));
+  tile(first,"bill","Scan bill",()->startActivity(new Intent(this,BillScanActivity.class)));
+  LinearLayout second=tileRow(page);
+  tile(second,"search","Search",()->startActivity(new Intent(this,UniversalSearchActivity.class)));
+  tile(second,"Proforma","Proforma",()->open(this::proforma));
+  tile(second,"work","Today's work",()->startActivity(new Intent(this,WorkActivity.class)));
+  gap(page,8);
 
-  gap(page,10);TextView moneyTitle=text("MONEY OVERVIEW",11,MUTED);moneyTitle.setTypeface(null,Typeface.BOLD);moneyTitle.setLetterSpacing(.10f);page.addView(moneyTitle);gap(page,8);
-  metric(page,"Receivable",amountOrMissing(sm,"receivable"),time(sm.optString("rFetchedAt")),"receive",true,()->open(()->outstanding("receivable")));
-  metric(page,"Payable",amountOrMissing(sm,"payable"),time(sm.optString("pFetchedAt")),"pay",false,()->open(()->outstanding("payable")));
-  metric(page,"Sales this month",amountOrMissing(sm,"sales"),time(sm.optString("sFetchedAt")),"Reports",false,()->open(()->register("sales")));
+  label(page,"MONEY");
+  metric(page,"Customers owe you",amountOrMissing(sm,"receivable"),time(sm.optString("rFetchedAt")),"receive",true,()->open(()->outstanding("receivable")));
+  LinearLayout pair=new LinearLayout(this);pair.setBaselineAligned(false);
+  half(pair,"You owe suppliers",amountOrMissing(sm,"payable"),"pay",()->open(()->outstanding("payable")));
+  half(pair,"Sales this month",amountOrMissing(sm,"sales"),"Reports",()->open(()->register("sales")));
+  LinearLayout.LayoutParams pairLP=new LinearLayout.LayoutParams(-1,-2);pairLP.bottomMargin=dp(14);page.addView(pair,pairLP);
 
-  gap(page,8);TextView reportTitle=text("KEY REPORTS",11,MUTED);reportTitle.setTypeface(null,Typeface.BOLD);reportTitle.setLetterSpacing(.10f);page.addView(reportTitle);gap(page,8);
-  quick(page,"Reports","Sales register","Month-wise posted invoices with verified totals",()->open(()->register("sales")));
-  quick(page,"Due","Bills receivable","Customers with pending balances",()->open(()->outstanding("receivable")));
-  quick(page,"share","Today's dispatch","Open and share today's invoices",()->open(this::dispatch));
-  quick(page,"next","All reports","Sales, purchases, ledgers, outstanding and activity",()->rootTab("Reports"));
+  JSONArray fav=favouriteArray();
+  if(fav.length()>0){label(page,"YOUR PARTIES");int shown=Math.min(4,fav.length());for(int i=0;i<shown;i++){String party=fav.optString(i);quick(page,"star",party,"Outstanding, statement and invoices",()->open(()->ledger(party)));}if(fav.length()>shown)quick(page,"Parties","All favourite parties",fav.length()+" saved on this phone",()->open(this::favourites));gap(page,4);}
 
-  JSONObject update=object(boot,"update");if(update.optBoolean("available")){gap(page,8);quick(page,"refresh","Update available","TallyBridge "+update.optString("latest")+" • review signed release",()->rootTab("System"));}
-  String error=sync.optString("lastError");if(!error.isEmpty()){gap(page,8);LinearLayout warn=column();warn.setPadding(dp(14),dp(12),dp(14),dp(12));warn.setBackground(surface(dark?0xff3a3022:0xfffff7e6,14));TextView wt=text("Sync needs attention",13,dark?0xffffd28a:0xff8a5a00);wt.setTypeface(null,Typeface.BOLD);warn.addView(wt);warn.addView(text(error,12,MUTED));warn.setOnClickListener(v->rootTab("System"));page.addView(warn);}
+  int waiting=new BillOutbox(this).waiting();
+  if(waiting>0)quick(page,"bill",waiting==1?"1 purchase bill waiting":waiting+" purchase bills waiting","Sends by itself when the PC is connected • tap to see",()->startActivity(new Intent(this,BillScanActivity.class)));
+  JSONObject update=object(boot,"update");if(update.optBoolean("available"))quick(page,"refresh","Update available","TallyBridge "+update.optString("latest")+" • review signed release",()->open(this::updateCheck));
+  String error=sync.optString("lastError");if(!error.isEmpty()){LinearLayout warn=column();warn.setPadding(dp(14),dp(12),dp(14),dp(12));warn.setBackground(surface(dark?0xff3a3022:0xfffff7e6,14));warn.setFocusable(true);TextView wt=text("Sync needs attention",13,dark?0xffffd28a:0xff8a5a00);wt.setTypeface(null,Typeface.BOLD);warn.addView(wt);warn.addView(text(error,12,MUTED));warn.setOnClickListener(v->open(this::syncStatus));page.addView(warn);}
   ((ScrollView)page.getParent()).post(()->((ScrollView)page.getParent()).scrollTo(0,scrollY));
+ }
+ private void label(LinearLayout page,String value){TextView t=text(value,11,MUTED);t.setTypeface(null,Typeface.BOLD);t.setLetterSpacing(.10f);page.addView(t);gap(page,8);}
+ private LinearLayout tileRow(LinearLayout page){LinearLayout row=new LinearLayout(this);row.setBaselineAligned(false);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);page.addView(row,lp);return row;}
+ /** A large square action button: icon on top, short label below. */
+ private void tile(LinearLayout row,String icon,String title,Runnable action){
+  LinearLayout t=column();t.setGravity(Gravity.CENTER);t.setPadding(dp(6),dp(14),dp(6),dp(12));t.setBackground(touch(SURFACE,18));t.setFocusable(true);t.setClickable(true);t.setContentDescription(title);t.setOnClickListener(v->action.run());t.setMinimumHeight(dp(100));
+  android.widget.FrameLayout badge=new android.widget.FrameLayout(this);badge.setBackground(shape(TINT,14));badge.addView(new UiIcon(this,icon,TEAL),new android.widget.FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER));t.addView(badge,new LinearLayout.LayoutParams(dp(46),dp(46)));
+  TextView v=text(title,13,NAVY);v.setGravity(Gravity.CENTER);v.setTypeface(null,Typeface.BOLD);v.setMaxLines(2);v.setPadding(0,dp(8),0,0);t.addView(v,new LinearLayout.LayoutParams(-1,-2));
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);lp.leftMargin=row.getChildCount()==0?0:dp(10);row.addView(t,lp);
+ }
+ /** Half-width money card used in pairs on Home. */
+ private void half(LinearLayout row,String title,String amount,String icon,Runnable action){
+  LinearLayout card=column();card.setPadding(dp(16),dp(14),dp(16),dp(14));card.setBackground(touch(SURFACE,18));card.setFocusable(true);card.setOnClickListener(v->action.run());card.setContentDescription(title+" "+amount);
+  LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);top.addView(new UiIcon(this,icon,TEAL),new LinearLayout.LayoutParams(dp(18),dp(18)));TextView l=text(title,12,MUTED);l.setPadding(dp(8),0,0,0);l.setMaxLines(2);top.addView(l,new LinearLayout.LayoutParams(0,-2,1));card.addView(top);
+  TextView v=text(amount,20,NAVY);v.setMaxLines(1);v.setPadding(0,0,0,0);v.setAutoSizeTextTypeUniformWithConfiguration(11,20,1,android.util.TypedValue.COMPLEX_UNIT_SP);v.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));LinearLayout.LayoutParams vlp=new LinearLayout.LayoutParams(-1,dp(28));vlp.topMargin=dp(10);card.addView(v,vlp);
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);lp.leftMargin=row.getChildCount()==0?0:dp(10);row.addView(card,lp);
  }
  private void metric(LinearLayout page,String title,String amount,String updated,String icon,boolean primary,Runnable action){
   LinearLayout card=column();card.setPadding(dp(20),dp(18),dp(20),dp(18));card.setBackground(touch(primary?0xff102d44:SURFACE,20));card.setFocusable(true);card.setOnClickListener(v->action.run());int ink=primary?Color.WHITE:NAVY;LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);top.addView(new UiIcon(this,icon,primary?0xff93dbca:TEAL),new LinearLayout.LayoutParams(dp(22),dp(22)));TextView label=text(title,14,primary?0xffd4e2eb:MUTED);label.setPadding(dp(10),0,0,0);top.addView(label,new LinearLayout.LayoutParams(0,-2,1));top.addView(new UiIcon(this,"next",primary?0xffb4cbd8:MUTED),new LinearLayout.LayoutParams(dp(18),dp(18)));card.addView(top);TextView value=text(amount,30,ink);value.setMaxLines(1);value.setAutoSizeTextTypeUniformWithConfiguration(14,30,1,android.util.TypedValue.COMPLEX_UNIT_SP);value.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));value.setPadding(0,dp(12),0,dp(8));card.addView(value);card.addView(text(updated,12,primary?0xffb4cbd8:MUTED));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(12);page.addView(card,lp);
@@ -267,21 +289,36 @@ public final class MainActivity extends Activity {
  private void groupOutstanding(String name){load("Group outstanding",path("group-outstanding","group",name),()->groupOutstanding(name),x->{List<Row> data=withSource(x);JSONArray bills=array(x,"bills"),partial=array(x,"partialLedgers");data.add(heading(name,"Parent group • oldest pending bill first"));data.add(row("Total pending",x.optInt("count")+" bills",money(x.optDouble("total")),null));if(!x.optString("shareText").isEmpty())data.add(row("Share bill-wise outstanding","Group shown once at top • bill date + invoice + amount + age","",()->reviewMessage("Review group outstanding",x.optString("shareText"))));if(partial.length()>0)data.add(heading("Some bill details unavailable",partial.length()+" ledger(s) could not return bill-wise breakup. Existing bill details are still sorted correctly."));for(int i=0;i<bills.length();i++){JSONObject bill=bills.optJSONObject(i);if(bill==null)continue;String ledger=bill.optString("party","Ledger");int days=bill.optInt("invoiceDays",-1);String detail="Invoice "+bill.optString("billNumber","—")+"\nBill date "+bill.optString("date","Not available")+(days>=0?" • "+days+" days pending":"");data.add(row(ledger,detail,money(bill.optDouble("pendingAmount"))+" "+bill.optString("drCr"),()->open(()->ledgerOutstanding(ledger))));}empty(data,bills.length(),"No bill-wise pending invoices were returned for this group.");rows("Group outstanding",data,true);});}
  private void reports(){List<Row> data=new ArrayList<>();
   data.add(heading("Sales & purchases","Registers, invoices and dispatch"));
-  data.add(row("Sales register","Posted sales invoices only","",()->open(()->register("sales"))));
-  data.add(row("Proforma invoices","Tally Optional sales • separate from Sales Register","",()->open(()->register("proforma"))));
+  data.add(row("Sales register","Posted sales invoices • month by month","",()->open(()->register("sales"))));
   data.add(row("Purchase register","Financial year → active months → voucher","",()->open(()->register("purchase"))));
-  data.add(row("Today's dispatch","Invoices with dispatch information","",()->open(this::dispatch)));
-  data.add(heading("Customers & ledgers","Statements, balances and bill-wise outstanding"));
-  data.add(row("Ledgers","Search all parties and accounts","",()->open(()->ledgers(false))));
-  data.add(row("Ledger groups","Browse balances and bill-wise group outstanding","",()->open(()->ledgers(true))));
-  data.add(row("Customer 360","Invoices, pending bills and recent activity","",()->startActivity(new Intent(this,UniversalSearchActivity.class).putExtra(UniversalSearchActivity.EXTRA_MODE,UniversalSearchActivity.MODE_CUSTOMERS))));
+  data.add(row("Proforma invoices","Tally Optional sales • separate from Sales Register","",()->open(()->register("proforma"))));
+  data.add(row("Today's dispatch","Invoices with dispatch information • share PDFs","",()->open(this::dispatch)));
+  data.add(heading("Outstanding","Bill-wise pending amounts"));
   data.add(row("Bills receivable","Customers who need to pay","",()->open(()->outstanding("receivable"))));
   data.add(row("Bills payable","Amounts we need to pay","",()->open(()->outstanding("payable"))));
   data.add(row("Outstanding ageing","Overdue analysis with saved coverage","",()->open(this::ageing)));
-  data.add(heading("Activity","Useful read-only Tally activity"));
+  data.add(row("Group outstanding","Sundry Debtors, Sundry Creditors and other groups","",()->open(()->ledgers(true))));
+  data.add(heading("Accounts & activity","Read-only Tally reports"));
+  data.add(row("Ledger statement","Pick a ledger, then a period","",()->open(()->ledgers(false))));
   data.add(row("Day Book","Daily voucher activity","",()->open(()->genericReport("Day Book"))));
   local("Reports",this::reports,data,false);
  }
+ /** Customers and suppliers in one place: search, favourites and who owes what. */
+ private void parties(){List<Row> data=new ArrayList<>();JSONObject sm=object(object(boot,"summaries"),company);
+  data.add(row("Search parties","Customers and suppliers • name, GSTIN or mobile","",()->startActivity(new Intent(this,UniversalSearchActivity.class).putExtra(UniversalSearchActivity.EXTRA_MODE,UniversalSearchActivity.MODE_CUSTOMERS))));
+  JSONArray fav=favouriteArray();
+  data.add(heading("Favourites",fav.length()==0?"Open a party and choose Add to favourites to keep it here.":fav.length()+" saved on this phone"));
+  for(int i=0;i<fav.length();i++){String party=fav.optString(i);data.add(row(party,"Outstanding, statement and invoices","",()->open(()->ledger(party))));}
+  data.add(heading("Who owes what","Party-wise, oldest bill first"));
+  data.add(row("Customers who need to pay","Bills receivable",knownAmount(sm,"receivable"),()->open(()->outstanding("receivable"))));
+  data.add(row("Suppliers we need to pay","Bills payable",knownAmount(sm,"payable"),()->open(()->outstanding("payable"))));
+  data.add(row("Overdue ageing","How long bills have been pending","",()->open(this::ageing)));
+  data.add(heading("All accounts","Every ledger in Tally"));
+  data.add(row("All ledgers","Parties, banks, expenses and taxes","",()->open(()->ledgers(false))));
+  data.add(row("Ledger groups","Balances and bill-wise outstanding by group","",()->open(()->ledgers(true))));
+  local("Parties",this::parties,data,false);
+ }
+ private String knownAmount(JSONObject x,String key){return !x.has(key)||x.isNull(key)?"":money(x.optDouble(key));}
  private void payments(){load("Payments",path("health"),this::payments,this::renderPayments);}
  private void renderPayments(JSONObject x){List<Row> data=new ArrayList<>();JSONObject bank=object(x,"bank");
   data.add(heading("Payment setup",x.optBoolean("readyForPayments")?"Ready to collect payments":"Complete bank or UPI details on the PC"));
@@ -379,23 +416,14 @@ public final class MainActivity extends Activity {
  private void dispatch(){load("Today's dispatch",path("today-dispatch"),this::dispatch,x->{List<Row> data=withSource(x);data.add(row("Today's total",x.optInt("count")+" vouchers",money(x.optDouble("total")),null));JSONArray a=array(x,"vouchers");addVouchers(data,a);empty(data,a.length(),"No dispatch vouchers returned for today.");rows("Today's dispatch",data,true);});}
  private void ageing(){load("Outstanding ageing",path("ageing"),this::ageing,x->{List<Row> data=withSource(x);data.add(heading("Saved bill coverage",x.optInt("coveredParties")+" of "+x.optInt("totalParties")+" parties • "+x.optInt("coveragePercent")+"%\nOpen a customer's outstanding report to add bill details. Partial coverage is not the complete receivable total."));data.add(row("Covered outstanding",x.optInt("billCount")+" bills",money(x.optDouble("total")),null));JSONArray a=array(x,"buckets");for(int i=0;i<a.length();i++){JSONObject b=a.optJSONObject(i);if(b!=null)data.add(row(b.optString("label"),b.optInt("bills")+" bills",money(b.optDouble("amount")),null));}rows("Outstanding ageing",data,false);});}
  private void customer(String name){load("Customer 360",path("customer360","ledger",name),()->customer(name),x->{List<Row> data=withSource(x);data.add(row(name,x.optInt("pendingBillCount")+" pending bills",money(x.optDouble("outstanding")),null));data.add(row("Overdue","Saved bill details",money(x.optDouble("overdue")),null));data.add(row("Open outstanding","Refresh bill-wise information","",()->open(()->ledgerOutstanding(name))));data.add(row("Date statement","View activity for a selected period","",()->open(()->dateMenu(name))));JSONObject payment=x.optJSONObject("lastPayment");if(payment!=null)data.add(row("Last payment",payment.optString("date")+" • "+payment.optString("number"),money(payment.optDouble("amount")),()->open(()->invoice(payment))));shareRows(data,x.optString("shareText"),path("customer360-pdf","ledger",name),"Customer-"+name);data.add(heading("Latest invoices",""));addVouchers(data,array(x,"latestInvoices"));data.add(heading("Recent activity",""));addVouchers(data,array(x,"recentActivity"));rows("Customer 360",data,false);});}
- private void tools(){List<Row> data=new ArrayList<>();
-  data.add(heading("Create","Fast everyday business actions"));
-  data.add(row("New order","Offline-first order entry","",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_QUICK))));
-  data.add(row("Voice order","Speak an order, review it, then save","",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_VOICE))));
-  data.add(row("Scan purchase bill","Photo or PDF of a supplier bill → InvoiceTotally → Tally","",()->startActivity(new Intent(this,BillScanActivity.class))));
-  data.add(row("Purchase bills sent","Status of bills sent from this phone","",()->startActivity(new Intent(this,BillScanActivity.class))));
-  data.add(row("Proforma invoice","Create, preview and share a proforma","",()->rootTab("Proforma")));
-  data.add(row("GSM calculator","Towel GSM from length, breadth and weight • offline","",()->startActivity(new Intent(this,GsmCalculatorActivity.class))));
-  data.add(heading("Find & reuse","Search and customer shortcuts"));
-  data.add(row("Universal search","Customers, invoices, orders, items, LR/RR, GSTIN and mobile","",()->startActivity(new Intent(this,UniversalSearchActivity.class))));
-  data.add(row("Customer 360","Search a customer and open the relationship view","",()->startActivity(new Intent(this,UniversalSearchActivity.class).putExtra(UniversalSearchActivity.EXTRA_MODE,UniversalSearchActivity.MODE_CUSTOMERS))));
-  data.add(row("Favourite customers","Frequently used ledgers for this company","",()->open(this::favourites)));
-  data.add(row("Today's work","Pending orders, dispatch, sales and alerts","",()->startActivity(new Intent(this,WorkActivity.class))));
-  local("Tools",this::tools,data,false);
- }
-
- private void system(){List<Row> data=new ArrayList<>();
+ /** Everything that is not a daily screen: tools, business setup, sync, preferences and security. */
+ private void more(){List<Row> data=new ArrayList<>();
+  data.add(heading("Create & send","Everyday actions"));
+  data.add(row("Proforma invoice","Create, preview and share a proforma","",()->open(this::proforma)));
+  data.add(row("Purchase bills","Scan or send a supplier bill • see bills sent from this phone","",()->startActivity(new Intent(this,BillScanActivity.class))));
+  data.add(row("Payments & QR","Bank details and UPI payment QR","",()->open(this::payments)));
+  data.add(row("GSM calculator","Towel GSM from length, breadth and weight • works offline","",()->startActivity(new Intent(this,GsmCalculatorActivity.class))));
+  data.add(row("Home-screen widgets","Order desk, quick actions and one-tap shortcuts","",()->open(this::widgetsScreen)));
   data.add(heading("Business setup","Company identity and payment readiness"));
   data.add(row("Company health","GST, address, mobile, bank, UPI and sync readiness","",()->open(this::healthScreen)));
   data.add(row("Payment settings",object(boot,"pdfBanks").optString(company.trim().toLowerCase(Locale.ROOT),"Not selected")+" • change bank/UPI on Windows","",()->open(this::payments)));
@@ -411,10 +439,26 @@ public final class MainActivity extends Activity {
   data.add(row("Lock app","Require fingerprint or phone screen lock on the next open","",()->{AppSession.lock();unlocked=false;showLock();}));
   data.add(row("Renew Google sign-in","Keeps your approved phone key","",this::connectScreen));
   data.add(row("Reset phone pairing","Requires new desktop approval","",this::reset));
-  data.add(heading("TallyBridge "+appVersion(),"Read-only Tally access • orders and settings remain local/synced safely."));
-  local("System",this::system,data,false);
+  data.add(heading("TallyBridge "+appVersion(),"Reports are read-only. Bills and bank entries reach Tally only after you approve them on the PC."));
+  local("More",this::more,data,false);
  }
- private void more(){system();}
+ /** Lists every home-screen widget; on supported launchers one tap places it. */
+ private void widgetsScreen(){List<Row> data=new ArrayList<>();
+  android.appwidget.AppWidgetManager manager=android.appwidget.AppWidgetManager.getInstance(this);boolean canPin=manager!=null&&manager.isRequestPinAppWidgetSupported();
+  data.add(heading("Home-screen widgets",canPin?"Tap a widget to place it on your home screen.":"Long-press an empty spot on your home screen → Widgets → TallyBridge."));
+  widgetRow(data,canPin,OrdersWidget.class,"Order desk","Pending orders with party, items and time • add or refresh in one tap • resizable");
+  widgetRow(data,canPin,QuickDockWidget.class,"Quick actions bar","New order, voice order, scan bill, search, proforma and GSM in one row");
+  widgetRow(data,canPin,QuickOrderWidget.class,"New order","1×1 • opens fast order entry");
+  widgetRow(data,canPin,VoiceOrderWidget.class,"Voice order","1×1 • speak an order, review, save");
+  widgetRow(data,canPin,BillScanWidget.class,"Scan bill","1×1 • opens the camera for a supplier bill");
+  widgetRow(data,canPin,SearchWidget.class,"Search","1×1 • customers, invoices, orders and items");
+  widgetRow(data,canPin,ProformaWidget.class,"Proforma","1×1 • start a proforma invoice");
+  widgetRow(data,canPin,GsmWidget.class,"GSM calculator","1×1 • towel GSM, works offline");
+  data.add(heading("App shortcuts","Long-press the TallyBridge app icon for New order, Voice order, Scan bill and Search."));
+  local("Widgets",this::widgetsScreen,data,false);
+ }
+ private void widgetRow(List<Row> data,boolean canPin,Class<?> provider,String title,String detail){data.add(row(title,detail,"",canPin?()->pinWidget(provider):null));}
+ private void pinWidget(Class<?> provider){try{android.appwidget.AppWidgetManager m=android.appwidget.AppWidgetManager.getInstance(this);if(m==null||!m.requestPinAppWidget(new ComponentName(this,provider),null,null))toast("Long-press your home screen → Widgets → TallyBridge");}catch(Exception e){toast("Long-press your home screen → Widgets → TallyBridge");}}
  private void syncNow(){int epoch=generation;progress.setVisibility(View.VISIBLE);String selected=company;work.execute(()->{try{JSONObject result=api.call("/api/v1/mobile/sync","POST",new JSONObject().put("company",selected).put("reason","android").toString());main.post(()->{if(active(epoch)){progress.setVisibility(View.GONE);JSONObject state=result.optJSONObject("autoSync");if(state!=null)try{boot.put("autoSync",state);}catch(Exception ignored){}toast(result.optBoolean("started")?"Sync started":"Sync is already running");if(syncScreenActive)syncStatus();main.postDelayed(this::refreshBridgeStatus,1200);main.postDelayed(this::refreshBridgeStatus,4500);}});}catch(Exception e){main.post(()->{if(active(epoch)){progress.setVisibility(View.GONE);toast(bridgeMessage(e));}});}});}
  private void probe(){int epoch=generation;progress.setVisibility(View.VISIBLE);work.execute(()->{try{api.call("/api/v1/mobile/probe","POST","{}");main.post(()->{if(active(epoch)){progress.setVisibility(View.GONE);toast("Tally connection confirmed");refreshBridgeStatus();}});}catch(Exception e){main.post(()->{if(active(epoch)){progress.setVisibility(View.GONE);toast(bridgeMessage(e));}});}});}
  private void refreshBridgeStatus(){if(destroyed||!unlocked||store.get("device").isEmpty())return;work.execute(()->{try{JSONObject data=api.get("/api/v1/mobile/status");main.post(()->{if(destroyed||!unlocked)return;boot=data;updateStatus();if(syncScreenActive)syncStatus();});}catch(Exception ignored){}});}

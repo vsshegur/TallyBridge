@@ -21,6 +21,7 @@ public class DesignTest {
  @Rule public ActivityTestRule<MainActivity> rule=new ActivityTestRule<>(MainActivity.class);
  private void call(String name)throws Exception {Method m=MainActivity.class.getDeclaredMethod(name);m.setAccessible(true);m.invoke(rule.getActivity());}
  private void field(String name,Object value)throws Exception {Field f=MainActivity.class.getDeclaredField(name);f.setAccessible(true);f.set(rule.getActivity(),value);}
+ private static boolean hasText(android.view.View v,String text){if(v instanceof TextView&&text.contentEquals(((TextView)v).getText()))return true;if(v instanceof android.view.ViewGroup){android.view.ViewGroup g=(android.view.ViewGroup)v;for(int i=0;i<g.getChildCount();i++)if(hasText(g.getChildAt(i),text))return true;}return false;}
  private void ui(Runnable r){InstrumentationRegistry.getInstrumentation().runOnMainSync(r);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
  private java.util.List<android.view.accessibility.AccessibilityNodeInfo> cancelNodes(android.app.UiAutomation automation){
   android.view.accessibility.AccessibilityNodeInfo root=automation.getRootInActiveWindow();
@@ -62,10 +63,20 @@ public class DesignTest {
    field("company","Vijayalaxmi Textiles • Solapur");
    JSONObject summary=new JSONObject().put("receivable",12345678.50).put("payable",245800.00).put("sales",1834500.75).put("rFetchedAt","2026-09-26T04:00:00Z").put("pFetchedAt","2026-09-26T04:00:00Z").put("sFetchedAt","2026-09-26T04:00:00Z");
    field("boot",new JSONObject().put("tallyOnline",true).put("autoSync",new JSONObject().put("lastOk","2026-09-27T08:00:00Z").put("lastError","Previous report warning")).put("lastSuccess","2026-09-27T08:00:00Z").put("lastUpdated","2026-09-27T08:02:00Z").put("summaries",new JSONObject().put("Vijayalaxmi Textiles • Solapur",summary)));
+   Field st=MainActivity.class.getDeclaredField("store");st.setAccessible(true);((CryptoStore)st.get(rule.getActivity())).put("favourites:Vijayalaxmi Textiles • Solapur","[\"ABC Textiles & Trading Company\",\"Raj Fabrics\"]");
    call("renderHome");
+   android.view.View root=rule.getActivity().getWindow().getDecorView();
+   for(String section:SectionNav.LABELS)assertTrue("bottom bar shows "+section,hasText(root,section));
+   assertTrue(hasText(root,"Scan bill"));assertTrue(hasText(root,"YOUR PARTIES"));
    Field status=MainActivity.class.getDeclaredField("statusView");status.setAccessible(true);TextView statusText=(TextView)status.get(rule.getActivity());assertNotNull(statusText);assertTrue(statusText.getText().toString().startsWith("Connected"));assertFalse(statusText.getText().toString().contains("needs attention"));
   }catch(Exception e){throw new RuntimeException(e);}});
   capture("02-overview");
+  ui(()->{try{field("tab","Parties");call("parties");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("39-parties");
+  ui(()->assertTrue("favourite party listed",hasText(rule.getActivity().getWindow().getDecorView(),"Raj Fabrics")));
+  ui(()->{try{field("tab","More");call("widgetsScreen");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("40-widgets");
+  ui(()->assertTrue("widget list shown",hasText(rule.getActivity().getWindow().getDecorView(),"Order desk")));
   ui(()->{try{field("tab","Reports");call("reports");}catch(Exception e){throw new RuntimeException(e);}});
   capture("03-reports");
   ui(()->{try{call("connectScreen");}catch(Exception e){throw new RuntimeException(e);}});
@@ -133,6 +144,7 @@ public class DesignTest {
    rule.getActivity().getSharedPreferences("appearance",0).edit().putString("mode","Light").commit();call("applyAppearance");
    Field f=MainActivity.class.getDeclaredField("dark");f.setAccessible(true);assertFalse(f.getBoolean(rule.getActivity()));
    rule.getActivity().getSharedPreferences("appearance",0).edit().putString("mode","System").commit();call("applyAppearance");
+   Field st=MainActivity.class.getDeclaredField("store");st.setAccessible(true);((CryptoStore)st.get(rule.getActivity())).put("favourites:Vijayalaxmi Textiles • Solapur","[]");
    boolean systemDark=(rule.getActivity().getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;
    assertEquals(systemDark,f.getBoolean(rule.getActivity()));
   }catch(Exception e){throw new RuntimeException(e);}});
