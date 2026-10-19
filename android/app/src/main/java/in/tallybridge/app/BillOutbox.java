@@ -112,6 +112,14 @@ final class BillOutbox {
 
  private synchronized void mark(JSONObject m,String state,String error){try{m.put("state",state).put("error",error);save(m);}catch(Exception ignored){}}
 
+ private static final java.util.concurrent.atomic.AtomicBoolean flushing=new java.util.concurrent.atomic.AtomicBoolean(false);
+ /** Sends waiting bills in the background (called when the app connects to the PC). */
+ static void flushInBackground(Context c,BridgeApi api){
+  BillOutbox box=new BillOutbox(c.getApplicationContext());
+  if(box.waiting()==0||!flushing.compareAndSet(false,true))return;
+  new Thread(()->{try{box.flush(api);}catch(Exception ignored){}finally{flushing.set(false);}},"bill-outbox").start();
+ }
+
  /** Sends every waiting bill; returns how many are still on the phone. */
  int flush(BridgeApi api){for(JSONObject m:list())send(api,m.optString("id"),null);return list().size();}
 }

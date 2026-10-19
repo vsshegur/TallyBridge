@@ -1,6 +1,8 @@
-# TallyBridge 2.0.2 native design preview
+# TallyBridge
 
-Upgrading? Read [2.0.2 installation and design changes](docs/UPDATE_2_0_2.md).
+**New in 2.6.0:** send purchase bills from the phone to [InvoiceTotally](https://github.com/vsshegur/invoicetotally) and post the reviewed bills to Tally from this PC — see [2.6.0 purchase bills](docs/UPDATE_2_6_0.md).
+
+Upgrading from 2.0.x? Read [2.0.2 installation and design changes](docs/UPDATE_2_0_2.md).
 
 Start with [the no-card setup guide](docs/NO_CARD_SETUP.md). This version uses
 Cloudflare Tunnel plus direct native Google sign-in. Cloudflare Access, its team
@@ -13,8 +15,12 @@ name and its payment-card signup are not required.
 - Native Java Android app, Android 9+, using platform Views, AndroidX Credential
   Manager, Google sign-in, Android Keystore, screen-lock authentication, native
   PDF rendering and sharing. Accounting screens do not use a WebView.
-- Read-only Go Tally bridge with local desktop setup on 8765 and an isolated
-  Android listener on 8766.
+- Go Tally bridge with local desktop setup on 8765 and an isolated
+  Android listener on 8766. Everything the phone can do is read-only.
+- Optional InvoiceTotally connection (Purchase bills): bills photographed on the
+  phone are read by InvoiceTotally and, once reviewed there, posted to Tally by
+  this PC. Posting is off until switched on and accepts only new vouchers and
+  masters for the expected company.
 - Saved default PDF bank per company, reports and existing PDF engines.
 - Windows installer and Android preview APK built by GitHub Actions.
 
