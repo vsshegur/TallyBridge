@@ -401,32 +401,39 @@ func (c *ITConnector) tallyStatusAt(fresh bool) itTally {
 		}
 		return out
 	}
-	var st itTally
-	if _, _, pending := c.s.tally.Pending(); pending || (!fresh && live.TallyOnline && time.Since(live.LastSuccess) < 20*time.Second) {
-		st = itTally{Status: "ok", Detail: "Connected", Companies: names(live.Companies)}
-		if live.GateState == "BUSY" {
-			st.Detail = "Connected — busy"
-		}
-		if !live.TallyOnline && live.LastSuccess.IsZero() {
-			st = c.tally // cooldown before any success: keep what we knew
-		}
-	} else if lv, err := c.s.probeLive(); err == nil {
-		c.mu.Lock()
-		c.fails = 0
-		c.mu.Unlock()
-		st = itTally{Status: "ok", Detail: "Connected", Companies: names(lv.Companies)}
-	} else if errors.Is(err, ErrBusy) || errors.Is(err, ErrCooldown) {
-		st = c.tally
-	} else {
+	failed := func() itTally {
 		c.mu.Lock()
 		c.fails++
-		fails := c.fails
-		prev := c.tally
+		fails, prev := c.fails, c.tally
 		c.mu.Unlock()
 		if fails < 2 && prev.Status == "ok" {
-			st = prev
+			return prev
+		}
+		return itTally{Status: "down", Detail: "TallyPrime is not running, or its connectivity port (9000) is off", Companies: []string{}}
+	}
+	var st itTally
+	reason, _, pending := c.s.tally.Pending()
+	switch {
+	case pending && reason == "busy":
+		// Another request is talking to Tally right now: don't queue a probe behind it.
+		st = itTally{Status: "ok", Detail: "Connected — busy", Companies: names(live.Companies)}
+		if len(st.Companies) == 0 {
+			st.Companies = c.tally.Companies
+		}
+	case pending && !live.TallyOnline:
+		st = failed() // safety cooldown after a failed request
+	case pending || (!fresh && live.TallyOnline && time.Since(live.LastSuccess) < 20*time.Second):
+		st = itTally{Status: "ok", Detail: "Connected", Companies: names(live.Companies)}
+	default:
+		if lv, err := c.s.probeLive(); err == nil {
+			c.mu.Lock()
+			c.fails = 0
+			c.mu.Unlock()
+			st = itTally{Status: "ok", Detail: "Connected", Companies: names(lv.Companies)}
+		} else if errors.Is(err, ErrBusy) || errors.Is(err, ErrCooldown) {
+			st = c.tally
 		} else {
-			st = itTally{Status: "down", Detail: "TallyPrime is not running, or its connectivity port (9000) is off", Companies: []string{}}
+			st = failed()
 		}
 	}
 	if st.Companies == nil {
