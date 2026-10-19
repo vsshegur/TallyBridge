@@ -1,4 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_proforma_desc"
+    android:previewLayout="@layout/quick_pi_widget"
     android:minWidth="40dp" android:minHeight="40dp"
     android:minResizeWidth="40dp" android:minResizeHeight="40dp"
     android:targetCellWidth="1" android:targetCellHeight="1"

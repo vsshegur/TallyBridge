@@ -1,1 +1,14 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/voice_widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center" android:padding="8dp" android:background="@drawable/quick_order_widget_panel"><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="◉" android:textColor="#7BD8BD" android:textStyle="bold" android:textSize="20sp" android:maxLines="1"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="Voice Order" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="11sp" android:maxLines="1" android:ellipsize="end"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:text="Speak &amp; review" android:textColor="#B9CBD5" android:textSize="7sp" android:maxLines="1" android:ellipsize="end"/></LinearLayout>
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-screen widget: the launcher inflates it without AppCompat, so the framework android:tint is the one that works. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" tools:ignore="UseAppTint"
+    android:id="@+id/voice_widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center" android:padding="6dp"
+    android:background="@drawable/quick_order_widget_panel" android:contentDescription="Voice order">
+    <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/ic_widget_voice"
+        android:tint="#7BD8BD" android:importantForAccessibility="no" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp"
+        android:text="Voice order" android:textColor="#FFFFFF" android:textSize="10.5sp" android:textStyle="bold"
+        android:maxLines="1" android:ellipsize="end" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1dp"
+        android:text="Speak &amp; review" android:textColor="#B9CBD5" android:textSize="7.5sp" android:maxLines="1" android:ellipsize="end" />
+</LinearLayout>

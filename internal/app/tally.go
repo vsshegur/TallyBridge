@@ -771,7 +771,11 @@ func parsePartyBills(b []byte, party string) []BillRow {
 			return false
 		}
 		reportedParty := firstDeep(n, "BILLPARTY", "PARTYLEDGERNAME")
-		if reportedParty != "" && !strings.EqualFold(strings.TrimSpace(reportedParty), strings.TrimSpace(party)) {
+		// party "" reads a whole Bills Receivable / Bills Payable report: every bill names its party.
+		if party == "" && strings.TrimSpace(reportedParty) == "" {
+			return false
+		}
+		if party != "" && reportedParty != "" && !strings.EqualFold(strings.TrimSpace(reportedParty), strings.TrimSpace(party)) {
 			return false
 		}
 		bn := firstDeep(n, "BILLREF", "BILLNAME", "DSPDISPNAME", "VOUCHERNUMBER", "REFERENCE", "NAME")
@@ -795,7 +799,11 @@ func parsePartyBills(b []byte, party string) []BillRow {
 		if dt := parseISOOrZero(firstNonBlank(due, date)); !dt.IsZero() && time.Now().After(dt) {
 			age = int(time.Since(dt).Hours() / 24)
 		}
-		rows = append(rows, BillRow{Party: party, BillNumber: bn, Date: date, DueDate: due, PendingAmount: abs(amt), SignedAmount: amt, DrCr: balanceSide(amt), Ageing: age, OriginalAmount: abs(parseAmount(firstDeep(n, "ORIGINALAMOUNT", "OPENINGAMOUNT", "DSPORIGINALAMT", "BILLOP")))})
+		billParty := party
+		if billParty == "" {
+			billParty = strings.TrimSpace(reportedParty)
+		}
+		rows = append(rows, BillRow{Party: billParty, BillNumber: bn, Date: date, DueDate: due, PendingAmount: abs(amt), SignedAmount: amt, DrCr: balanceSide(amt), Ageing: age, OriginalAmount: abs(parseAmount(firstDeep(n, "ORIGINALAMOUNT", "OPENINGAMOUNT", "DSPORIGINALAMT", "BILLOP")))})
 		return true
 	}
 	walk(root)

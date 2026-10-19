@@ -46,7 +46,7 @@ func TestValidatePostingXMLRejectsEverythingElse(t *testing.T) {
 		"alter":               strings.Replace(v, `ACTION="Create"`, `ACTION="Alter"`, 1),
 		"delete":              strings.Replace(led, `ACTION="Create"`, `ACTION="Delete"`, 1),
 		"no action":           strings.Replace(led, ` ACTION="Create"`, ``, 1),
-		"receipt voucher":     strings.Replace(strings.Replace(v, `VCHTYPE="Purchase"`, `VCHTYPE="Receipt"`, 1), "<VOUCHERTYPENAME>Purchase<", "<VOUCHERTYPENAME>Receipt<", 1),
+		"journal voucher":     strings.Replace(strings.Replace(v, `VCHTYPE="Purchase"`, `VCHTYPE="Journal"`, 1), "<VOUCHERTYPENAME>Purchase<", "<VOUCHERTYPENAME>Journal<", 1),
 		"type mismatch":       strings.Replace(v, "<VOUCHERTYPENAME>Purchase<", "<VOUCHERTYPENAME>Payment<", 1),
 		"no company":          strings.Replace(v, "<SVCURRENTCOMPANY>Shree Ganesh &amp; Sons</SVCURRENTCOMPANY>", "", 1),
 		"tdl injection":       strings.Replace(led, "</STATICVARIABLES>", "</STATICVARIABLES><TDL><TDLMESSAGE/></TDL>", 1),

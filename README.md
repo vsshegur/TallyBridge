@@ -1,6 +1,8 @@
 # TallyBridge
 
-**New in 2.6.0:** send purchase bills from the phone to [InvoiceTotally](https://github.com/vsshegur/invoicetotally) and post the reviewed bills to Tally from this PC — see [2.6.0 purchase bills](docs/UPDATE_2_6_0.md).
+**New in 2.7.0:** match bank statements (any bank, including co-operative banks) with Tally through InvoiceTotally and post Receipts, Payments and Contras after review; a simpler Android app (Home · Parties · Orders · Reports · More) and better widgets — see [2.7.0](docs/UPDATE_2_7_0.md).
+
+**2.6.0:** send purchase bills from the phone to [InvoiceTotally](https://github.com/vsshegur/invoicetotally) and post the reviewed bills to Tally from this PC — see [2.6.0 purchase bills](docs/UPDATE_2_6_0.md).
 
 Upgrading from 2.0.x? Read [2.0.2 installation and design changes](docs/UPDATE_2_0_2.md).
 

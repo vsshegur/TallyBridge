@@ -7,10 +7,14 @@ import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-/** Shared five-section navigation used across the native Android app. */
+/**
+ * Shared five-section navigation used across the native Android app.
+ * Home (today + quick actions) • Parties (customers and suppliers) • Orders •
+ * Reports (registers and outstanding) • More (tools, settings and sync).
+ */
 final class SectionNav {
  private SectionNav(){}
- static final String[] LABELS={"Home","Orders","Reports","Tools","System"};
+ static final String[] LABELS={"Home","Parties","Orders","Reports","More"};
 
  static LinearLayout bar(Activity a,String selected,int surface,int tint,int muted,int teal){
   LinearLayout nav=new LinearLayout(a);
@@ -39,9 +43,9 @@ final class SectionNav {
   }
   String action;
   switch(label){
+   case "Parties": action=MainActivity.ACTION_PARTIES; break;
    case "Reports": action=MainActivity.ACTION_REPORTS; break;
-   case "Tools": action=MainActivity.ACTION_TOOLS; break;
-   case "System": action=MainActivity.ACTION_SYSTEM; break;
+   case "More": case "Tools": case "System": action=MainActivity.ACTION_MORE; break;
    default: action=MainActivity.ACTION_HOME;
   }
   Intent i=new Intent(a,MainActivity.class).setAction(action).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);

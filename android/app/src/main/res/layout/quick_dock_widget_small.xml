@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quick actions bar. QuickDockWidget picks the full or the narrow version from the widget's width. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" tools:ignore="UseAppTint"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal"
+    android:baselineAligned="false" android:padding="5dp" android:background="@drawable/quick_dock_bg">
+    <FrameLayout android:id="@+id/quick_dock_brand" android:layout_width="38dp" android:layout_height="match_parent"
+        android:contentDescription="Open TallyBridge">
+        <ImageView android:layout_width="30dp" android:layout_height="30dp" android:layout_gravity="center"
+            android:src="@drawable/app_icon" android:importantForAccessibility="no"/>
+    </FrameLayout>
+    <LinearLayout android:id="@+id/quick_dock_order" android:layout_width="0dp" android:layout_height="match_parent"
+        android:layout_weight="1" android:layout_marginStart="3dp" android:gravity="center" android:orientation="vertical"
+        android:background="@drawable/quick_dock_action" android:contentDescription="New order">
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_widget_add"
+            android:tint="#7BD8BD" android:importantForAccessibility="no"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp"
+            android:text="Order" android:textColor="#F4F8FA" android:textStyle="bold" android:textSize="8.5sp"
+            android:maxLines="1" android:ellipsize="end"/>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/quick_dock_voice" android:layout_width="0dp" android:layout_height="match_parent"
+        android:layout_weight="1" android:layout_marginStart="3dp" android:gravity="center" android:orientation="vertical"
+        android:background="@drawable/quick_dock_action" android:contentDescription="Voice order">
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_widget_voice"
+            android:tint="#7BD8BD" android:importantForAccessibility="no"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp"
+            android:text="Voice" android:textColor="#F4F8FA" android:textStyle="bold" android:textSize="8.5sp"
+            android:maxLines="1" android:ellipsize="end"/>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/quick_dock_bill" android:layout_width="0dp" android:layout_height="match_parent"
+        android:layout_weight="1" android:layout_marginStart="3dp" android:gravity="center" android:orientation="vertical"
+        android:background="@drawable/quick_dock_action" android:contentDescription="Scan purchase bill">
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_widget_camera"
+            android:tint="#7BD8BD" android:importantForAccessibility="no"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp"
+            android:text="Bill" android:textColor="#F4F8FA" android:textStyle="bold" android:textSize="8.5sp"
+            android:maxLines="1" android:ellipsize="end"/>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/quick_dock_search" android:layout_width="0dp" android:layout_height="match_parent"
+        android:layout_weight="1" android:layout_marginStart="3dp" android:gravity="center" android:orientation="vertical"
+        android:background="@drawable/quick_dock_action" android:contentDescription="Search everything">
+        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_widget_search"
+            android:tint="#7BD8BD" android:importantForAccessibility="no"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp"
+            android:text="Search" android:textColor="#F4F8FA" android:textStyle="bold" android:textSize="8.5sp"
+            android:maxLines="1" android:ellipsize="end"/>
+    </LinearLayout>
+</LinearLayout>

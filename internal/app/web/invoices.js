@@ -92,7 +92,7 @@
       <div class="card span6"><div class="metric-label">Posting to Tally</div>
         <div class="toolbar" style="margin-top:10px">${data.postingEnabled?pill('ok','ON — reviewed bills are posted'):pill('warn','OFF — nothing is written to Tally')}
         <button class="btn ${data.postingEnabled?'secondary':''}" data-bills="posting" data-on="${data.postingEnabled?0:1}">${data.postingEnabled?'Turn off':'Turn on'}</button></div>
-        <div class="metric-sub" style="line-height:1.5">Only bills you push in InvoiceTotally are posted: Purchase/Sales vouchers and new ledgers, stock items and units — never edits or deletions. The phone stays read-only.</div></div>
+        <div class="metric-sub" style="line-height:1.5">Only what you push in InvoiceTotally is posted: purchase/sales bills, bank statement entries (Receipt, Payment, Contra) and new ledgers, stock items and units — never edits or deletions. The phone stays read-only.</div></div>
       <div class="card span3"><div class="metric-label">Tally</div><div class="metric-value metric-small">${t.status==='ok'?'Connected':t.status==='down'?'Not reachable':'Checking…'}</div><div class="metric-sub">${esc(t.status==='ok'?((t.companies||[]).join(', ')||'No company open'):t.detail||'')}</div></div>
       <div class="card span3"><div class="metric-label">Today</div><div class="metric-value">${posted}</div><div class="metric-sub">posted${failed?` • ${failed} failed`:''}${pending?` • ${pending} waiting`:''}</div></div>
     </div>
@@ -129,7 +129,7 @@
       if(a==='open-web'){if(data?.serverUrl)window.open(data.serverUrl,'_blank','noopener');return}
       if(a==='remove'){const c=(data.connections||[]).find(x=>x.id===b.dataset.id);if(!confirm(`Stop handling “${c?.company||'this company'}” on this PC? Bills already in InvoiceTotally stay there.`))return;await post('/save',{serverUrl:data.serverUrl,remove:[b.dataset.id]});toast('Removed');await load();return}
       if(a==='posting'){const on=b.dataset.on==='1';
-        if(on&&!confirm('Turn on posting?\n\nTallyBridge will post the bills you push in InvoiceTotally into Tally on this PC (Purchase/Sales vouchers, and new ledgers, stock items and units you approved). It never edits or deletes anything, and the phone stays read-only.'))return;
+        if(on&&!confirm('Turn on posting?\n\nTallyBridge will post what you push in InvoiceTotally into Tally on this PC: purchase/sales bills, bank statement entries (Receipt/Payment/Contra), and new ledgers, stock items and units you approved. It never edits or deletes anything, and the phone stays read-only.'))return;
         await busyBtn(b,on?'Turning on':'Turning off',async()=>{data=Object.assign(data,await post('/options',{postingEnabled:on}));paint();toast(on?'Posting is on':'Posting is off')});return}
       if(a==='phone'){await post('/options',{phoneUploads:b.checked});toast(b.checked?'Phones can send bills':'Phones can no longer send bills');await load();return}
       if(a==='retry'){await post('/uploads/retry',{id:b.dataset.id});toast('Sending…');setTimeout(load,800);return}
