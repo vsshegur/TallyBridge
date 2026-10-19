@@ -21,6 +21,7 @@ final class UiIcon extends View {
  case "Reports":line(c,4,3,4,21,21,21);line(c,8,17,8,12);line(c,13,17,13,8);line(c,18,17,18,5);break;
  case "Tools":c.drawCircle(7,17,2.5f,paint);line(c,9,15,18,6);c.drawArc(14,2,22,10,35,220,false,paint);line(c,17,7,21,3);break;
  case "System":c.drawCircle(12,12,4,paint);c.drawCircle(12,12,9,paint);line(c,12,1,12,4);line(c,12,20,12,23);line(c,1,12,4,12);line(c,20,12,23,12);line(c,4,4,6,6);line(c,18,18,20,20);line(c,18,6,20,4);line(c,4,20,6,18);break;
+ case "bill":line(c,6,3,18,3,18,21,15.5f,19.5f,13,21,10.5f,19.5f,8,21,6,19.5f,6,3);line(c,9,8,15,8);line(c,9,12,15,12);line(c,9,16,12,16);break;
  case "Proforma":c.drawRoundRect(5,3,19,21,2,2,paint);line(c,8,8,16,8);line(c,8,12,16,12);line(c,8,16,13,16);break;
  case "Payments":c.drawRoundRect(3,6,21,18,2,2,paint);line(c,3,10,21,10);c.drawCircle(17,14,1.2f,paint);break;
  case "health":c.drawCircle(12,12,9,paint);line(c,8,12,11,15,17,8);break;

@@ -107,7 +107,7 @@ public final class MainActivity extends Activity {
   }else{Intent intent=guard.createConfirmDeviceCredentialIntent("Unlock TallyBridge","Use your phone screen lock");if(intent==null){authenticating=false;toast("Screen lock unavailable");return;}startActivityForResult(intent,701);}
  }
  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==701){authenticating=false;if(result==RESULT_OK){unlocked=true;AppSession.unlock();begin();}else showLock();}else if(request==702&&result==RESULT_OK&&data!=null&&savePDF!=null){Uri target=data.getData();File source=savePDF;work.execute(()->{try(InputStream in=new FileInputStream(source);OutputStream out=getContentResolver().openOutputStream(target)){if(out==null)throw new IOException("Could not open selected file");byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);main.post(()->toast("PDF saved"));}catch(Exception e){main.post(()->toast(e.getMessage()));}});}}
- private void begin(){history.clear();current=null;if(store.get("base").isEmpty()){connectScreen();return;}if(store.get("device").isEmpty()){verifyOwner();return;}base("Connecting",false);int epoch=++generation;progress.setVisibility(View.VISIBLE);work.execute(()->{try{JSONObject s=api.get("/api/v2/native/status");JSONObject b=s.optBoolean("approved")?api.get("/api/v1/mobile/bootstrap"):null;main.post(()->{if(!active(epoch))return;if(b==null){approvalScreen();return;}reconnectNeeded=false;boot=b;selectInitialCompany();handlePendingLaunch();});}catch(Exception e){main.post(()->{if(active(epoch))showFailure(e);});}});}
+ private void begin(){history.clear();current=null;if(store.get("base").isEmpty()){connectScreen();return;}if(store.get("device").isEmpty()){verifyOwner();return;}base("Connecting",false);int epoch=++generation;progress.setVisibility(View.VISIBLE);work.execute(()->{try{JSONObject s=api.get("/api/v2/native/status");JSONObject b=s.optBoolean("approved")?api.get("/api/v1/mobile/bootstrap"):null;main.post(()->{if(!active(epoch))return;if(b==null){approvalScreen();return;}reconnectNeeded=false;boot=b;selectInitialCompany();BillOutbox.flushInBackground(this,api);handlePendingLaunch();});}catch(Exception e){main.post(()->{if(active(epoch))showFailure(e);});}});}
  private void handlePendingLaunch(){String action=pendingLaunchAction;pendingLaunchAction="";
   if(ACTION_NEW_PROFORMA.equals(action)){rootTab("Proforma");return;}
   if(ACTION_SEARCH.equals(action)){rootTab("Tools");startActivity(new Intent(this,UniversalSearchActivity.class));return;}
@@ -191,6 +191,7 @@ public final class MainActivity extends Activity {
   TextView dailyTitle=text("DAILY WORK",11,MUTED);dailyTitle.setTypeface(null,Typeface.BOLD);dailyTitle.setLetterSpacing(.10f);page.addView(dailyTitle);gap(page,8);
   quick(page,"Home","Today's work","Pending orders, dispatch, sales and anything needing attention",()->startActivity(new Intent(this,WorkActivity.class)));
   quick(page,"Orders","New order","Fast order entry • works offline",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_QUICK)));
+  quick(page,"bill","Scan purchase bill","Photo or PDF → read by InvoiceTotally → review on PC",()->startActivity(new Intent(this,BillScanActivity.class)));
   quick(page,"search","Search everything","Customers, invoices, orders, items, LR/RR, GSTIN and mobile",()->startActivity(new Intent(this,UniversalSearchActivity.class)));
   quick(page,"Tools","Voice order","Speak an order, review it, then save",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_VOICE)));
 
@@ -382,6 +383,8 @@ public final class MainActivity extends Activity {
   data.add(heading("Create","Fast everyday business actions"));
   data.add(row("New order","Offline-first order entry","",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_QUICK))));
   data.add(row("Voice order","Speak an order, review it, then save","",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_VOICE))));
+  data.add(row("Scan purchase bill","Photo or PDF of a supplier bill → InvoiceTotally → Tally","",()->startActivity(new Intent(this,BillScanActivity.class))));
+  data.add(row("Purchase bills sent","Status of bills sent from this phone","",()->startActivity(new Intent(this,BillScanActivity.class))));
   data.add(row("Proforma invoice","Create, preview and share a proforma","",()->rootTab("Proforma")));
   data.add(row("GSM calculator","Towel GSM from length, breadth and weight • offline","",()->startActivity(new Intent(this,GsmCalculatorActivity.class))));
   data.add(heading("Find & reuse","Search and customer shortcuts"));

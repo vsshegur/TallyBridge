@@ -38,6 +38,8 @@ type Server struct {
 	updateChecking  bool
 	diagMu          sync.Mutex
 	diagByCompany   map[string]DiagnosticContext
+	it              *ITConnector
+	bills           *BillQueue
 }
 
 func NewServer(base string) (*Server, error) {
@@ -55,6 +57,8 @@ func NewServer(base string) (*Server, error) {
 	}
 	s := &Server{store: st, cache: c, native: n, nonces: map[string]map[string]time.Time{}, diagByCompany: map[string]DiagnosticContext{}}
 	s.tally = NewTallyClient(st)
+	s.it = newITConnector(s, base)
+	s.bills = newBillQueue(s, base)
 	return s, nil
 }
 func (s *Server) Handler() http.Handler {
@@ -1897,6 +1901,10 @@ func (s *Server) Settings() Settings { return s.store.Settings() }
 func OpenDesktop(u string) error     { return openDesktop(u) }
 
 // DesktopHandler is setup only. The legacy web phone and mobile API are not published.
+// Files the desktop admin page loads (see web/admin.html).
+var desktopAssets = map[string]bool{"/assets/admin.js": true, "/assets/styles.css": true, "/assets/favicon.svg": true,
+	"/assets/operations.js": true, "/assets/invoices.js": true}
+
 func (s *Server) DesktopHandler() http.Handler {
 	h := s.Handler()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1904,7 +1912,7 @@ func (s *Server) DesktopHandler() http.Handler {
 			http.Error(w, "Desktop setup is local only", 403)
 			return
 		}
-		if r.URL.Path != "/" && r.URL.Path != "/admin" && !strings.HasPrefix(r.URL.Path, "/api/v1/admin/") && r.URL.Path != "/assets/admin.js" && r.URL.Path != "/assets/styles.css" && r.URL.Path != "/assets/favicon.svg" {
+		if r.URL.Path != "/" && r.URL.Path != "/admin" && !strings.HasPrefix(r.URL.Path, "/api/v1/admin/") && !desktopAssets[r.URL.Path] {
 			http.NotFound(w, r)
 			return
 		}

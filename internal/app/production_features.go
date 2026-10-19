@@ -337,6 +337,7 @@ func (s *Server) handlePaymentQR(w http.ResponseWriter, r *http.Request) {
 
 var backupNames = map[string]bool{
 	"settings.json": true, "phone.json": true, "pdf-banks.json": true, "native-security.json": true,
+	itConfigFile: true, itJournalFile: true,
 }
 
 func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {

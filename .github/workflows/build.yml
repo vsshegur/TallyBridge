@@ -54,6 +54,7 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 14
           name: Proforma-PDF-Verification
           path: ${{ runner.temp }}/proforma-verification/proforma.pdf
           if-no-files-found: error
@@ -62,6 +63,7 @@ jobs:
         run: ./scripts/Build-Windows.ps1
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 14
           name: TallyBridge-Windows-Preview
           path: build/*.exe
           if-no-files-found: error
@@ -94,6 +96,7 @@ jobs:
           grep -q "versionName='$EXPECTED_NAME'" app/build/outputs/apk/debug/APK-VERSION.txt
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 14
           name: TallyBridge-Android-Debug-Tests
           path: |
             android/app/build/outputs/apk/debug/SIGNING-REPORT.txt
@@ -102,6 +105,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          retention-days: 14
           name: Android-Lint-Report
           path: android/app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
@@ -141,6 +145,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          retention-days: 14
           name: Android-Design-Screenshots
           path: android/ui-screenshots/*.png
           if-no-files-found: ignore
