@@ -109,8 +109,9 @@ func (s *Server) verifyGoogleRequest(r *http.Request) (string, error) {
 	if e != nil || absDuration(time.Since(date)) > 2*time.Minute || len(nonce) < 32 || len(nonce) > 128 {
 		return "", errors.New("invalid request time or nonce")
 	}
-	body, e := io.ReadAll(io.LimitReader(r.Body, (2<<20)+1))
-	if e != nil || len(body) > 2<<20 {
+	limit := nativeBodyLimit(r)
+	body, e := io.ReadAll(io.LimitReader(r.Body, limit+1))
+	if e != nil || int64(len(body)) > limit {
 		return "", errors.New("request too large")
 	}
 	r.Body = io.NopCloser(strings.NewReader(string(body)))

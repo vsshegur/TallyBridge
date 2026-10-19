@@ -210,7 +210,7 @@ func (t *TallyClient) request(report, company string, body []byte, timeout time.
 		t.markNetworkFailure(err)
 		return nil, time.Since(start).Milliseconds(), 0, err
 	}
-	clean, n := sanitizeXML(raw)
+	clean, n := sanitizeXML(tallyToUTF8(raw))
 	san = n
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		err = fmt.Errorf("Tally HTTP %s", res.Status)
