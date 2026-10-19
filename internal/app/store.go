@@ -105,8 +105,21 @@ func (s *Store) saveDevicesLocked() error {
 	return atomicWrite(filepath.Join(s.dir, "phone.json"), b, 0600)
 }
 func atomicWrite(path string, b []byte, mode os.FileMode) error {
+	// Flush the data to disk before the rename; otherwise a power cut right
+	// after saving can leave an empty settings or phone-approval file.
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, mode); err != nil {
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	if _, err = f.Write(b); err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		_ = os.Remove(tmp)
 		return err
 	}
 	return os.Rename(tmp, path)

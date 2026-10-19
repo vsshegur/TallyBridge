@@ -522,8 +522,9 @@ func (s *Server) verifyNativeRequest(r *http.Request, requireApproval bool) (Nat
 	if len(nonce) < 32 || len(nonce) > 128 {
 		return d, errors.New("invalid nonce")
 	}
-	body, e := io.ReadAll(io.LimitReader(r.Body, (2<<20)+1))
-	if e != nil || len(body) > 2<<20 {
+	limit := nativeBodyLimit(r)
+	body, e := io.ReadAll(io.LimitReader(r.Body, limit+1))
+	if e != nil || int64(len(body)) > limit {
 		return d, errors.New("request too large")
 	}
 	r.Body = io.NopCloser(strings.NewReader(string(body)))
@@ -553,4 +554,14 @@ func (s *Server) verifyNativeRequest(r *http.Request, requireApproval bool) (Nat
 		}
 	}
 	return d, nil
+}
+
+// nativeBodyLimit is the largest signed body accepted for a phone request.
+// Photo orders carry a base64 JPEG (the phone allows up to 3 MB before
+// encoding), so that one route gets the same ceiling its handler enforces.
+func nativeBodyLimit(r *http.Request) int64 {
+	if r.URL.Path == "/api/v1/mobile/orders/photo" {
+		return maxPhotoJSONBody
+	}
+	return 2 << 20
 }
