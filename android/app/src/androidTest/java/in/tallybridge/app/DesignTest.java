@@ -71,6 +71,8 @@ public class DesignTest {
    Field status=MainActivity.class.getDeclaredField("statusView");status.setAccessible(true);TextView statusText=(TextView)status.get(rule.getActivity());assertNotNull(statusText);assertTrue(statusText.getText().toString().startsWith("Connected"));assertFalse(statusText.getText().toString().contains("needs attention"));
   }catch(Exception e){throw new RuntimeException(e);}});
   capture("02-overview");
+  ui(()->{try{Field b=MainActivity.class.getDeclaredField("body");b.setAccessible(true);LinearLayout body=(LinearLayout)b.get(rule.getActivity());((ScrollView)body.getChildAt(0)).fullScroll(android.view.View.FOCUS_DOWN);}catch(Exception e){throw new RuntimeException(e);}});
+  capture("41-overview-bottom");
   ui(()->{try{field("tab","Parties");call("parties");}catch(Exception e){throw new RuntimeException(e);}});
   capture("39-parties");
   ui(()->assertTrue("favourite party listed",hasText(rule.getActivity().getWindow().getDecorView(),"Raj Fabrics")));
