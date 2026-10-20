@@ -40,10 +40,35 @@ jobs:
             echo "SIGNED=false" >> "$GITHUB_ENV"
             echo "::warning::Signing secrets are not set, so this APK is unsigned. Add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD under Settings → Secrets and variables → Actions."
           fi
+      - name: Check the signing key (when configured)
+        if: env.SIGNED == 'true'
+        run: |
+          # Clear messages for the usual mistakes; prints only public facts (alias names, certificate SHA-1), never secrets.
+          KS="$TB_KEYSTORE"
+          test -s "$KS" || { echo "::error title=Signing key::ANDROID_KEYSTORE_BASE64 decoded to an empty file"; exit 1; }
+          echo "::notice title=Signing key::keystore file is $(stat -c %s "$KS") bytes ($(file -b "$KS" | cut -c1-60))"
+          if ! keytool -list -keystore "$KS" -storepass "$TB_STORE_PASSWORD" > "$RUNNER_TEMP/ks.txt" 2>&1; then
+            echo "::error title=Signing key::keytool cannot open the keystore: $(grep -m1 -iE 'exception|error|password' "$RUNNER_TEMP/ks.txt" | cut -c1-200). Check ANDROID_KEYSTORE_PASSWORD, and that ANDROID_KEYSTORE_BASE64 is the whole .jks file in base64."
+            exit 1
+          fi
+          ALIASES=$(grep -E 'PrivateKeyEntry' "$RUNNER_TEMP/ks.txt" | cut -d, -f1 | paste -sd ' ' -)
+          echo "::notice title=Signing key::aliases in the keystore: ${ALIASES:-none}"
+          if ! keytool -list -v -keystore "$KS" -storepass "$TB_STORE_PASSWORD" -alias "$TB_KEY_ALIAS" > "$RUNNER_TEMP/alias.txt" 2>&1; then
+            echo "::error title=Signing key::alias in ANDROID_KEY_ALIAS was not found. Aliases in the keystore: ${ALIASES:-none}"
+            exit 1
+          fi
+          SHA1=$(sed -nE 's/^\s*SHA1: ([0-9A-F:]+).*/\1/p' "$RUNNER_TEMP/alias.txt" | head -1 | tr -d ':' | tr 'A-F' 'a-f')
+          echo "::notice title=Signing key::certificate SHA-1 $SHA1"
+          if [ "$SHA1" != "$TB_EXPECTED_SHA1" ]; then echo "::error title=Signing key::this keystore's certificate ($SHA1) is not the permanent TallyBridge key ($TB_EXPECTED_SHA1)"; exit 1; fi
+          rm -f "$RUNNER_TEMP/ks.txt" "$RUNNER_TEMP/alias.txt"
       - name: Build and lint R8 optimized release
         working-directory: android
         run: |
-          gradle --no-daemon test assembleRelease lintRelease
+          set -o pipefail
+          if ! gradle --no-daemon test assembleRelease lintRelease 2>&1 | tee "$RUNNER_TEMP/gradle.txt"; then
+            grep -A4 "What went wrong" "$RUNNER_TEMP/gradle.txt" | grep -v "^--$" | head -6 | while IFS= read -r l; do echo "::error title=Gradle::$l"; done
+            exit 1
+          fi
           OUT=app/build/outputs/apk/release
           if [ "$SIGNED" = true ]; then APK=$OUT/app-release.apk; else APK=$OUT/app-release-unsigned.apk; fi
           test -s "$APK"
