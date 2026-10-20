@@ -26,15 +26,6 @@
             android:text="Voice" android:textColor="#F4F8FA" android:textStyle="bold" android:textSize="8.5sp"
             android:maxLines="1" android:ellipsize="end"/>
     </LinearLayout>
-    <LinearLayout android:id="@+id/quick_dock_bill" android:layout_width="0dp" android:layout_height="match_parent"
-        android:layout_weight="1" android:layout_marginStart="3dp" android:gravity="center" android:orientation="vertical"
-        android:background="@drawable/quick_dock_action" android:contentDescription="Scan purchase bill">
-        <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_widget_camera"
-            android:tint="#7BD8BD" android:importantForAccessibility="no"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp"
-            android:text="Bill" android:textColor="#F4F8FA" android:textStyle="bold" android:textSize="8.5sp"
-            android:maxLines="1" android:ellipsize="end"/>
-    </LinearLayout>
     <LinearLayout android:id="@+id/quick_dock_search" android:layout_width="0dp" android:layout_height="match_parent"
         android:layout_weight="1" android:layout_marginStart="3dp" android:gravity="center" android:orientation="vertical"
         android:background="@drawable/quick_dock_action" android:contentDescription="Search everything">

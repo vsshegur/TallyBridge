@@ -563,8 +563,6 @@ func nativeBodyLimit(r *http.Request) int64 {
 	switch r.URL.Path {
 	case "/api/v1/mobile/orders/photo":
 		return maxPhotoJSONBody
-	case "/api/v1/mobile/bills/page":
-		return maxBillPageBody
 	}
 	return 2 << 20
 }

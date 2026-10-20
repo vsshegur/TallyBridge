@@ -131,7 +131,3 @@ svg{display:block}
  .desktop-body .main{overflow:visible}
 }
 /* 2.9 InvoiceTotally sign-in approvals */
-.side-btn .nav-badge{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#e5484d;color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
-.signin-wait{border-color:#3b82f6!important;box-shadow:0 0 0 1px rgba(59,130,246,.25),var(--shadow)}
-.signin-wait .list-row{gap:16px}
-.signin-code{font:800 22px/1 ui-monospace,Consolas,monospace;letter-spacing:.08em;color:var(--ink);background:var(--blue2);border-radius:10px;padding:10px 12px;white-space:nowrap}

@@ -30,7 +30,6 @@ public class ScreensTest {
  @Rule public ActivityTestRule<UniversalSearchActivity> search=new ActivityTestRule<>(UniversalSearchActivity.class,false,false);
  @Rule public ActivityTestRule<Customer360Activity> customer=new ActivityTestRule<>(Customer360Activity.class,false,false);
  @Rule public ActivityTestRule<GsmCalculatorActivity> gsm=new ActivityTestRule<>(GsmCalculatorActivity.class,false,false);
- @Rule public ActivityTestRule<BillScanActivity> bills=new ActivityTestRule<>(BillScanActivity.class,false,false);
 
  private Context ctx(){return InstrumentationRegistry.getInstrumentation().getTargetContext();}
  private void ui(Runnable r){InstrumentationRegistry.getInstrumentation().runOnMainSync(r);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
@@ -114,14 +113,4 @@ public class ScreensTest {
   mode("Dark");showGsm("55-gsm-dark");
  }
 
- private void showBills(String name)throws Exception{
-  BillScanActivity a=bills.launchActivity(new Intent(ctx(),BillScanActivity.class));unsecure(a);
-  Thread.sleep(1500);
-  ui(()->assertTrue(hasText(a.getWindow().getDecorView(),"Scan bill")));
-  capture(a,name);ui(a::finish);Thread.sleep(300);
- }
- @Test public void scanBillLightAndDark()throws Exception{
-  mode("Light");showBills("56-scan-bill");
-  mode("Dark");showBills("57-scan-bill-dark");
- }
 }

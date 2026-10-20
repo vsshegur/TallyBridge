@@ -107,7 +107,7 @@ public final class MainActivity extends Activity {
   }else{Intent intent=guard.createConfirmDeviceCredentialIntent("Unlock TallyBridge","Use your phone screen lock");if(intent==null){authenticating=false;toast("Screen lock unavailable");return;}startActivityForResult(intent,701);}
  }
  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==701){authenticating=false;if(result==RESULT_OK){unlocked=true;AppSession.unlock();begin();}else showLock();}else if(request==702&&result==RESULT_OK&&data!=null&&savePDF!=null){Uri target=data.getData();File source=savePDF;work.execute(()->{try(InputStream in=new FileInputStream(source);OutputStream out=getContentResolver().openOutputStream(target)){if(out==null)throw new IOException("Could not open selected file");byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);main.post(()->toast("PDF saved"));}catch(Exception e){main.post(()->toast(e.getMessage()));}});}}
- private void begin(){history.clear();current=null;if(store.get("base").isEmpty()){connectScreen();return;}if(store.get("device").isEmpty()){verifyOwner();return;}base("Connecting",false);int epoch=++generation;progress.setVisibility(View.VISIBLE);work.execute(()->{try{JSONObject s=api.get("/api/v2/native/status");JSONObject b=s.optBoolean("approved")?api.get("/api/v1/mobile/bootstrap"):null;main.post(()->{if(!active(epoch))return;if(b==null){approvalScreen();return;}reconnectNeeded=false;boot=b;selectInitialCompany();BillOutbox.flushInBackground(this,api);handlePendingLaunch();});}catch(Exception e){main.post(()->{if(active(epoch))showFailure(e);});}});}
+ private void begin(){history.clear();current=null;if(store.get("base").isEmpty()){connectScreen();return;}if(store.get("device").isEmpty()){verifyOwner();return;}base("Connecting",false);int epoch=++generation;progress.setVisibility(View.VISIBLE);work.execute(()->{try{JSONObject s=api.get("/api/v2/native/status");JSONObject b=s.optBoolean("approved")?api.get("/api/v1/mobile/bootstrap"):null;main.post(()->{if(!active(epoch))return;if(b==null){approvalScreen();return;}reconnectNeeded=false;boot=b;selectInitialCompany();handlePendingLaunch();});}catch(Exception e){main.post(()->{if(active(epoch))showFailure(e);});}});}
  private void handlePendingLaunch(){String action=pendingLaunchAction;pendingLaunchAction="";
   if(ACTION_NEW_PROFORMA.equals(action)){rootTab("Proforma");return;}
   if(ACTION_SEARCH.equals(action)){rootTab("Home");startActivity(new Intent(this,UniversalSearchActivity.class));return;}
@@ -188,11 +188,11 @@ public final class MainActivity extends Activity {
   LinearLayout first=tileRow(page);
   tile(first,"plus","New order",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_QUICK)));
   tile(first,"mic","Voice order",()->startActivity(new Intent(this,OrdersActivity.class).setAction(OrdersActivity.ACTION_VOICE)));
-  tile(first,"bill","Scan bill",()->startActivity(new Intent(this,BillScanActivity.class)));
+  tile(first,"search","Search",()->startActivity(new Intent(this,UniversalSearchActivity.class)));
   LinearLayout second=tileRow(page);
-  tile(second,"search","Search",()->startActivity(new Intent(this,UniversalSearchActivity.class)));
   tile(second,"Proforma","Proforma",()->open(this::proforma));
   tile(second,"work","Today's work",()->startActivity(new Intent(this,WorkActivity.class)));
+  tile(second,"calculator","GSM",()->startActivity(new Intent(this,GsmCalculatorActivity.class)));
   gap(page,8);
 
   label(page,"MONEY");
@@ -207,8 +207,6 @@ public final class MainActivity extends Activity {
 
   int score=health.optInt("score",0);
   if(health.length()>0&&!health.optBoolean("ready"))quick(page,"health","Company details "+score+"% complete","Add the missing GST, address, mobile or bank details in Tally",()->open(this::healthScreen));
-  int waiting=new BillOutbox(this).waiting();
-  if(waiting>0)quick(page,"bill",waiting==1?"1 purchase bill waiting":waiting+" purchase bills waiting","Sends by itself when the PC is connected • tap to see",()->startActivity(new Intent(this,BillScanActivity.class)));
   JSONObject update=object(boot,"update");if(update.optBoolean("available"))quick(page,"refresh","Update available","TallyBridge "+update.optString("latest")+" • review signed release",()->open(this::updateCheck));
   String error=sync.optString("lastError");if(!error.isEmpty()){LinearLayout warn=column();warn.setPadding(dp(14),dp(12),dp(14),dp(12));warn.setBackground(surface(dark?0xff3a3022:0xfffff7e6,14));warn.setFocusable(true);TextView wt=text("Sync needs attention",13,AMBER);wt.setTypeface(null,Typeface.BOLD);warn.addView(wt);warn.addView(text(error,12,MUTED));warn.setOnClickListener(v->open(this::syncStatus));page.addView(warn);}
   ((ScrollView)page.getParent()).post(()->((ScrollView)page.getParent()).scrollTo(0,scrollY));
@@ -417,7 +415,6 @@ public final class MainActivity extends Activity {
  private void more(){List<Row> data=new ArrayList<>();
   data.add(heading("Create & send","Everyday actions"));
   data.add(row("Proforma invoice","Create, preview and share a proforma","",()->open(this::proforma)));
-  data.add(row("Purchase bills","Scan or send a supplier bill • see bills sent from this phone","",()->startActivity(new Intent(this,BillScanActivity.class))));
   data.add(row("Payments & QR","Bank details and UPI payment QR","",()->open(this::payments)));
   data.add(row("GSM calculator","Towel GSM from length, breadth and weight • works offline","",()->startActivity(new Intent(this,GsmCalculatorActivity.class))));
   data.add(row("Home-screen widgets","Order desk, quick actions and one-tap shortcuts","",()->open(this::widgetsScreen)));
@@ -436,7 +433,7 @@ public final class MainActivity extends Activity {
   data.add(row("Lock app","Require fingerprint or phone screen lock on the next open","",()->{AppSession.lock();unlocked=false;showLock();}));
   data.add(row("Renew Google sign-in","Keeps your approved phone key","",this::connectScreen));
   data.add(row("Reset phone pairing","Requires new desktop approval","",this::reset));
-  data.add(heading("TallyBridge "+appVersion(),"Reports are read-only. Bills and bank entries reach Tally only after you approve them on the PC."));
+  data.add(heading("TallyBridge "+appVersion(),"Reports are read-only — TallyBridge never writes to Tally."));
   local("More",this::more,data,false);
  }
  /** Lists every home-screen widget; on supported launchers one tap places it. */
@@ -444,10 +441,9 @@ public final class MainActivity extends Activity {
   android.appwidget.AppWidgetManager manager=android.appwidget.AppWidgetManager.getInstance(this);boolean canPin=manager!=null&&manager.isRequestPinAppWidgetSupported();
   data.add(heading("Home-screen widgets",canPin?"Tap a widget to place it on your home screen.":"Long-press an empty spot on your home screen → Widgets → TallyBridge."));
   widgetRow(data,canPin,OrdersWidget.class,"Order desk","Pending orders with party, items and time • add or refresh in one tap • resizable");
-  widgetRow(data,canPin,QuickDockWidget.class,"Quick actions bar","New order, voice order, scan bill, search, proforma and GSM in one row");
+  widgetRow(data,canPin,QuickDockWidget.class,"Quick actions bar","New order, voice order, search, proforma and GSM in one row");
   widgetRow(data,canPin,QuickOrderWidget.class,"New order","1×1 • opens fast order entry");
   widgetRow(data,canPin,VoiceOrderWidget.class,"Voice order","1×1 • speak an order, review, save");
-  widgetRow(data,canPin,BillScanWidget.class,"Scan bill","1×1 • opens the camera for a supplier bill");
   widgetRow(data,canPin,SearchWidget.class,"Search","1×1 • customers, invoices, orders and items");
   widgetRow(data,canPin,ProformaWidget.class,"Proforma","1×1 • start a proforma invoice");
   widgetRow(data,canPin,GsmWidget.class,"GSM calculator","1×1 • towel GSM, works offline");
