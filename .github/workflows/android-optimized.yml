@@ -65,12 +65,14 @@ jobs:
         working-directory: android
         run: |
           set -o pipefail
+          trap 'echo "::error title=Build step::stopped at: $BASH_COMMAND"' ERR
           if ! gradle --no-daemon test assembleRelease lintRelease 2>&1 | tee "$RUNNER_TEMP/gradle.txt"; then
             grep -A4 "What went wrong" "$RUNNER_TEMP/gradle.txt" | grep -v "^--$" | head -6 | while IFS= read -r l; do echo "::error title=Gradle::$l"; done
             exit 1
           fi
           OUT=app/build/outputs/apk/release
           if [ "$SIGNED" = true ]; then APK=$OUT/app-release.apk; else APK=$OUT/app-release-unsigned.apk; fi
+          echo "::notice title=APK output::$(ls $OUT | paste -sd ' ' -)"
           test -s "$APK"
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
           EXPECTED_CODE=$(sed -nE "s/.*versionCode ([0-9]+).*/\1/p" app/build.gradle | head -1)
