@@ -629,7 +629,7 @@ func (s *Server) handleBills(w http.ResponseWriter, r *http.Request) {
 	reason := ""
 	switch {
 	case cfg.ServerURL == "" || len(cfg.Connections) == 0:
-		reason = "Connect InvoiceTotally on the PC first: TallyBridge → Purchase bills."
+		reason = "Connect InvoiceTotally on the PC first: TallyBridge → InvoiceTotally."
 	case cfg.PhoneOff:
 		reason = "Sending bills from the phone is switched off on the PC."
 	}

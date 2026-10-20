@@ -1517,7 +1517,7 @@ func (s *Server) getLedgers(c string, refresh bool) (LedgerIndexData, error) {
 	if refresh {
 		b, d, _, e := s.tally.request("Ledgers", c, ledgerIndexXML(c), 0)
 		if e == nil && len(parseLedgers(b)) == 0 {
-			e = errors.New("ledger response was empty or unrecognized; saved index kept")
+			e = errors.New("Tally sent no ledgers — the last saved list is kept")
 		}
 		if e == nil {
 			xs := parseLedgers(b)
@@ -1559,7 +1559,7 @@ func (s *Server) getOutstanding(c, typ string, refresh bool) (OutstandingData, e
 		}
 		b, d, _, e := s.tally.request(strings.Title(typ)+" party balances", c, partyBalancesXML(c, grp, id), 0)
 		if e == nil && !hasLedgerBalances(b) {
-			e = errors.New("party balance response was empty or unrecognized; saved balances kept")
+			e = errors.New("Tally sent no party balances (no parties under this group yet?) — the last saved figures are kept")
 		}
 		if e == nil {
 			ps := parsePartyBalances(b)
@@ -1621,7 +1621,7 @@ func (s *Server) getVouchers(c, typ, period string, refresh bool) (VoucherData, 
 		if e == nil && len(parseVouchers(b)) == 0 {
 			var previous VoucherData
 			if !recognizedCollection(b) {
-				e = errors.New("unrecognized register response; saved data kept")
+				e = errors.New("Tally's reply for this register could not be read — the last saved data is kept")
 			} else if _, ok := s.cache.Get(kind, c, variant, &previous); ok && previous.Count > 0 {
 				e = errors.New("empty register response requires verification; previous saved register kept")
 			}

@@ -102,7 +102,7 @@ public final class OrdersActivity extends Activity {
   ordersHeaderCount=body.getChildCount();loadOrders();
  }
  private void loadOrders(){
-  try{orderData=offline.list();paintOrders();OrdersWidget.refreshAll(this);int waiting=offline.waitingCount();syncState.setText(waiting>0?waiting+" change(s) saved on phone • checking PC…":"Saved on phone • checking PC…");syncState.setTextColor(waiting>0?AMBER:TEAL);}catch(Exception e){toast("Could not read saved Orders: "+shortError(e));return;}
+  try{orderData=offline.list();paintOrders();OrdersWidget.refreshAll(this);int waiting=offline.waitingCount();syncState.setText(waiting>0?(waiting==1?"1 change":waiting+" changes")+" saved on phone • checking PC…":"Saved on phone • checking PC…");syncState.setTextColor(waiting>0?AMBER:TEAL);}catch(Exception e){toast("Could not read saved Orders: "+shortError(e));return;}
   syncOrdersSilently();
  }
  private void syncOrdersSilently(){
@@ -168,7 +168,7 @@ public final class OrdersActivity extends Activity {
  private void buildForm(JSONObject order){
   frame(order==null?(quickMode?"Quick order":"Add order"):"Edit order",quickMode&&order==null?"Party • items • quantity • dispatch • save. Works offline.":"Offline-ready • saved buyer/item lists from Tally • rate is optional.");itemRows.clear();buyerDetails=order==null?new JSONObject():order.optJSONObject("buyerDetails");if(buyerDetails==null)buyerDetails=new JSONObject();buyerDetailsFor=order==null?"":order.optString("buyer");List<String> names=companyNames();if(names.isEmpty()){body.addView(txt("No saved company is available yet.",16,AMBER));return;}
   TextView offlineNote=txt("Changes save immediately on this phone. PC connection is not required.",12,TEAL);offlineNote.setTypeface(Typeface.DEFAULT_BOLD);body.addView(offlineNote);
-  body.addView(txt("COMPANY",11,MUTED),full(10));Spinner companySpin=new Spinner(this);companySpin.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));String wanted=order==null?store.get("company"):order.optString("company");companySpin.setSelection(Math.max(0,names.indexOf(wanted)));body.addView(companySpin,full(6));
+  body.addView(txt("COMPANY",11,MUTED),full(10));Spinner companySpin=new Spinner(this);ScreenHeader.spinner(companySpin,dark);companySpin.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));String wanted=order==null?store.get("company"):order.optString("company");companySpin.setSelection(Math.max(0,names.indexOf(wanted)));body.addView(companySpin,full(6));
   body.addView(txt("BUYER",11,MUTED),full(14));AutoCompleteTextView buyer=auto("Search saved Tally buyer or type name");if(order!=null)buyer.setText(order.optString("buyer"),false);body.addView(buyer,full(6));TextView buyerInfo=txt(buyerSummary(buyerDetails),12,MUTED);body.addView(buyerInfo);
   LinearLayout itemsBox=col();body.addView(txt("ITEMS",11,MUTED),full(16));body.addView(itemsBox);JSONArray existing=order==null?null:order.optJSONArray("items");if(existing!=null&&existing.length()>0){for(int i=0;i<existing.length();i++)addItemRow(itemsBox,existing.optJSONObject(i));}else addItemRow(itemsBox,null);body.addView(btn("+ Add another item",v->addItemRow(itemsBox,null)),full(8));
   body.addView(txt("DISPATCHED THROUGH",11,MUTED),full(16));EditText dispatchedThrough=input("Transport / courier / person (optional)",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_WORDS);if(order!=null)dispatchedThrough.setText(order.optString("dispatchedThrough"));body.addView(dispatchedThrough,full(6));

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Rounded dialog card that matches the app's light cards. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="16dp" android:insetTop="16dp" android:insetRight="16dp" android:insetBottom="16dp">
+    <shape android:shape="rectangle">
+        <corners android:radius="20dp" />
+        <solid android:color="#FFFFFF" />
+    </shape>
+</inset>

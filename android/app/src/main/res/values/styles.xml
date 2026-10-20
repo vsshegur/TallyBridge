@@ -3,6 +3,7 @@
  <style name="AppThemeLight" parent="android:style/Theme.Material.Light.NoActionBar">
   <item name="android:fontFamily">sans</item>
   <item name="android:colorAccent">#176B5B</item>
+  <item name="android:alertDialogTheme">@style/AppDialogLight</item>
   <item name="android:windowLightStatusBar">true</item>
   <item name="android:statusBarColor">#F5F7FA</item>
   <item name="android:navigationBarColor">#FFFFFF</item>
@@ -13,6 +14,7 @@
  <style name="AppThemeDark" parent="android:style/Theme.Material.NoActionBar">
   <item name="android:fontFamily">sans</item>
   <item name="android:colorAccent">#7BD8BD</item>
+  <item name="android:alertDialogTheme">@style/AppDialogDark</item>
   <item name="android:windowBackground">#101820</item>
   <item name="android:colorBackground">#101820</item>
   <item name="android:windowLightStatusBar">false</item>
@@ -20,5 +22,22 @@
   <item name="android:navigationBarColor">#1B2732</item>
   <item name="android:windowLightNavigationBar">false</item>
   <item name="android:windowActionModeOverlay">true</item>
+ </style>
+
+ <!-- Dialogs use the same card colours and rounded corners as the screens behind them. -->
+ <style name="AppDialogLight" parent="android:style/Theme.Material.Light.Dialog.Alert">
+  <item name="android:fontFamily">sans</item>
+  <item name="android:colorAccent">#176B5B</item>
+  <item name="android:windowBackground">@drawable/dialog_bg_light</item>
+  <item name="android:textColorPrimary">#102D44</item>
+  <item name="android:textColorSecondary">#596C79</item>
+ </style>
+ <style name="AppDialogDark" parent="android:style/Theme.Material.Dialog.Alert">
+  <item name="android:fontFamily">sans</item>
+  <item name="android:colorAccent">#7BD8BD</item>
+  <item name="android:colorBackground">#1B2732</item>
+  <item name="android:windowBackground">@drawable/dialog_bg_dark</item>
+  <item name="android:textColorPrimary">#E6EDF3</item>
+  <item name="android:textColorSecondary">#A7B8C5</item>
  </style>
 </resources>

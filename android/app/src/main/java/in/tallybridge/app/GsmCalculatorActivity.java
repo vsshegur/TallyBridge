@@ -34,15 +34,15 @@ public final class GsmCalculatorActivity extends Activity {
  private void label(LinearLayout box,String s){TextView v=text(s,11,MUTED);v.setTypeface(null,Typeface.BOLD);v.setLetterSpacing(.08f);box.addView(v,full(14));}
 
  private void render(){
-  LinearLayout root=col();root.setBackgroundColor(BG);root.setPadding(dp(18),dp(16),dp(18),dp(18));
-  LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);LinearLayout titles=col();TextView t=text("GSM Calculator",26,NAVY);t.setTypeface(null,Typeface.BOLD);titles.addView(t);titles.addView(text("Towel weight ÷ fabric area • works fully offline",13,MUTED));top.addView(titles,new LinearLayout.LayoutParams(0,-2,1));top.addView(button("Back",v->finish()),new LinearLayout.LayoutParams(dp(84),-2));root.addView(top);
-  ScrollView sv=new ScrollView(this);LinearLayout body=col();body.setPadding(0,dp(8),0,dp(30));sv.addView(body);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
+  LinearLayout root=col();root.setBackgroundColor(BG);
+  root.addView(ScreenHeader.bar(this,null,"GSM calculator","Towel weight ÷ fabric area • works offline",NAVY,TEAL,MUTED));
+  ScrollView sv=new ScrollView(this);LinearLayout body=col();body.setPadding(dp(18),dp(4),dp(18),dp(30));sv.addView(body);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
 
   label(body,"ITEM");item=input("Item name, e.g. Bath Towel",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);body.addView(item,full(5));
   description=input("Description (optional)",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);description.setSingleLine(false);description.setMinLines(2);body.addView(description,full(8));
   label(body,"DIMENSIONS");
   LinearLayout dims=new LinearLayout(this);length=input("Length",android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);breadth=input("Breadth",android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);LinearLayout.LayoutParams a=new LinearLayout.LayoutParams(0,-2,1);a.setMargins(0,0,dp(5),0);LinearLayout.LayoutParams b=new LinearLayout.LayoutParams(0,-2,1);b.setMargins(dp(5),0,0,0);dims.addView(length,a);dims.addView(breadth,b);body.addView(dims,full(5));
-  unit=new Spinner(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Inches","Centimetres"});unit.setAdapter(adapter);unit.setBackground(shape(SURFACE,12));unit.setPadding(dp(10),dp(8),dp(10),dp(8));body.addView(unit,full(8));
+  unit=new Spinner(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Inches","Centimetres"});unit.setAdapter(adapter);ScreenHeader.spinner(unit,dark);body.addView(unit,full(8));
   label(body,"WEIGHT");weight=input("Weight in grams",android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);body.addView(weight,full(5));
 
   LinearLayout resultCard=col();resultCard.setPadding(dp(18),dp(17),dp(18),dp(17));resultCard.setBackground(shape(TINT,16));TextView rTitle=text("CALCULATED GSM",11,TEAL);rTitle.setTypeface(null,Typeface.BOLD);rTitle.setLetterSpacing(.08f);resultCard.addView(rTitle);result=text("—",34,NAVY);result.setTypeface(null,Typeface.BOLD);resultCard.addView(result,full(4));formula=text("Enter length, breadth and weight to calculate.",12,MUTED);resultCard.addView(formula,full(4));body.addView(resultCard,full(16));

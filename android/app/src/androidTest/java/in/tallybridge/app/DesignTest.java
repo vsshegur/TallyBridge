@@ -93,6 +93,12 @@ public class DesignTest {
   capture("06-dark-reports");
   ui(()->{try{call("connectScreen");}catch(Exception e){throw new RuntimeException(e);}});
   capture("07-dark-connect");
+  ui(()->{try{field("tab","Parties");call("parties");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("44-dark-parties");
+  ui(()->{try{field("tab","More");call("more");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("45-dark-more");
+  ui(()->{try{field("tab","More");call("widgetsScreen");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("46-dark-widgets");
   ui(()->{try{
    JSONObject report=new JSONObject("{\"fetchedAt\":\"2026-09-27T08:00:00Z\",\"total\":24500,\"drCr\":\"Dr\",\"bills\":[{\"id\":\"fixture1\",\"billNumber\":\"INV-2026-001\",\"date\":\"2026-06-01\",\"invoiceDays\":118,\"pendingAmount\":24500,\"drCr\":\"Dr\"}]}");
    Method m=MainActivity.class.getDeclaredMethod("renderOutstanding",String.class,String.class,JSONObject.class);m.setAccessible(true);m.invoke(rule.getActivity(),"ABC Textiles & Trading Company","",report);
@@ -120,6 +126,13 @@ public class DesignTest {
    Method p=MainActivity.class.getDeclaredMethod("renderPayments",JSONObject.class);p.setAccessible(true);p.invoke(rule.getActivity(),health);
   }catch(Exception e){throw new RuntimeException(e);}});
   capture("15-payments");
+  ui(()->{try{
+   JSONObject report=new JSONObject("{\"fetchedAt\":\"2026-09-27T08:00:00Z\",\"total\":24500,\"drCr\":\"Dr\",\"bills\":[{\"id\":\"fixture1\",\"billNumber\":\"INV-2026-001\",\"date\":\"2026-06-01\",\"invoiceDays\":118,\"pendingAmount\":24500,\"drCr\":\"Dr\"}]}");
+   Method m=MainActivity.class.getDeclaredMethod("renderOutstanding",String.class,String.class,JSONObject.class);m.setAccessible(true);m.invoke(rule.getActivity(),"ABC Textiles & Trading Company","",report);
+  }catch(Exception e){throw new RuntimeException(e);}});
+  capture("47-outstanding-light");
+  ui(()->{try{call("syncStatus");}catch(Exception e){throw new RuntimeException(e);}});
+  capture("48-sync-light");
   ui(()->{try{
    field("tab","More");
    JSONObject health=new JSONObject().put("ready",false).put("score",71).put("tallyOnline",true)

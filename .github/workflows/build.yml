@@ -53,6 +53,7 @@ jobs:
           go test ./internal/app -run TestWriteProformaFixture -count=1 -v
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
+        continue-on-error: true  # a full artifact store must not stop the build and checks after it
         with:
           retention-days: 14
           name: Proforma-PDF-Verification
@@ -95,6 +96,7 @@ jobs:
           grep -q "versionCode='$EXPECTED_CODE'" app/build/outputs/apk/debug/APK-VERSION.txt
           grep -q "versionName='$EXPECTED_NAME'" app/build/outputs/apk/debug/APK-VERSION.txt
       - uses: actions/upload-artifact@v4
+        continue-on-error: true  # a full artifact store must not stop the build and checks after it
         with:
           retention-days: 14
           name: TallyBridge-Android-Debug-Tests
@@ -103,6 +105,7 @@ jobs:
             android/app/build/outputs/apk/debug/APK-VERSION.txt
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
+        continue-on-error: true  # a full artifact store must not stop the build and checks after it
         if: always()
         with:
           retention-days: 14
@@ -136,13 +139,14 @@ jobs:
           adb install -r android/app/build/outputs/apk/debug/app-debug.apk
           adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           adb shell am instrument -w in.tallybridge.app.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/design-results.txt
-          grep -q 'OK (10 tests)' /tmp/design-results.txt
+          grep -q 'OK (15 tests)' /tmp/design-results.txt
           mkdir -p android/ui-screenshots
-          for screen in 01-unlock 02-overview 03-reports 04-connect 05-dark-overview 06-dark-reports 07-dark-connect 08-dark-appearance 09-outstanding 10-filters 11-sync 12-proforma 13-proforma-totals 14-proforma-review 15-payments 16-health 17-diagnostics 18-more 19-orders-offline 20-orders-details-only 21-orders-widget 22-photo-order-share 23-orders-dark 24-orders-dispatched-dark 25-orders-widget-dark 26-work-today 27-customer-360 28-work-system 29-widget-proforma-1x1 30-widget-order-1x1 31-orders-widget-compact 32-orders-widget-compact-dark 33-widget-gsm-1x1 34-widget-search-1x1 35-widget-voice-order-1x1 36-widget-quick-dock-5x1 37-widget-quick-dock-small 38-widget-scan-bill-1x1 39-parties 40-widgets 41-overview-bottom; do
+          for screen in 01-unlock 02-overview 03-reports 04-connect 05-dark-overview 06-dark-reports 07-dark-connect 08-dark-appearance 09-outstanding 10-filters 11-sync 12-proforma 13-proforma-totals 14-proforma-review 15-payments 16-health 17-diagnostics 18-more 19-orders-offline 20-orders-details-only 21-orders-widget 22-photo-order-share 23-orders-dark 24-orders-dispatched-dark 25-orders-widget-dark 26-work-today 27-work-today-dark 28-work-pc-off 29-widget-proforma-1x1 30-widget-order-1x1 31-orders-widget-compact 32-orders-widget-compact-dark 33-widget-gsm-1x1 34-widget-search-1x1 35-widget-voice-order-1x1 36-widget-quick-dock-5x1 37-widget-quick-dock-small 38-widget-scan-bill-1x1 39-parties 40-widgets 41-overview-bottom 42-order-form 43-order-form-dark 44-dark-parties 45-dark-more 46-dark-widgets 47-outstanding-light 48-sync-light 49-search-pc-off 50-search 51-search-dark 52-customer 53-customer-dark 54-gsm 55-gsm-dark 56-scan-bill 57-scan-bill-dark; do
             adb exec-out run-as in.tallybridge.app cat "files/ui/$screen.png" > "android/ui-screenshots/$screen.png"
             test -s "android/ui-screenshots/$screen.png"
           done
       - uses: actions/upload-artifact@v4
+        continue-on-error: true  # a full artifact store must not stop the build and checks after it
         if: always()
         with:
           retention-days: 14

@@ -8,7 +8,7 @@
     if(!side||side.querySelector('[data-route="bills"]'))return;
     const b=document.createElement('button');
     b.className='side-btn'+(route==='bills'?' active':'');b.dataset.route='bills';
-    b.innerHTML=icon('bills')+'<span>Purchase bills</span>';
+    b.innerHTML=icon('bills')+'<span>InvoiceTotally</span>';
     const after=side.querySelector('[data-route="orders"]')||side.querySelector('[data-route="companies"]');
     if(after)after.insertAdjacentElement('afterend',b);else side.appendChild(b);
   }
@@ -28,7 +28,7 @@
 
   function page(){
     const p=$('#page');if(!p)return;
-    p.innerHTML=head('Purchase bills','Photograph a bill on the phone, review it in InvoiceTotally, and this PC posts it to Tally.')+'<div id="billsBody"><div class="screen-loader"><span class="spinner"></span> Loading…</div></div>';
+    p.innerHTML=head('InvoiceTotally','Purchase bills from the phone, bank statements and the GSTR-2B check are reviewed in InvoiceTotally. This PC reads Tally for them and posts only what you approve.')+'<div id="billsBody"><div class="screen-loader"><span class="spinner"></span> Loading…</div></div>';
     load();
     stop();timer=setInterval(()=>{if(route==='bills'&&!adding&&!document.querySelector('#billsBody input:focus,#billsBody textarea:focus'))load()},4000);
   }
