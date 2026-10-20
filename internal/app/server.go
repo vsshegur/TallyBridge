@@ -275,7 +275,7 @@ func (s *Server) handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 	if cfg.AutoUpdate {
 		s.maybeCheckUpdates()
 	}
-	jsonOut(w, map[string]any{"version": Version, "live": st, "settings": cfg, "devices": devs, "logs": s.tally.Logs(), "cache": s.cache.Stats(), "cachedCompanies": cc, "cachedCompaniesAt": at, "autoSync": s.autoSyncSnapshot(), "health": health, "update": s.updateSnapshot()})
+	jsonOut(w, map[string]any{"version": Version, "live": st, "settings": cfg, "devices": devs, "logs": s.tally.Logs(), "cache": s.cache.Stats(), "cachedCompanies": cc, "cachedCompaniesAt": at, "autoSync": s.autoSyncSnapshot(), "health": health, "update": s.updateSnapshot(), "itSignins": s.it.webPendingCount()})
 }
 func (s *Server) handleAdminProbe(w http.ResponseWriter, r *http.Request) {
 	st, e := s.probeLive()
