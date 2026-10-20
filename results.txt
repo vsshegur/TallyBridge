@@ -1,0 +1,17 @@
+
+in.tallybridge.app.DesignTest:.
+in.tallybridge.app.OperationsCenterTest:..
+in.tallybridge.app.OrdersHardeningTest:.
+in.tallybridge.app.OrdersOfflineTest:.
+in.tallybridge.app.PdfFlowTest:.
+in.tallybridge.app.PhotoOrderCleanupTest:.
+in.tallybridge.app.PhotoOrderShareTest:.
+in.tallybridge.app.ProformaTest:.
+in.tallybridge.app.ScreensTest:....
+in.tallybridge.app.ShareIntentTest:..
+
+Time: 150.523
+
+OK (15 tests)
+
+
