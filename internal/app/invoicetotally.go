@@ -1132,14 +1132,18 @@ func (c *ITConnector) save(ctx context.Context, rawServer string, add, remove []
 	return results, nil
 }
 
-// Reads for bank statement matching: pending bills of every party, and the
-// entries already in the bank ledger. Read-only, like the master reads.
-var itRowKinds = map[string]bool{"export_bills_receivable": true, "export_bills_payable": true, "export_bank_entries": true}
+// Reads for bank statement matching (pending bills of every party, entries
+// already in the bank ledger) and for the GSTR-2B check (inward vouchers with
+// their GST ledgers). Read-only, like the master reads.
+var itRowKinds = map[string]bool{"export_bills_receivable": true, "export_bills_payable": true, "export_bank_entries": true, "export_purchase_gst": true}
 
 var childOfRE = regexp.MustCompile(`(?is)<CHILDOF>(.*?)</CHILDOF>`)
 
 func itTallyRows(kind string, request, reply []byte) []map[string]any {
 	out := []map[string]any{}
+	if kind == "export_purchase_gst" {
+		return purchaseGstRows(reply)
+	}
 	if kind == "export_bank_entries" {
 		ledger := ""
 		if m := childOfRE.FindSubmatch(request); m != nil {
