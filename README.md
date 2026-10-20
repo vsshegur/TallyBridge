@@ -12,7 +12,7 @@ Start with [the no-card setup guide](docs/NO_CARD_SETUP.md). This version uses
 Cloudflare Tunnel plus direct native Google sign-in. Cloudflare Access, its team
 name and its payment-card signup are not required.
 
-**Downloads:** every build of `main` attaches the Windows installer (`TallyBridge-<version>-Setup.exe`) and the unsigned Android APK to the private **preview-<version>** release under Releases. Sign the APK with the permanent signing kit before installing.
+**Downloads:** every build of `main` attaches the Windows installer (`TallyBridge-<version>-Setup.exe`) and the unsigned Android APK to the private **preview-<version>** release under Releases. The APK is signed with the permanent TallyBridge key when the repository has the four signing secrets (see [release signing](docs/RELEASE_SIGNING.md)); otherwise it is unsigned and must be signed before installing.
 
 ## What is included
 

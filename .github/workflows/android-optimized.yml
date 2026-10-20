@@ -11,7 +11,13 @@ jobs:
     permissions:
       contents: write  # only to attach the APK to the private preview release
     env:
-      TB_ALLOW_UNSIGNED_RELEASE: 'true'
+      # Signed with the permanent key when the four repository secrets are set; otherwise an unsigned APK.
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      TB_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      TB_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      TB_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      # SHA-1 of the permanent TallyBridge key (android/PERMANENT_SIGNING_IDENTITY.txt); Google sign-in is tied to it.
+      TB_EXPECTED_SHA1: 55cc4a6d74685143a7e1e914b739cfc6ff4f2abe
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -21,21 +27,47 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - name: Restore the permanent signing key (when configured)
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$TB_STORE_PASSWORD" ] && [ -n "$TB_KEY_ALIAS" ] && [ -n "$TB_KEY_PASSWORD" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/tallybridge-release.jks"
+            chmod 600 "$RUNNER_TEMP/tallybridge-release.jks"
+            echo "TB_KEYSTORE=$RUNNER_TEMP/tallybridge-release.jks" >> "$GITHUB_ENV"
+            echo "SIGNED=true" >> "$GITHUB_ENV"
+            echo "Building a signed APK with the permanent key."
+          else
+            echo "TB_ALLOW_UNSIGNED_RELEASE=true" >> "$GITHUB_ENV"
+            echo "SIGNED=false" >> "$GITHUB_ENV"
+            echo "::warning::Signing secrets are not set, so this APK is unsigned. Add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD under Settings → Secrets and variables → Actions."
+          fi
       - name: Build and lint R8 optimized release
         working-directory: android
         run: |
           gradle --no-daemon test assembleRelease lintRelease
-          APK=app/build/outputs/apk/release/app-release-unsigned.apk
+          OUT=app/build/outputs/apk/release
+          if [ "$SIGNED" = true ]; then APK=$OUT/app-release.apk; else APK=$OUT/app-release-unsigned.apk; fi
           test -s "$APK"
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
           EXPECTED_CODE=$(sed -nE "s/.*versionCode ([0-9]+).*/\1/p" app/build.gradle | head -1)
           EXPECTED_NAME=$(sed -nE "s/.*versionName '([^']+)'.*/\1/p" app/build.gradle | head -1)
-          "$AAPT" dump badging "$APK" | tee app/build/outputs/apk/release/APK-VERSION.txt
-          grep -q "versionCode='$EXPECTED_CODE'" app/build/outputs/apk/release/APK-VERSION.txt
-          grep -q "versionName='$EXPECTED_NAME'" app/build/outputs/apk/release/APK-VERSION.txt
-          ! grep -q "application-debuggable" app/build/outputs/apk/release/APK-VERSION.txt
-          cp "$APK" "app/build/outputs/apk/release/TallyBridge-${EXPECTED_NAME}-R8-optimized-unsigned.apk"
-          sha256sum "$APK" > app/build/outputs/apk/release/UNSIGNED-SHA256.txt
+          "$AAPT" dump badging "$APK" | tee $OUT/APK-VERSION.txt
+          grep -q "versionCode='$EXPECTED_CODE'" $OUT/APK-VERSION.txt
+          grep -q "versionName='$EXPECTED_NAME'" $OUT/APK-VERSION.txt
+          ! grep -q "application-debuggable" $OUT/APK-VERSION.txt
+          if [ "$SIGNED" = true ]; then
+            # Refuse to publish an APK signed with any key other than the permanent one.
+            APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+            "$APKSIGNER" verify --verbose --print-certs "$APK" | tee $OUT/SIGNATURE.txt
+            grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" $OUT/SIGNATURE.txt
+            ACTUAL=$(sed -nE 's/^Signer #1 certificate SHA-1 digest: ([0-9a-f]+).*/\1/p' $OUT/SIGNATURE.txt | head -1)
+            if [ "$ACTUAL" != "$TB_EXPECTED_SHA1" ]; then echo "::error::APK was signed with $ACTUAL, not the permanent TallyBridge key $TB_EXPECTED_SHA1"; exit 1; fi
+            cp "$APK" "$OUT/TallyBridge-${EXPECTED_NAME}.apk"
+            (cd $OUT && sha256sum "TallyBridge-${EXPECTED_NAME}.apk" > "TallyBridge-${EXPECTED_NAME}.sha256.txt")
+          else
+            cp "$APK" "$OUT/TallyBridge-${EXPECTED_NAME}-R8-optimized-unsigned.apk"
+            (cd $OUT && sha256sum "TallyBridge-${EXPECTED_NAME}-R8-optimized-unsigned.apk" > "TallyBridge-${EXPECTED_NAME}-R8-optimized-unsigned.sha256.txt")
+          fi
+          rm -f "$RUNNER_TEMP/tallybridge-release.jks"
       # Release files do not count against Actions artifact storage, so the APK can always be downloaded.
       - name: Attach APK to the preview release
         if: github.ref == 'refs/heads/main'
@@ -46,21 +78,26 @@ jobs:
           test -n "$VERSION"
           TAG="preview-$VERSION"
           OUT=android/app/build/outputs/apk/release
-          cp "$OUT/UNSIGNED-SHA256.txt" "$OUT/TallyBridge-$VERSION-R8-optimized-unsigned.sha256.txt"
+          if [ "$SIGNED" = true ]; then NAME="TallyBridge-$VERSION"; else NAME="TallyBridge-$VERSION-R8-optimized-unsigned"; fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
               --title "TallyBridge $VERSION (preview builds)" \
-              --notes "Windows installer and Android APK built from main by GitHub Actions. Android APK is unsigned: sign it with the permanent signing kit before installing. See docs/UPDATE_${VERSION//./_}.md." || \
+              --notes "Windows installer and Android APK built from main by GitHub Actions. See docs/UPDATE_${VERSION//./_}.md." || \
             gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
-          gh release upload "$TAG" "$OUT/TallyBridge-$VERSION-R8-optimized-unsigned.apk" "$OUT/TallyBridge-$VERSION-R8-optimized-unsigned.sha256.txt" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$TAG" "$OUT/$NAME.apk" "$OUT/$NAME.sha256.txt" --repo "$GITHUB_REPOSITORY" --clobber
+          if [ "$SIGNED" = true ]; then
+            # A signed APK replaces the unsigned one, so there is only one file to install.
+            for old in "TallyBridge-$VERSION-R8-optimized-unsigned.apk" "TallyBridge-$VERSION-R8-optimized-unsigned.sha256.txt"; do
+              gh release delete-asset "$TAG" "$old" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
+            done
+          fi
       - uses: actions/upload-artifact@v4
         continue-on-error: true  # the release above is the download; this copy is a convenience
         with:
           retention-days: 14
-          name: TallyBridge-Android-R8-Unsigned
+          name: TallyBridge-Android-R8
           path: |
-            android/app/build/outputs/apk/release/TallyBridge-*-R8-optimized-unsigned.apk
+            android/app/build/outputs/apk/release/TallyBridge-*.apk
             android/app/build/outputs/apk/release/APK-VERSION.txt
-            android/app/build/outputs/apk/release/UNSIGNED-SHA256.txt
             android/app/build/outputs/mapping/release/mapping.txt
           if-no-files-found: error
