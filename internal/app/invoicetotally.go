@@ -76,6 +76,7 @@ type itLink struct {
 	waitingLogged time.Time
 	serverURL     string
 	cancel        context.CancelFunc
+	webPending    int // browsers waiting for approval to open InvoiceTotally (the same count on every company link)
 }
 
 // itDone remembers every posting job this PC has run. A job is sent to Tally at
@@ -466,6 +467,7 @@ type itHeartbeatReply struct {
 	Company      string `json:"company"`
 	TallyCompany string `json:"tally_company"`
 	Pending      int    `json:"pending"`
+	WebPending   int    `json:"web_pending"`
 }
 
 func (c *ITConnector) heartbeatLoop(ctx context.Context, l *itLink) {
@@ -487,9 +489,14 @@ func (c *ITConnector) heartbeat(ctx context.Context, l *itLink) {
 	open := companyOpenIn(t, l.conn.TallyCompany)
 	c.mu.Unlock()
 	var r itHeartbeatReply
-	err := c.call(ctx, cfg.ServerURL, l.conn.Token, "POST", "/api/bridge/heartbeat", map[string]any{
+	beat := map[string]any{
 		"tally_ok": t.Status == "ok" && (open == nil || *open), "version": Version, "client": "TallyBridge",
-		"posting": cfg.PostingEnabled, "phone": !cfg.PhoneOff, "companies": t.Companies}, &r, 20*time.Second)
+		"posting": cfg.PostingEnabled, "phone": !cfg.PhoneOff, "companies": t.Companies}
+	// InvoiceTotally signs in with the same Google account the phone uses, and asks this PC to approve each new browser.
+	if a := c.webSignIn(); a != nil {
+		beat["auth"] = a
+	}
+	err := c.call(ctx, cfg.ServerURL, l.conn.Token, "POST", "/api/bridge/heartbeat", beat, &r, 20*time.Second)
 	if ctx.Err() != nil {
 		return
 	}
@@ -507,6 +514,8 @@ func (c *ITConnector) heartbeat(ctx context.Context, l *itLink) {
 	c.mu.Lock()
 	l.server = itStatus{"ok", "Connected"}
 	l.pending = r.Pending
+	newWaiting := r.WebPending > l.webPending && r.WebPending > c.webPendingLocked()
+	l.webPending = r.WebPending
 	l.companyOpen = companyOpenIn(t, r.TallyCompany)
 	if r.Company != l.conn.Company || r.TallyCompany != l.conn.TallyCompany {
 		l.conn.Company, l.conn.TallyCompany = r.Company, r.TallyCompany
@@ -518,6 +527,9 @@ func (c *ITConnector) heartbeat(ctx context.Context, l *itLink) {
 		_ = c.saveLocked()
 	}
 	c.mu.Unlock()
+	if newWaiting {
+		c.log(plural(r.WebPending, "browser is", "browsers are")+" waiting for approval to open InvoiceTotally — approve or deny on this page", "signin", true, nil)
+	}
 	if r.Pending > 0 {
 		select {
 		case l.wake <- struct{}{}:
@@ -804,6 +816,7 @@ func (c *ITConnector) snapshot() map[string]any {
 	return map[string]any{
 		"serverUrl": c.cfg.ServerURL, "postingEnabled": c.cfg.PostingEnabled, "phoneUploads": !c.cfg.PhoneOff,
 		"configured":  c.cfg.ServerURL != "" && len(c.cfg.Connections) > 0,
+		"webPending":  c.webPendingLocked(), "webSignIn": c.webSignIn() != nil, "webSignInEmail": c.webSignIn()["owner_email"],
 		"connections": conns, "tally": c.tally, "activity": append([]ITActivity{}, act...),
 	}
 }
@@ -928,6 +941,8 @@ func (s *Server) handleITAdmin(w http.ResponseWriter, r *http.Request) {
 	c := s.it
 	sub := strings.TrimPrefix(r.URL.Path, "/api/v1/admin/invoicetotally")
 	switch {
+	case sub == "/browsers":
+		s.handleITBrowsers(w, r)
 	case sub == "" && r.Method == http.MethodGet:
 		snap := c.snapshot()
 		snap["uploads"] = s.bills.list(true)

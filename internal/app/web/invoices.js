@@ -2,6 +2,7 @@
 (()=>{
   I.bills='<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>';
   let data=null, loading=false, timer=null, adding=false, editUrl=false;
+  let browsers=null, browsersAt=0, browsersErr='', browsersFor=-1, seenSignins=0;
 
   function installNav(){
     const side=document.querySelector('.side-nav');
@@ -12,11 +13,19 @@
     const after=side.querySelector('[data-route="orders"]')||side.querySelector('[data-route="companies"]');
     if(after)after.insertAdjacentElement('afterend',b);else side.appendChild(b);
   }
+  // Browsers waiting to open InvoiceTotally: a count on the menu item, and a note once when a new one appears.
+  function signinBadge(){
+    const n=+(snap?.itSignins||0),b=document.querySelector('.side-btn[data-route="bills"]');if(!b)return;
+    let el=b.querySelector('.nav-badge');
+    if(n>0){if(!el){el=document.createElement('span');el.className='nav-badge';b.appendChild(el)}el.textContent=n;el.title=n+' waiting for approval'}else el?.remove();
+    if(n>seenSignins&&route!=='bills')toast(n===1?'A browser is waiting for approval to open InvoiceTotally':`${n} browsers are waiting for approval to open InvoiceTotally`);
+    seenSignins=n;
+  }
   function versionChip(){const chip=document.querySelector('.version-chip');if(chip&&snap?.version)chip.textContent='v'+snap.version+' • phone access is read-only'}
 
   const baseRender=render;
   render=function(){
-    installNav();versionChip();
+    installNav();versionChip();signinBadge();
     if(route!=='bills'){stop();baseRender();return;}
     $$('.side-btn').forEach(b=>b.classList.toggle('active',b.dataset.route===route));
     page();lastRenderKey='bills';
@@ -35,9 +44,36 @@
 
   async function load(){
     if(loading)return;loading=true;
-    try{data=await api('/api/v1/admin/invoicetotally');paint()}
+    try{data=await api('/api/v1/admin/invoicetotally');paint();
+      if(data.configured&&(browsers===null||browsersFor!==data.webPending||(data.webPending>0&&Date.now()-browsersAt>3500)))loadBrowsers()}
     catch(e){const b=$('#billsBody');if(b)b.innerHTML=`<div class="notice err">${esc(e.message)}</div>`}
     finally{loading=false}
+  }
+
+  async function loadBrowsers(){
+    browsersAt=Date.now();browsersFor=data?.webPending??-1;
+    try{browsers=await api('/api/v1/admin/invoicetotally/browsers');browsersErr='';if(snap){snap.itSignins=browsers.pending.length;seenSignins=Math.min(seenSignins,snap.itSignins);signinBadge()}}catch(e){browsersErr=e.message}
+    paint();
+  }
+  const when=sec=>sec?fmtAgo(new Date(sec*1000)):'—';
+  function waitingCard(){
+    const list=browsers?.pending||[];if(!list.length)return'';
+    return `<div class="card signin-wait" style="margin-bottom:16px"><div class="metric-label">Browsers waiting for approval</div>
+      <div class="sub" style="margin:6px 0 4px">Someone signed in to InvoiceTotally with your Google account. Approve only if the code matches the one on that browser's screen.</div>
+      ${list.map(b=>`<div class="list-row"><div class="signin-code">${esc(String(b.code).slice(0,3))} ${esc(String(b.code).slice(3))}</div>
+        <div class="grow"><div class="title">${esc(b.name||'Browser')}</div><div class="sub">${esc(b.email)} • asked ${when(b.created_at)}</div></div>
+        <div class="toolbar"><button class="btn" data-bills="web-approve" data-id="${esc(b.id)}" data-name="${esc(b.name)}" data-email="${esc(b.email)}">Approve</button>
+        <button class="btn secondary" data-bills="web-deny" data-id="${esc(b.id)}" data-name="${esc(b.name)}" data-email="${esc(b.email)}">Deny</button></div></div>`).join('')}</div>`;
+  }
+  function browsersCard(){
+    if(!data.webSignIn)return `<div class="section-title">Sign-in to InvoiceTotally</div><div class="card"><div class="sub" style="line-height:1.6">InvoiceTotally can use <b>Google sign-in</b> with the same account as the phone app, and ask this PC to approve each new browser. Set the Google client ID and your email in <a href="#cloudflare" data-route="cloudflare">Connection</a> first. Until then InvoiceTotally keeps using its password.</div></div>`;
+    const list=browsers?.approved||[];
+    return `<div class="section-title">Signed-in browsers</div><div class="card">
+      <div class="sub" style="margin-bottom:6px">InvoiceTotally signs in with your Google account (<b>${esc(data.webSignInEmail||'the phone app\'s account')}</b>). Each browser below was approved on this PC.</div>
+      ${browsersErr?`<div class="notice err">${esc(browsersErr)}</div>`:''}
+      ${list.length?list.map(b=>`<div class="list-row"><div><div class="title">${esc(b.name||'Browser')}</div><div class="sub">${esc(b.email)} • approved ${when(b.decided_at)} • last used ${when(b.last_seen)}</div></div>
+        <button class="btn danger" data-bills="web-revoke" data-id="${esc(b.id)}" data-name="${esc(b.name)}" data-email="${esc(b.email)}">Sign out</button></div>`).join('')
+        :`<div class="empty">${browsers?'No browser is signed in yet. Open InvoiceTotally and sign in with Google — it will ask for approval here.':'Loading…'}</div>`}</div>`;
   }
 
   function setupCard(){
@@ -87,7 +123,7 @@
     const posted=conns.reduce((n,c)=>n+(c.stats?.postedToday||0),0),failed=conns.reduce((n,c)=>n+(c.stats?.failedToday||0),0);
     const pending=conns.reduce((n,c)=>n+(c.pending||0),0);
     const L=data.legacy||{};
-    box.innerHTML=`${L.running?`<div class="notice warn" style="margin-bottom:14px"><b>The old InvoiceTotally Bridge is still running.</b> Close it (tray icon → Quit) and remove it from startup, so only TallyBridge posts to Tally.</div>`:''}
+    box.innerHTML=`${waitingCard()}${L.running?`<div class="notice warn" style="margin-bottom:14px"><b>The old InvoiceTotally Bridge is still running.</b> Close it (tray icon → Quit) and remove it from startup, so only TallyBridge posts to Tally.</div>`:''}
     <div class="grid dashboard-grid">
       <div class="card span6"><div class="metric-label">Posting to Tally</div>
         <div class="toolbar" style="margin-top:10px">${data.postingEnabled?pill('ok','ON — reviewed bills are posted'):pill('warn','OFF — nothing is written to Tally')}
@@ -102,6 +138,7 @@
         :`<button class="btn secondary" data-bills="show-add">＋ Add company</button><button class="btn secondary" data-bills="open-web">Open InvoiceTotally</button><button class="btn secondary" data-bills="edit-url">Web address</button>`}</div>
       ${editUrl?`<div class="toolbar" style="margin-top:12px"><input id="itUrlEdit" class="input grow" value="${esc(data.serverUrl)}"><button class="btn" data-bills="save-url">Test &amp; save</button><button class="btn secondary" data-bills="cancel-url">Cancel</button></div>`:''}
       <div id="itStatus" class="sub" role="status" style="margin-top:8px"></div></div>
+    ${browsersCard()}
     <div class="section-title">Bills from the phone</div>
     <div class="card"><label class="check-row" style="padding-top:0"><input type="checkbox" data-bills="phone" ${data.phoneUploads?'checked':''}><span><b>Allow approved phones to send bills</b><small>In the TallyBridge app tap <b>Scan bill</b>: photos and PDFs come to this PC and go on to InvoiceTotally for reading. If the internet is down they wait here and are sent automatically.</small></span></label>
       ${ups.length?ups.map(uploadRow).join(''):`<div class="empty">No bills from the phone yet.</div>`}</div>
@@ -132,6 +169,11 @@
         if(on&&!confirm('Turn on posting?\n\nTallyBridge will post what you push in InvoiceTotally into Tally on this PC: purchase/sales bills, bank statement entries (Receipt/Payment/Contra), and new ledgers, stock items and units you approved. It never edits or deletes anything, and the phone stays read-only.'))return;
         await busyBtn(b,on?'Turning on':'Turning off',async()=>{data=Object.assign(data,await post('/options',{postingEnabled:on}));paint();toast(on?'Posting is on':'Posting is off')});return}
       if(a==='phone'){await post('/options',{phoneUploads:b.checked});toast(b.checked?'Phones can send bills':'Phones can no longer send bills');await load();return}
+      if(a==='web-approve'||a==='web-deny'||a==='web-revoke'){
+        const act=a.slice(4),name=b.dataset.name||'this browser';
+        if(act==='revoke'&&!confirm(`Sign “${name}” out of InvoiceTotally? It will need approval here again.`))return;
+        await busyBtn(b,act==='approve'?'Approving':act==='deny'?'Denying':'Signing out',async()=>{await post('/browsers',{id:b.dataset.id,action:act,name:b.dataset.name,email:b.dataset.email});
+          toast(act==='approve'?'Approved — the browser is signed in':act==='deny'?'Denied':'Signed out');await loadBrowsers()});return}
       if(a==='retry'){await post('/uploads/retry',{id:b.dataset.id});toast('Sending…');setTimeout(load,800);return}
       if(a==='delete-upload'){if(!confirm('Delete this bill from the PC? It has not reached InvoiceTotally.'))return;await post('/uploads/delete',{id:b.dataset.id});await load();return}
     }catch(err){toast(err.message,true)}

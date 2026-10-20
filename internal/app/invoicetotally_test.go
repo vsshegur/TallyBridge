@@ -191,6 +191,8 @@ type fakeCloud struct {
 	pages      map[string]map[int]map[string]any
 	started    map[string]bool
 	failPages  int
+	webPending []map[string]any
+	webActions []map[string]any
 	srv        *httptest.Server
 }
 
@@ -213,7 +215,14 @@ func newFakeCloud(t *testing.T) *fakeCloud {
 			if in["test"] != true {
 				f.heartbeats = append(f.heartbeats, in)
 			}
-			json.NewEncoder(w).Encode(map[string]any{"company": "Ganesh Web", "tally_company": itCompany, "pending": len(f.pending)})
+			json.NewEncoder(w).Encode(map[string]any{"company": "Ganesh Web", "tally_company": itCompany, "pending": len(f.pending), "web_pending": len(f.webPending)})
+		case p == "/api/bridge/web-devices" && r.Method == "GET":
+			json.NewEncoder(w).Encode(map[string]any{"pending": f.webPending, "approved": []any{}})
+		case strings.HasPrefix(p, "/api/bridge/web-devices/") && r.Method == "POST":
+			in["id"] = strings.TrimPrefix(p, "/api/bridge/web-devices/")
+			f.webActions = append(f.webActions, in)
+			f.webPending = nil
+			io.WriteString(w, `{"ok":true}`)
 		case p == "/api/bridge/jobs":
 			f.polls = append(f.polls, r.URL.RawQuery)
 			out, keep := []itJob{}, []itJob{}

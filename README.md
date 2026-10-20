@@ -1,8 +1,10 @@
 # TallyBridge
 
+**New in 2.9.0:** InvoiceTotally signs in with your Google account and each new browser is approved on this PC; Customers and Search removed from the PC menu — see [2.9.0](docs/UPDATE_2_9_0.md).
+
 **2.8.1:** the PC control center scrolls properly on smaller screens — see [2.8.1](docs/UPDATE_2_8_1.md).
 
-**New in 2.8.0:** check GSTR-2B against the purchase register in InvoiceTotally (TallyBridge reads purchases with their GST, read-only); a tidier Android app with one header, clearer drop-downs and dialogs in Light and Dark — see [2.8.0](docs/UPDATE_2_8_0.md).
+**2.8.0:** check GSTR-2B against the purchase register in InvoiceTotally (TallyBridge reads purchases with their GST, read-only); a tidier Android app with one header, clearer drop-downs and dialogs in Light and Dark — see [2.8.0](docs/UPDATE_2_8_0.md).
 
 **2.7.0:** match bank statements (any bank, including co-operative banks) with Tally through InvoiceTotally and post Receipts, Payments and Contras after review; a simpler Android app (Home · Parties · Orders · Reports · More) and better widgets — see [2.7.0](docs/UPDATE_2_7_0.md).
 
