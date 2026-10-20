@@ -8,6 +8,8 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    permissions:
+      contents: write  # only to attach the installer to the private preview release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -62,7 +64,26 @@ jobs:
       - name: Build Windows installers
         shell: pwsh
         run: ./scripts/Build-Windows.ps1
+      # Release files do not count against Actions artifact storage, so the installer can always be downloaded.
+      - name: Attach installer to the preview release
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(sed -nE 's/^const Version = "([^"]+)".*/\1/p' internal/app/types.go)
+          test -n "$VERSION"
+          TAG="preview-$VERSION"
+          cp build/TallyBridge_Setup.exe "build/TallyBridge-$VERSION-Setup.exe"
+          (cd build && sha256sum "TallyBridge-$VERSION-Setup.exe" > "TallyBridge-$VERSION-Setup.sha256.txt")
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title "TallyBridge $VERSION (preview builds)" \
+              --notes "Windows installer and Android APK built from main by GitHub Actions. Android APK is unsigned: sign it with the permanent signing kit before installing. See docs/UPDATE_${VERSION//./_}.md." || \
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload "$TAG" "build/TallyBridge-$VERSION-Setup.exe" "build/TallyBridge-$VERSION-Setup.sha256.txt" --repo "$GITHUB_REPOSITORY" --clobber
       - uses: actions/upload-artifact@v4
+        continue-on-error: true  # the release above is the download; this copy is a convenience
         with:
           retention-days: 14
           name: TallyBridge-Windows-Preview
