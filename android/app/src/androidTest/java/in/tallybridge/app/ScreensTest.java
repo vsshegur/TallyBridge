@@ -54,6 +54,7 @@ public class ScreensTest {
  }
 
  @Before public void seed()throws Exception{
+  InstrumentationRegistry.getInstrumentation().setInTouchMode(true); // as after a tap: no keyboard-focus ring on the back arrow
   CryptoStore s=new CryptoStore(ctx());s.put("base","https://127.0.0.1:9");s.put("device","fixture-device");s.put("company","Vijayalaxmi Textiles");
   s.put("billCompanies","[{\"id\":\"c1\",\"name\":\"Vijayalaxmi Textiles\"}]");
  }
