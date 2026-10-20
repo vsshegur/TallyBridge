@@ -37,11 +37,13 @@ public class OperationsCenterTest {
    .put("alerts",new JSONArray()
     .put(new JSONObject().put("severity","warning").put("title","Order pending for 2+ days").put("detail","ORD-20261001-003 • Mahesh Textiles").put("action","orders"))
     .put(new JSONObject().put("severity","info").put("title","Compatibility mode").put("detail","Core bridge data is available.").put("action","tools")));
-  ui(()->{try{call("frame",new Class[]{String.class,String.class},"Today","Daily work • Vijayalaxmi Textiles");call("renderToday",new Class[]{JSONObject.class},today);}catch(Exception e){throw new RuntimeException(e);}});
+  ui(()->{try{call("frame",new Class[]{String.class,String.class},"Today's work","Vijayalaxmi Textiles");call("renderToday",new Class[]{JSONObject.class},today);}catch(Exception e){throw new RuntimeException(e);}});
   capture("26-work-today");
 
-  ui(()->{try{call("showTools",new Class[]{});}catch(Exception e){throw new RuntimeException(e);}});
-  capture("27-customer-360");
+  // PC switched off: phone orders still show, money is a dash rather than a misleading ₹0.00.
+  JSONObject offlineToday=new JSONObject().put("_saved",true).put("pcOffline",true).put("pendingOrders",2).put("oldPendingOrders",0).put("dispatchedToday",1).put("alerts",new JSONArray());
+  ui(()->{try{call("frame",new Class[]{String.class,String.class},"Today's work","Vijayalaxmi Textiles");call("renderToday",new Class[]{JSONObject.class},offlineToday);}catch(Exception e){throw new RuntimeException(e);}});
+  capture("28-work-pc-off");
 
   // In 2.4.6 Search, Customers and System intentionally route through the
   // proven MainActivity core screens instead of duplicate fragile Work APIs.
@@ -49,8 +51,20 @@ public class OperationsCenterTest {
   assertEquals("in.tallybridge.app.OPEN_CUSTOMERS",MainActivity.ACTION_CUSTOMERS);
   assertEquals("in.tallybridge.app.OPEN_SYSTEM",MainActivity.ACTION_SYSTEM);
   assertNotNull(SectionNav.class);
+ }
 
-  ui(()->{try{call("frame",new Class[]{String.class,String.class},"Today","Unified navigation • Home • Orders • Reports • Tools • System");}catch(Exception e){throw new RuntimeException(e);}});
-  capture("28-work-system");
+ @Test public void todayRendersInDarkTheme()throws Exception{
+  Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();
+  c.getSharedPreferences("appearance",Context.MODE_PRIVATE).edit().putString("mode","Dark").commit();
+  try{
+   rule.launchActivity(null);Thread.sleep(800);
+   ui(()->rule.getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE));
+   JSONObject today=new JSONObject().put("tallyOnline",false).put("pendingOrders",4).put("oldPendingOrders",0).put("dispatchedToday",2)
+    .put("salesToday",48250).put("salesCount",3).put("receivable",845000).put("payable",120500)
+    .put("health",new JSONObject().put("score",86).put("ready",true)).put("performance",new JSONObject().put("successRate",97).put("averageMs",340))
+    .put("alerts",new JSONArray().put(new JSONObject().put("severity","critical").put("title","Tally is closed on the PC").put("detail","Figures are from the last read at 9:10 AM").put("action","system")));
+   ui(()->{try{call("frame",new Class[]{String.class,String.class},"Today's work","Vijayalaxmi Textiles");call("renderToday",new Class[]{JSONObject.class},today);}catch(Exception e){throw new RuntimeException(e);}});
+   capture("27-work-today-dark");
+  }finally{c.getSharedPreferences("appearance",Context.MODE_PRIVATE).edit().putString("mode","System").commit();}
  }
 }

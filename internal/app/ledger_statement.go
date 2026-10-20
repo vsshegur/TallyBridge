@@ -117,7 +117,7 @@ func (s *Server) getLedgerStatement(c, l, isoFrom, isoTo, tallyFrom, tallyTo str
 	}
 	rows, complete := statementRows(b, l)
 	if len(rows) == 0 && (!recognizedCollection(b) || hasOld && old.Count > 0) {
-		return saved(errors.New("empty or unrecognized statement response; previous data kept"))
+		return saved(errors.New("Tally sent no entries for this ledger and period — the last saved statement is kept"))
 	}
 	x := LedgerStatementData{CommonData: CommonData{Live: true, Source: "live", FetchedAt: time.Now(), DurationMS: d}, Company: c, Ledger: l, FromDate: isoFrom, ToDate: isoTo, Vouchers: rows, Count: len(rows)}
 	for _, v := range rows {

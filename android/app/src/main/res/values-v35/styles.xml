@@ -3,6 +3,7 @@
  <style name="AppThemeLight" parent="android:style/Theme.Material.Light.NoActionBar">
   <item name="android:fontFamily">sans</item>
   <item name="android:colorAccent">#176B5B</item>
+  <item name="android:alertDialogTheme">@style/AppDialogLight</item>
   <item name="android:windowLightStatusBar">true</item>
   <item name="android:statusBarColor">#F5F7FA</item>
   <item name="android:navigationBarColor">#FFFFFF</item>
@@ -14,6 +15,7 @@
  <style name="AppThemeDark" parent="android:style/Theme.Material.NoActionBar">
   <item name="android:fontFamily">sans</item>
   <item name="android:colorAccent">#7BD8BD</item>
+  <item name="android:alertDialogTheme">@style/AppDialogDark</item>
   <item name="android:windowBackground">#101820</item>
   <item name="android:colorBackground">#101820</item>
   <item name="android:windowLightStatusBar">false</item>

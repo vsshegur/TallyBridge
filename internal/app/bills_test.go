@@ -86,7 +86,7 @@ func TestPhoneBillsReachInvoiceTotally(t *testing.T) {
 
 	// Before InvoiceTotally is connected the phone is told what to do.
 	code, out := ravi.do(t, s, "GET", "/api/v1/mobile/bills", nil)
-	if code != 200 || out["enabled"] != false || !strings.Contains(out["reason"].(string), "Purchase bills") {
+	if code != 200 || out["enabled"] != false || !strings.Contains(out["reason"].(string), "Connect InvoiceTotally") {
 		t.Fatal(code, out)
 	}
 	img := base64.StdEncoding.EncodeToString(testJPEG(t, 1200, 1600, 10))

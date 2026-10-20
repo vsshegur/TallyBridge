@@ -26,6 +26,17 @@ public class OrdersOfflineTest {
  private JSONObject item(String name,double qty,String unit,Double rate)throws Exception {JSONObject x=new JSONObject().put("name",name).put("quantity",qty).put("unit",unit);if(rate!=null)x.put("rate",rate);return x;}
  private JSONObject order(String buyer,String phone,String notes,JSONArray items)throws Exception {return new JSONObject().put("company","Vijayalaxmi Textiles").put("buyer",buyer).put("buyerDetails",new JSONObject().put("MOBILENUMBER",phone).put("ADDRESS","Fixture Market Road").put("CITY","Solapur").put("PARTYGSTIN","27AAAAA0000A1Z5")).put("items",items).put("notes",notes);}
 
+ /** Fills a widget preview with real row layouts (a home-screen host fills the list through OrdersWidgetService). */
+ private static void sampleRows(View widget,int rowLayout){
+  ListView list=widget.findViewById(R.id.widget_orders_list);ViewGroup parent=(ViewGroup)list.getParent();list.setVisibility(View.GONE);widget.findViewById(R.id.widget_empty).setVisibility(View.GONE);
+  LinearLayout rows=new LinearLayout(widget.getContext());rows.setOrientation(LinearLayout.VERTICAL);rows.setPadding(0,Math.round(3*widget.getResources().getDisplayMetrics().density),0,0);
+  String[][] data={{"Raj Fabrics","19 Oct","09:32 PM","PHONE-20261019-2132-74B","48 PCS Microfiber Napkin 14x21"},{"Mahesh Textiles","18 Oct","06:15 PM","ORD-EDIT-001","12 PCS Bath Towel 70x140 • 24 PCS Microfiber Napkin 14x21"}};
+  LayoutInflater in=LayoutInflater.from(widget.getContext());
+  for(int i=0;i<data.length;i++){View r=in.inflate(rowLayout,rows,false);((TextView)r.findViewById(R.id.widget_row_party)).setText(data[i][0]);((TextView)r.findViewById(R.id.widget_row_date)).setText(data[i][1]);((TextView)r.findViewById(R.id.widget_row_time)).setText(data[i][2]);((TextView)r.findViewById(R.id.widget_row_number)).setText(data[i][3]);((TextView)r.findViewById(R.id.widget_row_items)).setText(data[i][4]);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);if(i>0)lp.topMargin=Math.round(7*widget.getResources().getDisplayMetrics().density);rows.addView(r,lp);}
+  parent.addView(rows,new FrameLayout.LayoutParams(-1,-2));
+ }
+ private void openForm()throws Exception{Method m=OrdersActivity.class.getDeclaredMethod("openForm",JSONObject.class);m.setAccessible(true);m.invoke(rule.getActivity(),(Object)null);}
+
  @Test public void ordersRemainUsableOfflineAndDetailsPreviewRenders()throws Exception {
   Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();
   c.getSharedPreferences("identity",Context.MODE_PRIVATE).edit().clear().commit();
@@ -54,11 +65,13 @@ public class OrdersOfflineTest {
   assertTrue(finalOrder.optString("shareText").contains("Vijayalaxmi Textiles"));
 
   cancelDialog();
+  ui(()->{try{openForm();}catch(Exception e){throw new RuntimeException(e);}});
+  capture("42-order-form");
   ui(()->{
    OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(232,237,242));
    View widget=a.getLayoutInflater().inflate(R.layout.orders_widget,stage,false);
    ((TextView)widget.findViewById(R.id.widget_pending)).setText("2");((TextView)widget.findViewById(R.id.widget_mode)).setText("Saved on phone • 10:42 AM");
-   widget.findViewById(R.id.widget_orders_list).setVisibility(View.GONE);TextView empty=widget.findViewById(R.id.widget_empty);empty.setVisibility(View.VISIBLE);empty.setText("Raj Fabrics  •  48 PCS Microfiber Napkin 14x21\nMahesh Textiles  •  12 PCS Bath Towel 70x140");
+   sampleRows(widget,R.layout.orders_widget_row);
    int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(300*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(w,h,Gravity.CENTER));a.setContentView(stage);
   });
   capture("21-orders-widget");
@@ -82,7 +95,9 @@ capture("31-orders-widget-compact");
   capture("23-orders-dark");
   ui(()->{try{java.lang.reflect.Field f=OrdersActivity.class.getDeclaredField("dispatchedTab");f.setAccessible(true);f.setBoolean(rule.getActivity(),true);Method m=OrdersActivity.class.getDeclaredMethod("paintOrders");m.setAccessible(true);m.invoke(rule.getActivity());}catch(Exception e){throw new RuntimeException(e);}});
   capture("24-orders-dispatched-dark");
-  ui(()->{OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(15,22,29));View widget=a.getLayoutInflater().inflate(R.layout.orders_widget_dark,stage,false);((TextView)widget.findViewById(R.id.widget_pending)).setText("2");((TextView)widget.findViewById(R.id.widget_mode)).setText("Saved on phone • 10:42 AM");widget.findViewById(R.id.widget_orders_list).setVisibility(View.GONE);TextView empty=widget.findViewById(R.id.widget_empty);empty.setVisibility(View.VISIBLE);empty.setText("Raj Fabrics  •  48 PCS Microfiber Napkin 14x21\nMahesh Textiles  •  12 PCS Bath Towel 70x140");int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(300*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(w,h,Gravity.CENTER));a.setContentView(stage);});
+  ui(()->{try{openForm();}catch(Exception e){throw new RuntimeException(e);}});
+  capture("43-order-form-dark");
+  ui(()->{OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(15,22,29));View widget=a.getLayoutInflater().inflate(R.layout.orders_widget_dark,stage,false);((TextView)widget.findViewById(R.id.widget_pending)).setText("2");((TextView)widget.findViewById(R.id.widget_mode)).setText("Saved on phone • 10:42 AM");sampleRows(widget,R.layout.orders_widget_row_dark);int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(300*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(w,h,Gravity.CENTER));a.setContentView(stage);});
   capture("25-orders-widget-dark");
 ui(()->{OrdersActivity a=rule.getActivity();FrameLayout stage=new FrameLayout(a);stage.setBackgroundColor(Color.rgb(15,22,29));View widget=a.getLayoutInflater().inflate(R.layout.orders_widget_compact_dark,stage,false);((TextView)widget.findViewById(R.id.widget_pending)).setText("2");((TextView)widget.findViewById(R.id.widget_party1)).setText("Mahesh Textiles • 12 PCS Bath Towel 70x140");int w=Math.round(360*a.getResources().getDisplayMetrics().density),h=Math.round(150*a.getResources().getDisplayMetrics().density);stage.addView(widget,new FrameLayout.LayoutParams(w,h,Gravity.CENTER));a.setContentView(stage);});
 capture("32-orders-widget-compact-dark");

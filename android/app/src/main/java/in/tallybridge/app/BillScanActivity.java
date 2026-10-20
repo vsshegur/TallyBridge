@@ -118,16 +118,12 @@ public final class BillScanActivity extends Activity {
  // ------------------------------------------------------------------ screen
  private void build(){
   LinearLayout root=col();root.setBackgroundColor(BG);
-  ScrollView scroll=new ScrollView(this);body=col();body.setPadding(dp(18),dp(18),dp(18),dp(32));scroll.addView(body);
+  root.addView(ScreenHeader.bar(this,null,"Scan bill","Photograph the bill or pick a PDF. It goes to your PC, InvoiceTotally reads it, and you review it there before anything is posted to Tally.",NAVY,TEAL,MUTED));
+  ScrollView scroll=new ScrollView(this);body=col();body.setPadding(dp(18),dp(2),dp(18),dp(32));scroll.addView(body);
   root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
 
-  LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);
-  TextView back=txt("‹",30,NAVY);back.setPadding(0,0,dp(14),dp(2));back.setOnClickListener(v->finish());back.setContentDescription("Back");top.addView(back);
-  TextView title=txt("Purchase bill",26,NAVY);title.setTypeface(Typeface.DEFAULT_BOLD);top.addView(title);body.addView(top);
-  body.addView(txt("Photograph the bill or pick a PDF. It goes to your PC, InvoiceTotally reads it, and you review it there before it is posted to Tally.",13,MUTED),full(2));
-
-  body.addView(label("COMPANY"),full(16));
-  companySpin=new Spinner(this);companySpin.setBackground(shape(SURFACE,12));companySpin.setPadding(dp(8),dp(6),dp(8),dp(6));body.addView(companySpin,full(6));
+  body.addView(label("COMPANY"),full(6));
+  companySpin=new Spinner(this);ScreenHeader.spinner(companySpin,dark);body.addView(companySpin,full(6));
   fillCompanies();
 
   body.addView(label("BILL TYPE"),full(14));
