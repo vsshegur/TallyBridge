@@ -114,3 +114,19 @@ svg{display:block}
 .desktop-body .main{scrollbar-color:#31505d #0b1b25}
 .desktop-body .side-nav{scrollbar-color:#294451 transparent}
 @media(max-width:760px){.nav-group-label{padding-left:8px}.health-section{padding:12px}.health-section-head{align-items:flex-start}.health-section .health-grid{grid-template-columns:1fr}}
+
+/* 2.8.1 scrolling: the window itself never scrolls, so the menu and the page each scroll on their own.
+   Without a fixed row height the grid grew to the menu's full height and everything below the window edge was out of reach. */
+.desktop-body .admin-shell{height:100vh;height:100dvh;grid-template-rows:minmax(0,1fr);overflow:hidden}
+.desktop-body .sidebar{min-height:0;overflow:hidden}
+.desktop-body .side-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.desktop-body .sidebar-footer{flex:none}
+.desktop-body .main{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+/* Narrow windows stack the menu above the page; then the whole window scrolls normally. */
+@media(max-width:760px){
+ .desktop-body{overflow:auto;height:auto;min-height:100vh}
+ .desktop-body .admin-shell{display:block;height:auto;overflow:visible}
+ .desktop-body .sidebar{overflow:visible}
+ .desktop-body .side-nav{overflow:visible}
+ .desktop-body .main{overflow:visible}
+}

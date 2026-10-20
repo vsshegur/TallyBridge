@@ -105,7 +105,9 @@ jobs:
           test -n "$VERSION"
           TAG="preview-$VERSION"
           OUT=android/app/build/outputs/apk/release
-          if [ "$SIGNED" = true ]; then NAME="TallyBridge-$VERSION"; else NAME="TallyBridge-$VERSION-R8-optimized-unsigned"; fi
+          # The phone app keeps its own version (it may not change in a PC-only update); files are named after it.
+          AVERSION=$(sed -nE "s/.*versionName '([^']+)'.*/\1/p" android/app/build.gradle | head -1)
+          if [ "$SIGNED" = true ]; then NAME="TallyBridge-$AVERSION"; else NAME="TallyBridge-$AVERSION-R8-optimized-unsigned"; fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
               --title "TallyBridge $VERSION (preview builds)" \
@@ -114,7 +116,7 @@ jobs:
           gh release upload "$TAG" "$OUT/$NAME.apk" "$OUT/$NAME.sha256.txt" --repo "$GITHUB_REPOSITORY" --clobber
           if [ "$SIGNED" = true ]; then
             # A signed APK replaces the unsigned one, so there is only one file to install.
-            for old in "TallyBridge-$VERSION-R8-optimized-unsigned.apk" "TallyBridge-$VERSION-R8-optimized-unsigned.sha256.txt"; do
+            for old in "TallyBridge-$AVERSION-R8-optimized-unsigned.apk" "TallyBridge-$AVERSION-R8-optimized-unsigned.sha256.txt"; do
               gh release delete-asset "$TAG" "$old" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
             done
           fi
