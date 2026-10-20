@@ -67,7 +67,7 @@ public class DesignTest {
    call("renderHome");
    android.view.View root=rule.getActivity().getWindow().getDecorView();
    for(String section:SectionNav.LABELS)assertTrue("bottom bar shows "+section,hasText(root,section));
-   assertTrue(hasText(root,"Scan bill"));assertTrue(hasText(root,"YOUR PARTIES"));
+   assertTrue(hasText(root,"Voice order"));assertTrue(hasText(root,"YOUR PARTIES"));
    Field status=MainActivity.class.getDeclaredField("statusView");status.setAccessible(true);TextView statusText=(TextView)status.get(rule.getActivity());assertNotNull(statusText);assertTrue(statusText.getText().toString().startsWith("Connected"));assertFalse(statusText.getText().toString().contains("needs attention"));
   }catch(Exception e){throw new RuntimeException(e);}});
   capture("02-overview");

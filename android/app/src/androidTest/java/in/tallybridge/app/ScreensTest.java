@@ -22,7 +22,7 @@ import java.lang.reflect.Method;
 import static org.junit.Assert.*;
 
 /**
- * Light and dark screenshots of the screens opened from Home, More and widgets: Search, Customer, GSM calculator and Scan bill.
+ * Light and dark screenshots of the screens opened from Home, More and widgets: Search, Customer and GSM calculator.
  * Fixture data only; the PC address is unreachable on purpose, so each screen also proves it copes with the PC being off.
  */
 @RunWith(AndroidJUnit4.class)
