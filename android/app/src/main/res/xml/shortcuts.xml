@@ -9,10 +9,6 @@
         android:shortcutShortLabel="@string/shortcut_voice_short" android:shortcutLongLabel="@string/shortcut_voice_long">
         <intent android:action="in.tallybridge.app.ORDER_VOICE" android:targetPackage="in.tallybridge.app" android:targetClass="in.tallybridge.app.OrdersActivity" />
     </shortcut>
-    <shortcut android:shortcutId="scan_bill" android:enabled="true" android:icon="@drawable/shortcut_bill"
-        android:shortcutShortLabel="@string/shortcut_bill_short" android:shortcutLongLabel="@string/shortcut_bill_long">
-        <intent android:action="in.tallybridge.app.BILL_CAMERA" android:targetPackage="in.tallybridge.app" android:targetClass="in.tallybridge.app.BillScanActivity" />
-    </shortcut>
     <shortcut android:shortcutId="search" android:enabled="true" android:icon="@drawable/shortcut_search"
         android:shortcutShortLabel="@string/shortcut_search_short" android:shortcutLongLabel="@string/shortcut_search_long">
         <intent android:action="android.intent.action.VIEW" android:targetPackage="in.tallybridge.app" android:targetClass="in.tallybridge.app.UniversalSearchActivity" />

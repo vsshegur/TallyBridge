@@ -8,8 +8,6 @@
     <string name="widget_order_desc">One tap opens fast order entry. Works offline.</string>
     <string name="widget_voice_label">Voice order</string>
     <string name="widget_voice_desc">Speak an order, review it, then save.</string>
-    <string name="widget_bill_label">Scan bill</string>
-    <string name="widget_bill_desc">Opens the camera for a supplier bill and sends it to your PC.</string>
     <string name="widget_search_label">Search</string>
     <string name="widget_search_desc">Find customers, invoices, orders, items, GSTIN or mobile.</string>
     <string name="widget_proforma_label">Proforma</string>
@@ -20,8 +18,6 @@
     <string name="shortcut_order_long">New order</string>
     <string name="shortcut_voice_short">Voice order</string>
     <string name="shortcut_voice_long">Voice order</string>
-    <string name="shortcut_bill_short">Scan bill</string>
-    <string name="shortcut_bill_long">Scan purchase bill</string>
     <string name="shortcut_search_short">Search</string>
     <string name="shortcut_search_long">Search everything</string>
 </resources>

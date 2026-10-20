@@ -36,21 +36,6 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
-        <activity android:name=".BillScanActivity" android:exported="true"
-            android:label="Purchase bill (TallyBridge)" android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="image/*" />
-                <data android:mimeType="application/pdf" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="image/*" />
-                <data android:mimeType="application/pdf" />
-            </intent-filter>
-        </activity>
         <provider android:name=".CaptureProvider" android:authorities="in.tallybridge.app.capture"
             android:exported="false" android:grantUriPermissions="true" />
         <service android:name=".OrdersWidgetService" android:permission="android.permission.BIND_REMOTEVIEWS" android:exported="false" />
@@ -75,12 +60,6 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/quick_order_widget_info" />
-        </receiver>
-        <receiver android:name=".BillScanWidget" android:exported="false" android:label="@string/widget_bill_label">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/bill_scan_widget_info" />
         </receiver>
         <provider android:name=".PdfProvider" android:authorities="in.tallybridge.app.pdf"
             android:exported="false" android:grantUriPermissions="true" />

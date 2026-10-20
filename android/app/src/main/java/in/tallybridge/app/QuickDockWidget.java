@@ -26,7 +26,6 @@ public final class QuickDockWidget extends AppWidgetProvider {
   v.setOnClickPendingIntent(R.id.quick_dock_brand,open(c,7100+id,new Intent(c,MainActivity.class).setAction(MainActivity.ACTION_HOME)));
   v.setOnClickPendingIntent(R.id.quick_dock_order,open(c,7200+id,new Intent(c,OrdersActivity.class).setAction(OrdersActivity.ACTION_NEW)));
   v.setOnClickPendingIntent(R.id.quick_dock_voice,open(c,7250+id,new Intent(c,OrdersActivity.class).setAction(OrdersActivity.ACTION_VOICE)));
-  v.setOnClickPendingIntent(R.id.quick_dock_bill,open(c,7275+id,new Intent(c,BillScanActivity.class).setAction(BillScanActivity.ACTION_CAMERA)));
   v.setOnClickPendingIntent(R.id.quick_dock_search,open(c,7290+id,new Intent(c,UniversalSearchActivity.class)));
   if(full){
    v.setOnClickPendingIntent(R.id.quick_dock_proforma,open(c,7400+id,new Intent(c,MainActivity.class).setAction(MainActivity.ACTION_NEW_PROFORMA)));

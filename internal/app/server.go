@@ -38,8 +38,6 @@ type Server struct {
 	updateChecking  bool
 	diagMu          sync.Mutex
 	diagByCompany   map[string]DiagnosticContext
-	it              *ITConnector
-	bills           *BillQueue
 }
 
 func NewServer(base string) (*Server, error) {
@@ -57,8 +55,6 @@ func NewServer(base string) (*Server, error) {
 	}
 	s := &Server{store: st, cache: c, native: n, nonces: map[string]map[string]time.Time{}, diagByCompany: map[string]DiagnosticContext{}}
 	s.tally = NewTallyClient(st)
-	s.it = newITConnector(s, base)
-	s.bills = newBillQueue(s, base)
 	return s, nil
 }
 func (s *Server) Handler() http.Handler {
@@ -275,7 +271,7 @@ func (s *Server) handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 	if cfg.AutoUpdate {
 		s.maybeCheckUpdates()
 	}
-	jsonOut(w, map[string]any{"version": Version, "live": st, "settings": cfg, "devices": devs, "logs": s.tally.Logs(), "cache": s.cache.Stats(), "cachedCompanies": cc, "cachedCompaniesAt": at, "autoSync": s.autoSyncSnapshot(), "health": health, "update": s.updateSnapshot(), "itSignins": s.it.webPendingCount()})
+	jsonOut(w, map[string]any{"version": Version, "live": st, "settings": cfg, "devices": devs, "logs": s.tally.Logs(), "cache": s.cache.Stats(), "cachedCompanies": cc, "cachedCompaniesAt": at, "autoSync": s.autoSyncSnapshot(), "health": health, "update": s.updateSnapshot()})
 }
 func (s *Server) handleAdminProbe(w http.ResponseWriter, r *http.Request) {
 	st, e := s.probeLive()
@@ -1903,7 +1899,7 @@ func OpenDesktop(u string) error     { return openDesktop(u) }
 // DesktopHandler is setup only. The legacy web phone and mobile API are not published.
 // Files the desktop admin page loads (see web/admin.html).
 var desktopAssets = map[string]bool{"/assets/admin.js": true, "/assets/styles.css": true, "/assets/favicon.svg": true,
-	"/assets/operations.js": true, "/assets/invoices.js": true}
+	"/assets/operations.js": true}
 
 func (s *Server) DesktopHandler() http.Handler {
 	h := s.Handler()

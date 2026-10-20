@@ -1,6 +1,8 @@
 # TallyBridge
 
-**New in 2.9.0:** InvoiceTotally signs in with your Google account and each new browser is approved on this PC; Customers and Search removed from the PC menu — see [2.9.0](docs/UPDATE_2_9_0.md).
+**New in 2.10.0:** InvoiceTotally is now its own Windows app ([invoicetotally-desktop](https://github.com/vsshegur/invoicetotally-desktop)) that talks to Tally by itself, so TallyBridge no longer connects to it: the InvoiceTotally page, phone **Scan bill** and the posting path are removed — TallyBridge never writes to Tally — see [2.10.0](docs/UPDATE_2_10_0.md).
+
+**2.9.0:** InvoiceTotally signs in with your Google account and each new browser is approved on this PC; Customers and Search removed from the PC menu — see [2.9.0](docs/UPDATE_2_9_0.md).
 
 **2.8.1:** the PC control center scrolls properly on smaller screens — see [2.8.1](docs/UPDATE_2_8_1.md).
 
@@ -25,10 +27,9 @@ name and its payment-card signup are not required.
   PDF rendering and sharing. Accounting screens do not use a WebView.
 - Go Tally bridge with local desktop setup on 8765 and an isolated
   Android listener on 8766. Everything the phone can do is read-only.
-- Optional InvoiceTotally connection (Purchase bills): bills photographed on the
-  phone are read by InvoiceTotally and, once reviewed there, posted to Tally by
-  this PC. Posting is off until switched on and accepts only new vouchers and
-  masters for the expected company.
+- Strictly read-only: TallyBridge sends only Export requests to Tally and never
+  writes to it. (Invoices and bank statements go into Tally with the separate
+  InvoiceTotally for Windows app.)
 - Saved default PDF bank per company, reports and existing PDF engines.
 - Windows installer and Android preview APK built by GitHub Actions.
 

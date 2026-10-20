@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -178,8 +177,6 @@ func (s *Server) runAutoSync(company, reason string) {
 	}
 }
 func (s *Server) StartBackground() {
-	s.it.Start()
-	go s.bills.Run(context.Background())
 	go func() {
 		time.Sleep(4 * time.Second)
 		s.startAutoSync("", "startup")
