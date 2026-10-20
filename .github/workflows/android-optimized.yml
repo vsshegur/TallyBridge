@@ -85,7 +85,7 @@ jobs:
             # Refuse to publish an APK signed with any key other than the permanent one.
             APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
             "$APKSIGNER" verify --verbose --print-certs "$APK" | tee $OUT/SIGNATURE.txt
-            grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" $OUT/SIGNATURE.txt
+            grep -qE "Verified using v(2|3|3\.1) scheme \(APK Signature Scheme v[0-9.]+\): true" $OUT/SIGNATURE.txt  # minSdk 28: v3 alone is valid
             ACTUAL=$(sed -nE 's/^Signer #1 certificate SHA-1 digest: ([0-9a-f]+).*/\1/p' $OUT/SIGNATURE.txt | head -1)
             if [ "$ACTUAL" != "$TB_EXPECTED_SHA1" ]; then echo "::error::APK was signed with $ACTUAL, not the permanent TallyBridge key $TB_EXPECTED_SHA1"; exit 1; fi
             cp "$APK" "$OUT/TallyBridge-${EXPECTED_NAME}.apk"
